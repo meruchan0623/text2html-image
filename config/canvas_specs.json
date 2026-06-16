@@ -1,0 +1,7 @@
+{
+  "main_image": {"width": 1024, "height": 1280, "ratio": "4:5", "use": "主图"},
+  "detail_page": {"width": 1080, "height": 1440, "ratio": "3:4", "use": "详情页图"},
+  "ad_banner": {"width": 750, "height": 1000, "ratio": "3:4", "use": "广告图"},
+  "social_media": {"width": 1080, "height": 1080, "ratio": "1:1", "use": "社媒图"},
+  "story": {"width": 1080, "height": 1920, "ratio": "9:16", "use": "故事图"}
+}

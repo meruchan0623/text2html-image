@@ -1,0 +1,245 @@
+/* T01_price_type 主模板样式 */
+
+/* 基础重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* 海报容器 */
+.poster {
+    position: relative;
+    overflow: hidden;
+    font-family: 'Noto Sans SC', 'Arial', sans-serif;
+    background-color: #ffffff;
+}
+
+/* 背景层 */
+.background-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+.background-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 主体资产层 */
+.hero-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hero-image {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+}
+
+/* UI信息层 */
+.ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 50px;
+}
+
+/* 标题组件 */
+.title-block {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.main-title {
+    font-size: 48px;
+    font-weight: bold;
+    line-height: 1.2;
+    color: #333333;
+    margin-bottom: 10px;
+    max-width: 80%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.sub-title {
+    font-size: 36px;
+    font-weight: normal;
+    line-height: 1.3;
+    color: #666666;
+    max-width: 80%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* 价格组件 */
+.price-block {
+    text-align: center;
+    margin-bottom: 30px;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    border-radius: 10px;
+    display: inline-block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.currency {
+    font-size: 24px;
+    color: #e74c3c;
+    vertical-align: top;
+    margin-right: 5px;
+}
+
+.price {
+    font-size: 72px;
+    font-weight: bold;
+    color: #e74c3c;
+    line-height: 1;
+}
+
+.unit {
+    font-size: 24px;
+    color: #e74c3c;
+    vertical-align: bottom;
+    margin-left: 5px;
+}
+
+/* 卖点卡片组件 */
+.benefit-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.benefit-card {
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 15px 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+}
+
+.benefit-icon {
+    font-size: 24px;
+    color: #3498db;
+}
+
+.benefit-text {
+    font-size: 18px;
+    color: #333333;
+    line-height: 1.4;
+}
+
+/* CTA按钮组件 */
+.cta-button {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.cta-btn {
+    background-color: #e74c3c;
+    color: #ffffff;
+    border: none;
+    padding: 20px 60px;
+    font-size: 24px;
+    font-weight: bold;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    min-width: 300px;
+}
+
+.cta-btn:hover {
+    background-color: #c0392b;
+}
+
+/* 免责声明组件 */
+.disclaimer {
+    text-align: center;
+    padding: 10px;
+}
+
+.disclaimer p {
+    font-size: 14px;
+    color: #999999;
+    line-height: 1.5;
+    max-width: 80%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* 文案层 */
+.copy-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 4;
+    pointer-events: none;
+}
+
+/* 导出层 */
+.export-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* 响应式调整 */
+@media (max-width: 750px) {
+    .main-title {
+        font-size: 36px;
+    }
+    
+    .sub-title {
+        font-size: 28px;
+    }
+    
+    .price {
+        font-size: 56px;
+    }
+    
+    .cta-btn {
+        padding: 15px 40px;
+        font-size: 20px;
+        min-width: 250px;
+    }
+    
+    .benefit-card {
+        min-width: 150px;
+        padding: 10px 15px;
+    }
+    
+    .benefit-text {
+        font-size: 16px;
+    }
+}

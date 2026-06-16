@@ -1,0 +1,208 @@
+{
+  "workspace_root": "$DOCUMENTS/text2html-image",
+  "default_project_id": "default",
+  "project_directory_schema": {
+    "root_pattern": "projects/<project_id>",
+    "subproject_root_pattern": "projects/<project_id>/subprojects/<subproject_id>",
+    "project_id_format": "lowercase ascii kebab-case, max 20 chars",
+    "directories": [
+      "source",
+      "working",
+      "html",
+      "screenshots",
+      "scores",
+      "exports",
+      "reports"
+    ],
+    "manifest_file": "project-manifest.json"
+  },
+  "copy_image_review": {
+    "max_iterations": 6,
+    "passing_score": 90,
+    "screenshot_pattern": "round-NN.png",
+    "score_pattern": "round-NN.json",
+    "score_dimensions": [
+      "layout_score",
+      "typography_score",
+      "color_score",
+      "asset_score"
+    ],
+    "score_schema": {
+      "overall_score": "number 0-100",
+      "layout_score": "number 0-100",
+      "typography_score": "number 0-100",
+      "color_score": "number 0-100",
+      "asset_score": "number 0-100",
+      "issues": "array of {severity, area, observed, expected, fix_hint}"
+    }
+  },
+  "workflow_phases": [
+    {
+      "order": 1,
+      "id": "asset-preparation",
+      "name": "资产准备",
+      "owner_skill": "text2html-image",
+      "inputs": ["platform_spec", "sku_info", "source_assets", "brand_or_theme_color"],
+      "outputs": ["assets/metadata/asset_index.json", "asset_mapping.json", "color_palette", "svg_element_specs"],
+      "gate": "assets have declared source, license, dimensions, transparency, and usage_scene"
+    },
+    {
+      "order": 2,
+      "id": "layout-specification",
+      "name": "布局指定",
+      "owner_skill": "text2html-image",
+      "inputs": ["asset_index", "canvas_specs", "template_types"],
+      "outputs": ["layout.json", "template_id", "safe_area_assignments"],
+      "gate": "layout fits canvas, uses known components, and keeps copy/hero/price zones separate"
+    },
+    {
+      "order": 3,
+      "id": "detail-specification",
+      "name": "细节指定",
+      "owner_skill": "text2html-image",
+      "inputs": ["layout.json", "component_specs", "svg_element_specs"],
+      "outputs": ["template HTML/CSS", "component overrides", "detail_notes"],
+      "gate": "all visible details are represented as editable HTML/CSS/SVG, not flattened text images"
+    },
+    {
+      "order": 4,
+      "id": "detail-modification",
+      "name": "细节修改",
+      "owner_skill": "text2html-image",
+      "inputs": ["current HTML/CSS", "visual feedback", "detail_notes"],
+      "outputs": ["revision record", "updated HTML/CSS", "before_after notes"],
+      "gate": "each change is scoped, reversible, and tied to a concrete visual issue"
+    },
+    {
+      "order": 5,
+      "id": "layout-stability-review",
+      "name": "布局稳固性审核",
+      "owner_skill": "text2html-image",
+      "inputs": ["updated HTML/CSS", "layout.json", "canvas_specs"],
+      "outputs": ["qc report", "stability score", "fix list"],
+      "gate": "no scrollbars, no unreplaced tokens, no text overflow, and no critical missing assets"
+    },
+    {
+      "order": 6,
+      "id": "multilingual-localization",
+      "name": "多语言化",
+      "owner_skill": "text2html-image",
+      "inputs": ["approved layout", "copy_master", "language style rules"],
+      "outputs": ["localized HTML previews", "export manifest", "language consistency report"],
+      "gate": "each target language keeps structure, hierarchy, and CTA/price visibility consistent"
+    }
+  ],
+  "canvas_sizes": {
+    "main_image": {
+      "width": 1024,
+      "height": 1280,
+      "ratio": "4:5",
+      "description": "主图"
+    },
+    "detail_page": {
+      "width": 1080,
+      "height": 1440,
+      "ratio": "3:4",
+      "description": "详情页图"
+    },
+    "ad_banner": {
+      "width": 750,
+      "height": 1000,
+      "ratio": "3:4",
+      "description": "广告图"
+    },
+    "social_media": {
+      "width": 1080,
+      "height": 1080,
+      "ratio": "1:1",
+      "description": "社媒图"
+    },
+    "story": {
+      "width": 1080,
+      "height": 1920,
+      "ratio": "9:16",
+      "description": "故事图"
+    },
+    "carousel": {
+      "width": 1080,
+      "height": 1080,
+      "ratio": "1:1",
+      "description": "轮播图"
+    }
+  },
+  "languages": [
+    "en-US",
+    "ja-JP",
+    "ko-KR",
+    "zh-CN",
+    "zh-TW",
+    "de-DE",
+    "fr-FR",
+    "es-ES",
+    "pt-BR",
+    "it-IT",
+    "ru-RU",
+    "ar-SA",
+    "th-TH",
+    "vi-VN",
+    "id-ID",
+    "ms-MY",
+    "tr-TR",
+    "hi-IN",
+    "nl-NL",
+    "pl-PL",
+    "sv-SE",
+    "da-DK",
+    "fi-FI",
+    "nb-NO"
+  ],
+  "export_formats": [
+    "PNG",
+    "JPG",
+    "WebP"
+  ],
+  "quality_checks": [
+    "size",
+    "scrollbar",
+    "overflow",
+    "missing_images",
+    "fonts",
+    "colors",
+    "layout"
+  ],
+  "template_types": [
+    "T01_price_type",
+    "banner_zh_hkmo"
+  ],
+  "font_config": {
+    "primary_font": "Noto Sans SC",
+    "fallback_fonts": ["Arial", "Helvetica", "sans-serif"],
+    "language_fonts": {
+      "ja-JP": "Noto Sans JP",
+      "ko-KR": "Noto Sans KR",
+      "zh-CN": "Noto Sans SC",
+      "zh-TW": "Noto Sans TC"
+    },
+    "size_rules": {
+      "title": {"min": 36, "max": 72, "default": 48},
+      "subtitle": {"min": 24, "max": 48, "default": 36},
+      "body": {"min": 18, "max": 36, "default": 24},
+      "caption": {"min": 14, "max": 24, "default": 18}
+    }
+  },
+  "safe_areas": {
+    "title": {"top": 50, "left": 50, "right": 50, "bottom": 0},
+    "price": {"top": 0, "left": 50, "right": 50, "bottom": 50},
+    "cta": {"top": 0, "left": 100, "right": 100, "bottom": 100}
+  },
+  "export_settings": {
+    "format": "PNG",
+    "quality": 90,
+    "compression": 6,
+    "transparent_background": false,
+    "device_scale_factor": 1,
+    "parallel_exports": 4,
+    "retry_count": 3,
+    "timeout": 30000
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "text2html-image",
+  "version": "1.0.0",
+  "description": "跨境电商图片生产工作流 Skill 系列，基于 HTML/CSS 的电商图片生产工作流，支持多语言版本批量生成。",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "project:init": "node scripts/project-init.js",
+    "build": "node scripts/build.js",
+    "quality-check": "node scripts/quality-check.js",
+    "review:score": "node scripts/review-score.js",
+    "batch-export": "node scripts/batch-export.js",
+    "test": "node scripts/test.js"
+  },
+  "keywords": [
+    "ecommerce",
+    "image-generation",
+    "html-css",
+    "multilingual",
+    "workflow"
+  ],
+  "author": "Tashima Meru",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

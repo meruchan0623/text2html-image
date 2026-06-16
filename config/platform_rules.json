@@ -1,0 +1,16 @@
+{
+  "default": {
+    "export_formats": ["PNG", "JPG", "WebP"],
+    "max_file_size": "2MB",
+    "safe_area_policy": "Keep title, price, CTA, and legal copy inside configured safe areas.",
+    "asset_policy": "Background and decorative assets must not contain flattened text."
+  },
+  "shopee": {
+    "preferred_canvas": "main_image",
+    "export_format": "JPG"
+  },
+  "lazada": {
+    "preferred_canvas": "detail_page",
+    "export_format": "PNG"
+  }
+}

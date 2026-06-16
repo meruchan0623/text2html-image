@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="master.css">
+</head>
+<body>
+  <main class="poster {{lang_class}}" style="width: {{canvas_width}}px; height: {{canvas_height}}px;" aria-label="{{title}}">
+    <div class="poster-bg"></div>
+
+    <section class="map-layer" aria-hidden="true">
+      <svg class="europe-map" viewBox="0 0 1000 830" role="img" aria-label="歐洲覆蓋地圖">
+        <g class="map-shapes">
+          <path class="country-blue island" d="M145 84l57-19 51 15 35 29-12 43-61 23-72-15-30-39z"/>
+          <path class="country-orange ireland" d="M207 396l43-31 48 17 23 58-34 49-65-6-38-45z"/>
+          <path class="country-orange uk" d="M296 310l58 24 34 75-32 100-92 10-37-70 28-58-20-44z"/>
+          <path class="country-tan norway" d="M507 25l58 43-39 120 26 91-67 99-48-62 22-132-26-90z"/>
+          <path class="country-blue sweden" d="M571 45l92 13 53 79-30 130-66 124-75-59 26-110-31-89z"/>
+          <path class="country-orange finland" d="M696 62l88-14 82 48-24 151-105 52-49-65 27-83z"/>
+          <path class="country-tan estonia" d="M781 312l80-5 18 33-60 29-47-18z"/>
+          <path class="country-orange latvia" d="M772 364l96-20 32 47-86 31-55-21z"/>
+          <path class="country-blue lithuania" d="M763 416l94-12 31 51-77 41-65-32z"/>
+          <path class="country-teal denmark" d="M540 379l60-28 47 30-33 46-67 7z"/>
+          <path class="country-blue france" d="M349 518l131-51 111 53 19 111-68 84-135-7-84-90z"/>
+          <path class="country-tan germany" d="M539 444l137-24 73 84-35 116-132 22-80-75z"/>
+          <path class="country-orange switzerland" d="M529 628l72-13 34 38-43 38-77-10z"/>
+          <path class="country-blue austria" d="M610 641l131-14 62 43-49 40-143-10z"/>
+          <path class="country-teal italy" d="M584 695l76 17 28 98 73 58-39 36-91-80-71 10-33-53 61-36z"/>
+          <path class="country-teal czech" d="M669 563l105-19 56 44-45 50-108-12z"/>
+          <path class="country-orange poland" d="M751 467l135-34 98 72-18 121-143 13-64-62z"/>
+          <path class="country-teal hungary" d="M774 637l109 1 40 51-58 49-111-24z"/>
+          <path class="country-orange romania" d="M884 648l129-28 97 69-29 115-143 23-77-83z"/>
+          <path class="country-teal bulgaria" d="M921 789l139-3 39 45-70 53-127-22z"/>
+          <path class="country-blue greece" d="M877 859l93 37 53 78-54 52-84-55-77-15 29-68z"/>
+          <path class="country-tan spain" d="M154 686l151-50 138 61 20 126-96 86-178-13-69-102z"/>
+          <path class="country-tan portugal" d="M95 718l60-20 28 185-67 6-36-88z"/>
+          <path class="country-tan turkey" d="M966 731l260-22 133 76-60 104-265 33-116-70z"/>
+          <path class="country-orange cyprus" d="M1062 980l63-8 27 19-48 20-48-8z"/>
+          <path class="country-tan belarus" d="M875 452l144-7 92 62-26 105-128 8 24-112z"/>
+          <path class="country-blue-2 ukraine" d="M956 559l212-14 136 78-40 116-179 40 24-93-99-72z"/>
+          <path class="country-orange croatia" d="M735 694l90 23 12 41-114-18-68-33z"/>
+          <path class="country-teal slovenia" d="M687 676l63 4 17 30-66 11-45-21z"/>
+          <path class="country-blue balkan" d="M787 731l98 29 37 70-70 39-85-62z"/>
+          <path class="country-teal corsica" d="M531 777l37 12 5 59-33 20-23-39z"/>
+          <path class="country-teal sardinia" d="M562 854l53 27 11 75-43 32-47-42z"/>
+          <path class="country-teal sicily" d="M694 938l91 18 33 30-70 27-81-21z"/>
+          <path class="country-blue north-sea" d="M416 388l42-23 44 33-36 48-46-11z"/>
+        </g>
+      </svg>
+    </section>
+
+    <section class="map-labels" aria-label="國家名稱">
+      <span class="map-label label-md" style="left: 156px; top: 119px;">冰島</span>
+      <span class="map-label label-sm" style="left: 204px; top: 436px;">愛爾蘭</span>
+      <span class="map-label label-lg" style="left: 292px; top: 466px;">英國</span>
+      <span class="map-label label-md" style="left: 459px; top: 281px;">挪威</span>
+      <span class="map-label label-lg" style="left: 531px; top: 266px;">瑞典</span>
+      <span class="map-label label-lg" style="left: 651px; top: 188px;">芬蘭</span>
+      <span class="map-label label-xs" style="left: 696px; top: 332px;">愛沙尼亞</span>
+      <span class="map-label label-sm" style="left: 704px; top: 383px;">拉脫維亞</span>
+      <span class="map-label label-md" style="left: 715px; top: 437px;">立陶宛</span>
+      <span class="map-label label-sm" style="left: 496px; top: 365px;">丹麥</span>
+      <span class="map-label label-lg" style="left: 359px; top: 603px;">法國</span>
+      <span class="map-label label-lg" style="left: 501px; top: 520px;">德國</span>
+      <span class="map-label label-sm" style="left: 485px; top: 653px;">瑞士</span>
+      <span class="map-label label-xs" style="left: 590px; top: 694px;">奧地利</span>
+      <span class="map-label label-md" style="left: 555px; top: 779px;">意大利</span>
+      <span class="map-label label-md" style="left: 627px; top: 563px;">捷克</span>
+      <span class="map-label label-lg" style="left: 744px; top: 477px;">波蘭</span>
+      <span class="map-label label-md" style="left: 722px; top: 625px;">匈牙利</span>
+      <span class="map-label label-lg" style="left: 848px; top: 616px;">羅馬尼亞</span>
+      <span class="map-label label-md" style="left: 837px; top: 752px;">保加利亞</span>
+      <span class="map-label label-md" style="left: 770px; top: 850px;">希臘</span>
+      <span class="map-label label-lg" style="left: 218px; top: 753px;">西班牙</span>
+      <span class="map-label label-md label-portugal" style="left: 119px; top: 726px;">葡萄牙</span>
+      <span class="map-label label-lg" style="left: 902px; top: 727px;">土耳其</span>
+      <span class="map-label label-sm label-cyprus" style="left: 888px; top: 850px;">塞浦路斯</span>
+      <span class="map-label label-xs" style="left: 596px; top: 655px;">斯洛維尼亞</span>
+      <span class="map-label label-xs" style="left: 643px; top: 671px;">克羅地亞</span>
+    </section>
+
+    <section class="globe-layer" aria-hidden="true">
+      <div class="globe-circle"></div>
+      <svg class="world-texture" viewBox="0 0 1000 290">
+        <path d="M85 197c45-37 96-47 152-30 35 11 72 10 109-2 66-20 123-2 166 47-81-14-146-6-194 25-54 35-132 23-233-40z"/>
+        <path d="M624 128c42-12 84-11 126 3 59 20 112 19 159-3 43-20 83-16 121 13-49 3-91 21-125 53-38 35-91 42-161 20-48-15-88-44-120-86z"/>
+        <path d="M430 230c42-10 83-8 123 6 36 13 75 11 117-7-39 30-84 45-137 44-45-1-79-15-103-43z"/>
+      </svg>
+    </section>
+
+    <section class="landmarks-layer" aria-label="歐洲地標剪影">
+      <svg class="landmarks-svg" viewBox="0 0 820 245" role="img">
+        <g fill="#E38A4E">
+          <path d="M0 207l139-54 43 76H0z"/>
+          <path d="M12 152c36-44 96-56 143-24l18 93H24z" opacity=".55"/>
+          <rect x="21" y="158" width="24" height="47" rx="12"/>
+          <rect x="58" y="146" width="24" height="59" rx="12"/>
+          <rect x="98" y="146" width="24" height="59" rx="12"/>
+          <rect x="136" y="163" width="20" height="42" rx="10"/>
+        </g>
+        <g fill="#32989E">
+          <path d="M168 223l47-24-46-150-20 11z"/>
+          <path d="M144 62l23-39 22 28-20 9z"/>
+          <rect x="160" y="62" width="31" height="128" transform="rotate(-15 175 126)"/>
+          <circle cx="173" cy="101" r="13" fill="#FDF2E3"/>
+          <path d="M157 133l34-9" stroke="#FDF2E3" stroke-width="5"/>
+        </g>
+        <g fill="#F8C75E" opacity=".85">
+          <path d="M235 229l87-139 58 139z"/>
+          <path d="M322 90l31 139h-31z" fill="#F3B642"/>
+        </g>
+        <g fill="#32989E">
+          <path d="M360 219l55-24-28-113-33 14z"/>
+          <circle cx="374" cy="70" r="14"/>
+          <path d="M348 90l20-57 16 51z"/>
+          <path d="M383 77l58 50-18 15-44-33z"/>
+          <path d="M356 75l-26 71 18 6 22-53z"/>
+          <path d="M361 52l6-32 9 31 16-27 2 34 26-17-16 29z"/>
+        </g>
+        <g fill="#DF7D32">
+          <path d="M438 215l113-37 1 58H438z"/>
+          <rect x="463" y="88" width="55" height="105"/>
+          <path d="M454 88l37-63 35 63z"/>
+          <circle cx="491" cy="126" r="17" fill="#FDF2E3" opacity=".75"/>
+          <path d="M488 22l5-22 8 22z"/>
+          <path d="M438 147h113v20H438z" opacity=".7"/>
+        </g>
+        <g fill="#32989E">
+          <rect x="570" y="104" width="117" height="89"/>
+          <path d="M558 104h142l-18-28H576z"/>
+          <path d="M602 193v-39c0-29 50-29 50 0v39z" fill="#FDF2E3"/>
+          <rect x="584" y="119" width="14" height="74" fill="#FDF2E3" opacity=".75"/>
+          <rect x="660" y="119" width="14" height="74" fill="#FDF2E3" opacity=".75"/>
+        </g>
+        <g fill="#32989E">
+          <path d="M713 218l56-205 58 205h-27l-32-87-31 87z"/>
+          <path d="M737 133h61v12h-61z" fill="#FDF2E3" opacity=".65"/>
+          <path d="M726 178h87v12h-87z" fill="#FDF2E3" opacity=".65"/>
+          <path d="M756 73h27v11h-27z" fill="#FDF2E3" opacity=".65"/>
+        </g>
+        <g fill="#64ACB0">
+          <path d="M666 223h174v-88H666z"/>
+          <path d="M642 135h220l-30-35H672z"/>
+          <rect x="688" y="151" width="17" height="72" fill="#FDF2E3" opacity=".7"/>
+          <rect x="724" y="151" width="17" height="72" fill="#FDF2E3" opacity=".7"/>
+          <rect x="760" y="151" width="17" height="72" fill="#FDF2E3" opacity=".7"/>
+          <rect x="796" y="151" width="17" height="72" fill="#FDF2E3" opacity=".7"/>
+          <path d="M714 92h75l-16-20h-43z"/>
+        </g>
+      </svg>
+    </section>
+
+    <svg class="arc-path" viewBox="0 0 1000 1263" aria-hidden="true">
+      <path d="M38 1260C211 1050 500 955 920 959" fill="none" stroke="#415BA8" stroke-width="8"/>
+    </svg>
+
+    <svg class="plane" viewBox="0 0 190 110" aria-hidden="true">
+      <path d="M10 64l167-43c9-2 16 0 18 5 2 6-3 11-13 13l-55 12 27 40-18 5-48-35-39 8 12 23-15 4-24-22-27 5z" fill="currentColor"/>
+    </svg>
+
+    <div class="title-pill">{{title}}</div>
+  </main>
+</body>
+</html>
