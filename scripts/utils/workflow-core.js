@@ -48,6 +48,8 @@ function getUserDocumentsDir() {
 
 function expandHome(inputPath) {
   if (!inputPath) return inputPath;
+  if (inputPath === '$REPO') return ROOT;
+  if (inputPath.startsWith('$REPO/')) return path.join(ROOT, inputPath.slice('$REPO/'.length));
   if (inputPath === '$DOCUMENTS') return getUserDocumentsDir();
   if (inputPath.startsWith('$DOCUMENTS/')) return path.join(getUserDocumentsDir(), inputPath.slice('$DOCUMENTS/'.length));
   if (inputPath === '~') return os.homedir();
@@ -76,16 +78,17 @@ function getProjectPaths(projectId, config = loadConfig(), options = {}) {
   const safeProjectId = sanitizeProjectId(projectId || config.default_project_id || 'default');
   const safeSubprojectId = options.subprojectId ? sanitizeProjectId(options.subprojectId, '') : '';
   const workspaceRoot = getWorkspaceRoot(config);
-  const projectRoot = path.join(workspaceRoot, 'projects', safeProjectId);
-  const activeRoot = safeSubprojectId ? path.join(projectRoot, 'subprojects', safeSubprojectId) : projectRoot;
+  const projectRoot = path.join(workspaceRoot, safeProjectId);
+  const activeRoot = safeSubprojectId ? path.join(projectRoot, safeSubprojectId) : projectRoot;
   const paths = {
     project_id: safeProjectId,
     subproject_id: safeSubprojectId || undefined,
     workspace_root: workspaceRoot,
     project_root: projectRoot,
     root: activeRoot,
-    manifest: path.join(activeRoot, config.project_directory_schema?.manifest_file || 'project-manifest.json'),
   };
+  const manifestFile = config.project_directory_schema?.manifest_file;
+  if (manifestFile) paths.manifest = path.join(activeRoot, manifestFile);
   for (const dir of config.project_directory_schema?.directories || PROJECT_DIRS) {
     paths[dir] = path.join(activeRoot, dir);
   }
@@ -100,7 +103,7 @@ function createProjectWorkspace(projectId, options = {}) {
     fs.mkdirSync(paths[dir], { recursive: true });
   }
 
-  if (!fs.existsSync(paths.manifest) || options.refreshManifest) {
+  if (paths.manifest && (!fs.existsSync(paths.manifest) || options.refreshManifest)) {
     writeJson(paths.manifest, {
       project_id: paths.project_id,
       subproject_id: paths.subproject_id,
@@ -197,6 +200,7 @@ function renderTemplate(template, row, outputDir, projectPaths) {
   const benefits = buildBenefits(row);
   const patchAssets = buildPatchAssets(row);
   const values = {
+    ...row,
     lang: row.lang,
     lang_class: langClass(row.lang),
     canvas_width: row.canvas_w,
@@ -222,7 +226,7 @@ function renderTemplate(template, row, outputDir, projectPaths) {
       .join('')
   );
 
-  html = html.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_match, key) => escapeHtml(values[key] ?? ''));
+  html = html.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_match, key) => escapeHtml(values[key] ?? '').replace(/\|/g, '\n'));
   return html;
 }
 

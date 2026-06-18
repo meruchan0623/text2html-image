@@ -13,6 +13,33 @@ Produce editable source first. Text, price, CTA, labels, and legal copy must rem
 
 Generated previews must be 静态 `index.html` plus CSS and assets. Do not add `<script>`, frontend state machines, debug panels, browser automation code, or generated control pages unless the user explicitly asks for an interactive prototype.
 
+Before coding a complex image, decide layer ownership:
+
+- `reference image`: visual target only; do not place it in the page unless the user explicitly approves it as a base asset.
+- `base image layer`: complex non-editable visuals such as maps, landmarks, people, dense illustrations, or textured backgrounds.
+- `editable text layer`: all user-facing copy, labels, prices, CTAs, legal text, and translatable words.
+- `editable vector layer`: simple shapes, icons, borders, pills, progress rings, and other elements that benefit from CSS/SVG editing.
+- `debug/report layer`: coordinate reports, recognition overlays, score JSON, and screenshots; never ship these as visible page UI.
+
+For complex maps, landmarks, illustrated backgrounds, or dense visual assets, prefer `base image + editable HTML/SVG overlay` unless the user explicitly asks for full vector recreation.
+
+## Text Editability Contract
+
+Before completion, verify that required text is real editable DOM text:
+
+- Required text is not baked into a raster image.
+- Required text is not converted into SVG path outlines.
+- Required text is not drawn on a canvas.
+- Required text can be selected in the rendered page.
+- Localizable text has stable metadata such as `data-i18n-key`.
+- Map, region, SKU, or repeated labels have stable business keys such as `data-country-code`, `data-region-code`, or `data-sku`.
+
+For map labels, prefer this pattern:
+
+```html
+<span class="map-label" data-country-code="FR" data-i18n-key="country.fr">法國</span>
+```
+
 ## Fast Path Default
 
 For ordinary requests like creating, recreating, or editing one poster/banner, avoid the full six-stage setup. Read only the minimum working files:
@@ -25,19 +52,23 @@ Then build the preview with `npm run build -- --project <project-id>`. Run QC on
 
 ## Project Workspace
 
-Runtime files live outside the repo in the current user's Documents folder:
+Runtime files live outside the repo in the current user's Documents folder, grouped directly by image project:
 
 ```text
-<Documents>/text2html-image/projects/<project-id>/
-<Documents>/text2html-image/projects/<project-id>/subprojects/<subproject-id>/
+<Documents>/text2html-image-project/<project-id>/
+<Documents>/text2html-image-project/<project-id>/<subproject-id>/
 ├── source/       原始素材和参考图
 ├── working/      中间文件、草稿、辅助数据
 ├── html/         可编辑 HTML/CSS 预览
 ├── screenshots/  浏览器截图
 ├── scores/       抄图/复刻每轮评分 JSON
-├── exports/      最终导出 manifest 和图片目标
+├── exports/      最终导出图片目标
 └── reports/      build、QC、汇总报告
 ```
+
+Image project folders must stay shallow and self-contained. Do not place repo configuration, skill files, package files, or global manifests inside image project folders. Keep generator runtime files such as `workflow.config.json`, `package.json`, `scripts/`, `templates/`, and skill source files in the repo only.
+
+Do not generate `project-manifest.json` inside image project folders. If a command needs structured output, write task-specific JSON under `reports/`, `scores/`, or `exports/`.
 
 Default project id is `default`. Prefer an explicit English kebab-case project id. Project and subproject ids are sanitized to lowercase ASCII kebab-case and capped at 20 characters.
 
@@ -50,6 +81,52 @@ Use `--subproject <subproject-id>` when one user job contains multiple page-leve
 - Localized variants use `index.<lang>.html`, for example `index.zh-cn.html`, `index.en-us.html`, `index.ja-jp.html`.
 - Prefer an explicit `html_group` field in `data/copy_master.json`; otherwise the script infers one from output/template fields.
 - Do not overwrite the only baseline during translation. Keep the canonical HTML and emit separate localized files.
+
+## Map + Table Poster Pitfalls
+
+Use these rules for coverage posters that combine a background map with editable HTML tables, especially multilingual eSIM region maps.
+
+- Decide the source of truth before editing. If the user asks to directly tune generated `html/<html-group>/index*.html`, do not run `npm run build` again until the direct edits are either accepted and backported to templates or intentionally discarded. A rebuild can overwrite generated HTML/CSS changes.
+- Keep a clear split between template source and generated workspace. Template fixes belong in `templates/<template_id>/`; emergency visual fixes can be made in the generated `html/<html-group>/` files, but then either sync the same change to every localized `index.<lang>.html` or document that only the canonical preview was edited.
+- For multilingual groups, a shared `master.css` does not update per-language asset references. If a map image changes in `index.html`, also grep and replace all `index.*.html` variants before exporting.
+- When left and right tables have different row counts, define the row height from the taller table container. For example, set `--coverage-table-height`, derive `--coverage-row-height: calc(var(--coverage-table-height) / 10)`, make the left table use `repeat(10, minmax(0, 1fr))`, and make the right table use the same row height for its 9 rows. Do not let each table auto-size independently.
+- Put map imagery in a deterministic layer below the table and above the card surface. A common stack is card background, map `z-index: 2`, title/table/notice `z-index: 3`, with `isolation: isolate` on the card when blending or transparency could leak.
+- Prefer a real transparent PNG for map backgrounds. Do not rely on `mix-blend-mode`, heavy CSS filters, or dark full-rectangle screenshots to simulate transparency; they can wash out text, pollute borders, and make exports differ across browsers.
+- Center map assets with `left: 50%; top: ...; transform: translate(-50%, -50%)` when the map must align to a table area. Size the map against the table container, not the whole canvas, when the design intent is "behind the table".
+- Table borders and map borders need separate tuning. If the map is only a faint context layer, its outline should be visible enough to read as a map but never compete with grid lines or row text.
+- CSS specificity can silently break language-specific fixes. When a generic language selector such as `.ja .row strong` overrides a special country rule, increase the special rule specificity, for example `.ja .row [data-country-code="CD"]`.
+- Long country names should be handled per language and per country, not by globally shrinking all rows. Keep normal countries at the base size, then add narrow exceptions such as `[data-country-code="CD"]`.
+- Chinese variants may need short operational names instead of literal long country names. If the approved copy is `民主剛果` / `民主刚果`, keep it as text data and keep the same row alignment as other countries.
+- Font choice is part of layout, not a cosmetic afterthought. Chinese variants should keep the approved CJK stack, Thai may need a Thai UI font and larger size, Japanese often needs lower weight, and English carrier text should stay at the intended medium weight.
+- When Figma is available, extract numeric frame metrics instead of matching by eye: canvas size, card x/y/w/h, title x/y/font/line-height, table x/y/w/h, row height, badge size, map x/y/w/h, color tokens, and opacity. Use those numbers as CSS constraints, then visually check exported PNGs.
+- If the in-app browser refuses a `file://` URL because of browser policy, do not treat that as a page failure and do not keep retrying. Use static DOM checks and direct Chrome headless screenshots as the verification fallback.
+- `npm run batch-export` may be report-oriented depending on the repo state. If actual PNG files are required and the script does not write them, export with Chrome headless against the generated HTML files.
+- For higher-resolution export, preserve the CSS layout viewport and increase device scale factor. For a 1404 x 1120 canvas, use `--window-size=1404,1120 --force-device-scale-factor=2` to produce 2808 x 2240 without changing layout.
+- After direct workspace edits, export from the generated HTML paths only. Do not rebuild first unless the goal is to test template regeneration.
+
+## Multilingual Copy-Recreation Pipeline Pitfalls
+
+Use these rules when opening a full multilingual copy-recreation pipeline from reference images into multiple editable HTML files and PNG exports.
+
+- Verify the reference canvas from the actual image dimensions before choosing a target size. Do not assume platform defaults such as 1600 x 1200 when the reference layout is 1404 x 1120.
+- If a template needs many custom copy fields, confirm the renderer supports arbitrary row fields before designing the template. If it only supports a fixed schema, make the smallest compatible renderer change so country names, carriers, and language-specific fields stay in `copy_master` instead of being hard-coded.
+- Treat `html_group` as the contract for batch multilingual output. All localized pages for one visual should land under one `html/<html-group>/` directory with one shared CSS file and stable `index.<lang>.html` names.
+- Build scripts may render old sample rows in addition to the active project rows. When that happens, scope review, QC interpretation, export, and final delivery to the intended `html_group` rather than every preview printed by `npm run build`.
+- Do not assume `npm run batch-export` writes PNG files. Check what it actually produces. If it only writes a manifest/report, use a local export helper or Chrome headless screenshots for real image output.
+- Playwright being installed does not mean its browser binary is available. If Playwright fails because the cached Chromium executable is missing, prefer an installed system browser such as Google Chrome or Microsoft Edge before changing HTML/CSS.
+- Keep one-off export helpers outside shared repo scripts unless the behavior is generally useful. A temporary helper can live in the task workspace `work/`, while durable export behavior should be promoted intentionally later.
+- Always run both page-level and cell-level overflow checks for dense multilingual tables. A page can have no scrollbars while individual cells still overflow their columns.
+- For local cell overflow detection, compare the text element bounding box with its parent cell, not only `document.scrollWidth` or page scrollbars.
+- Do not rely on `scrollHeight / lineHeight` to count visual lines in flex table cells; it can misreport centered single-line flex content. Use `Range.getClientRects()` or explicit span counts when checking real line breaks.
+- For long country names, decide early between single-line shrinking and semantic line breaks. Switching late can leave conflicting CSS rules, over-small fonts, or hidden overflow.
+- Do not put raw `<br>` in copy data if the renderer escapes HTML. Either add safe structured fields such as `country_cd_line1`, `country_cd_line2`, `country_cd_line3`, or implement a narrow safe token transform that does not allow arbitrary HTML.
+- A newline character inside a flex item may still render as one visual line. If semantic line breaks must be guaranteed, render explicit child spans and style the country cell as a vertical flex column.
+- Semantic line breaks are language-specific. Chinese, Japanese, and Korean may need two segments; Thai may need three shorter segments with its own line-height; English and Russian may remain single-line or use different abbreviations.
+- Avoid globally shrinking all country names to solve one long label. Keep the base language size readable, then add per-language/per-country exceptions or explicit semantic segments.
+- Map color tweaks through CSS filters can be iterative and unstable. Record whether the desired direction is "more blue", "lighter", "closer to 4G/5G badge", or "less dominant", then verify against exports rather than filter values alone.
+- When syncing final deliverables to an `outputs/` folder, make the HTML self-contained for preview. Copy required assets next to the HTML or rewrite asset paths so the output directory can be opened independently from the project workspace.
+- After every rebuild that changes HTML structure, resync the latest HTML, CSS, assets, and export reports to the deliverable folder. A stale copied HTML folder can make final outputs disagree with project previews.
+- Report DOM contracts along with images: canvas size, script count, image count, i18n node count, business key count, scrollbar status, and any language-specific exceptions. These checks catch regressions that visual review can miss.
 
 ## Escalation Triggers
 
@@ -72,7 +149,7 @@ Reference paths are relative to this skill directory, not the caller's current w
 | 3. 细节指定 | editable HTML/CSS/SVG details |
 | 4. 细节修改 | scoped revision record and updated source |
 | 5. 布局稳固性审核 | QC report, stability score, fix list |
-| 6. 多语言化 | localized previews and export manifest |
+| 6. 多语言化 | localized previews and export report |
 
 Reference routing:
 
@@ -104,6 +181,8 @@ Inputs:
 - target canvas width and height
 - optional style, copy, brand, asset, or text-editability constraints
 
+Before the loop, decide which parts are bitmap base assets and which parts must remain editable HTML/SVG. If text editability is required, never use OCR output as final rendered pixels. If a clean no-text base image is available, prefer base image plus editable text overlay.
+
 Loop:
 
 1. Build or revise editable HTML/CSS/SVG. Keep text, price, CTA, labels, and legal copy editable unless the user explicitly accepts bitmap text.
@@ -125,8 +204,8 @@ Score report schema:
   "subproject_id": "page-master-a",
   "round": 1,
   "generated_at": "2026-06-16T00:00:00.000Z",
-  "source_image": "<Documents>/text2html-image/projects/travel-esim-banner/subprojects/page-master-a/source/reference.png",
-  "screenshot": "<Documents>/text2html-image/projects/travel-esim-banner/subprojects/page-master-a/screenshots/round-01.png",
+  "source_image": "<Documents>/text2html-image-project/travel-esim-banner/page-master-a/source/reference.png",
+  "screenshot": "<Documents>/text2html-image-project/travel-esim-banner/page-master-a/screenshots/round-01.png",
   "overall_score": 90,
   "layout_score": 90,
   "typography_score": 90,
@@ -146,11 +225,69 @@ Score report schema:
 
 Browser/multimodal boundary:
 
-- Repo scripts create project folders, HTML previews, manifest files, and JSON report structure.
+- Repo scripts create project folders, HTML previews, and JSON report structure.
 - Codex Browser performs visual opening, screenshots, and real layout inspection.
 - 多模态读取 happens in Codex against the saved browser screenshot; do not hard-code Codex Browser APIs inside repo scripts.
 - Reuse the generated `file_url` and 刷新当前 Codex Browser 页面 between rebuilds.
 - Every build round should surface the local HTML path and `file_url` before screenshot review.
+- If Codex Browser cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
+
+## Map Label Placement
+
+For geographic or region-label images, do not rely on bitmap color segmentation as semantic truth. Use OpenCV/Pillow only for visual hints such as color regions, centroids, available width, and debug overlays.
+
+Prefer GIS/vector boundaries, a user-provided label table, or another structured truth layer for country/region identity. For artistic maps, calibrate the truth layer to the poster with stable control points.
+
+Choose label anchors by scoring:
+
+- Whether the label box fits inside the target region.
+- Available horizontal width around the anchor.
+- Distance from region boundaries.
+- Distance from the visual centroid or intended visual body.
+- Overlap with existing labels.
+- Font size readability.
+- Explicit force-label or omit rules.
+
+For narrow or irregular countries/regions, scan horizontal slices and place labels in the widest readable area instead of blindly using the geometric center.
+
+Tiny or dense regions may be omitted when labels cannot fit. Write the reason to the coordinate report, for example `omitted_micro_country`, `omitted_too_small_to_fit`, `omitted_label_box_outside_polygon`, or `omitted_no_geometry`.
+
+Recommended map-label artifacts:
+
+```text
+index.html
+style.css
+assets/base-map.png
+label-coordinate-report.json
+label-coordinate-debug.png
+optional: gis-calibration-report.json
+optional: gis-boundary-debug.svg
+optional: gis-boundary-debug.png
+preview.png
+```
+
+## Completion Contract
+
+Before claiming a complex image HTML conversion is complete, report or verify:
+
+- Canvas size.
+- Image count.
+- Script count.
+- Editable text count.
+- i18n metadata count.
+- Selectable text status.
+- Source asset path.
+- Preview path.
+- Report path.
+- Known omissions.
+
+For map or dense label work, also report:
+
+- Label count.
+- Included labels.
+- Omitted labels with reasons.
+- Coordinate source: `manual`, `opencv`, `gis-calibrated`, or another named method.
+- Debug overlay path.
 
 ## Commands
 
@@ -170,3 +307,9 @@ npm test
 - Unresolved template tokens in generated HTML.
 - Scrollbars, obvious text overflow, or critical missing assets after QC.
 - Multilingual variants that change visual hierarchy, price visibility, or CTA prominence.
+- Required text exists only in an image, SVG outline, or canvas.
+- Text labels are not selectable.
+- Expected i18n or business metadata is missing.
+- Output was written to the repo root or the wrong project folder.
+- Complex map labels lack coordinate reports or debug artifacts.
+- The page visually matches but the DOM contract fails.

@@ -32,11 +32,11 @@ const manifest = {
   generated_at: new Date().toISOString(),
   project_id: projectPaths.project_id,
   subproject_id: projectPaths.subproject_id,
-  mode: 'manifest-only',
+  mode: 'report-only',
   note: 'Open or refresh each file_url in Codex Browser before final export.',
   total: entries.length,
   exports: entries,
 };
 
-writeJson(path.join(projectPaths.exports, 'export-manifest.json'), manifest);
-console.log(`Prepared export manifest for ${entries.length} HTML preview(s) in project ${projectPaths.project_id}.`);
+writeJson(path.join(projectPaths.reports, 'export-report.json'), manifest);
+console.log(`Prepared export report for ${entries.length} HTML preview(s) in project ${projectPaths.project_id}.`);

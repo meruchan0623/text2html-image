@@ -27,8 +27,10 @@ for (const script of ['start.js', 'build.js', 'quality-check.js', 'batch-export.
 const config = JSON.parse(read('workflow.config.json'));
 assert(Array.isArray(config.workflow_phases), 'workflow.config.json missing workflow_phases');
 assert(config.workflow_phases.length === 6, 'workflow must have six phases');
-assert(config.workspace_root === '$DOCUMENTS/text2html-image', 'workflow.config.json must set workspace_root');
-assert(config.project_directory_schema?.subproject_root_pattern === 'projects/<project_id>/subprojects/<subproject_id>', 'workflow.config.json missing subproject root pattern');
+assert(config.workspace_root.includes('text2html-image-project'), 'workflow.config.json must set text2html-image-project workspace_root');
+assert(config.project_directory_schema?.root_pattern === '<project_id>', 'workflow.config.json should use one folder per image project');
+assert(config.project_directory_schema?.subproject_root_pattern === '<project_id>/<subproject_id>', 'workflow.config.json missing shallow subproject root pattern');
+assert(!config.project_directory_schema?.manifest_file, 'image project outputs must not create project manifest files');
 assert(!config.output_directory, 'workflow.config.json must not keep legacy output_directory');
 assert(Array.isArray(config.project_directory_schema?.directories), 'workflow.config.json missing project_directory_schema.directories');
 for (const dir of ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports']) {
@@ -61,7 +63,7 @@ for (const file of skillFiles) {
   assert(body.includes('## Fast Path Default'), `${file} must document the fast path default`);
   assert(body.includes('## Escalation Triggers'), `${file} must document escalation triggers`);
   assert(body.includes('## Project Workspace'), `${file} must document the project workspace`);
-  assert(body.includes('<Documents>/text2html-image'), `${file} must document cross-platform Documents workspace`);
+  assert(body.includes('text2html-image-project'), `${file} must document the image project workspace`);
   assert(body.includes('## HTML Grouping'), `${file} must document html grouping`);
   assert(body.includes('## 抄图复刻流程'), `${file} must document the copy-image workflow`);
   assert(body.includes('多模态读取'), `${file} must document multimodal screenshot review`);
@@ -75,7 +77,7 @@ for (const file of skillFiles) {
 
 const readmeBody = read('README.md');
 assert(readmeBody.includes('skills/text2html-image/'), 'README must document the text2html-image skill path');
-assert(readmeBody.includes('<Documents>/text2html-image'), 'README must document the Documents workspace');
+assert(readmeBody.includes('text2html-image-project'), 'README must document the Documents workspace');
 assert(readmeBody.includes('index.<lang>.html'), 'README must document localized html variants');
 assert(readmeBody.includes('file://'), 'README must document direct file URL preview');
 assert(readmeBody.includes('刷新当前 Codex Browser 页面'), 'README must document refreshing the current Codex Browser page');
@@ -107,12 +109,12 @@ const projectPaths = createProjectWorkspace(projectId);
 for (const dir of ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports']) {
   assert(fs.existsSync(projectPaths[dir]), `project workspace missing ${dir}`);
 }
-assert(projectPaths.root === path.join(getUserDocumentsDir(), 'text2html-image', 'projects', projectId), 'project root should be under Documents/text2html-image/projects');
+assert(projectPaths.root.endsWith(path.join('text2html-image-project', projectId)), 'project root should be directly under text2html-image-project');
 
 const subprojectPaths = createProjectWorkspace('Travel eSIM Banner For HKMO Long Name', { subprojectId: 'Page Master A' });
 assert(subprojectPaths.project_id === 'travel-esim-banner', 'long project name should sanitize to 20 chars');
 assert(subprojectPaths.subproject_id === 'page-master-a', 'subproject name should sanitize');
-assert(subprojectPaths.root === path.join(getUserDocumentsDir(), 'text2html-image', 'projects', 'travel-esim-banner', 'subprojects', 'page-master-a'), 'subproject root should be nested under project/subprojects');
+assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'travel-esim-banner', 'page-master-a')), 'subproject root should use shallow nesting under project');
 
 const defaultPaths = getProjectPaths();
 assert(defaultPaths.project_id === 'default', 'missing project should use default project id');
@@ -163,13 +165,14 @@ const batchOutput = require('child_process').execFileSync(process.execPath, [
   cwd: ROOT,
   encoding: 'utf8',
 });
-assert(batchOutput.includes('Prepared export manifest'), 'batch-export should prepare a manifest');
-const exportManifestPath = path.join(projectPaths.exports, 'export-manifest.json');
-assert(fs.existsSync(exportManifestPath), 'batch-export should write export-manifest.json');
-const exportManifest = JSON.parse(fs.readFileSync(exportManifestPath, 'utf8'));
-assert(exportManifest.exports.some((entry) => entry.variant === 'canonical'), 'batch-export should include canonical index.html');
-assert(exportManifest.exports.some((entry) => entry.variant === 'zh-cn'), 'batch-export should include zh-cn localized html');
-assert(exportManifest.exports.some((entry) => entry.variant === 'en-us'), 'batch-export should include en-us localized html');
+assert(batchOutput.includes('Prepared export report'), 'batch-export should prepare an export report');
+const exportReportPath = path.join(projectPaths.reports, 'export-report.json');
+assert(fs.existsSync(exportReportPath), 'batch-export should write reports/export-report.json');
+assert(!fs.existsSync(path.join(projectPaths.exports, 'export-manifest.json')), 'batch-export must not write export-manifest.json');
+const exportReport = JSON.parse(fs.readFileSync(exportReportPath, 'utf8'));
+assert(exportReport.exports.some((entry) => entry.variant === 'canonical'), 'batch-export should include canonical index.html');
+assert(exportReport.exports.some((entry) => entry.variant === 'zh-cn'), 'batch-export should include zh-cn localized html');
+assert(exportReport.exports.some((entry) => entry.variant === 'en-us'), 'batch-export should include en-us localized html');
 
 const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
 assert(bannerOutput, 'banner output should be generated');
