@@ -50,6 +50,18 @@ For ordinary requests like creating, recreating, or editing one poster/banner, a
 
 Then build the preview with `npm run build -- --project <project-id>`. Run QC only after a concrete HTML/CSS change or before export.
 
+## Execution Router
+
+Before changing an existing project, identify the active edit surface:
+
+- `template-source`: edit `templates/<template_id>/`; rebuild after the change.
+- `workspace-html`: edit generated `html/<html-group>/index*.html`; do not rebuild before export unless the change is intentionally backported or discarded.
+- `deliverable-copy`: edit a self-contained final output folder; sync back or mark it detached.
+
+If the user asks to patch an existing preview, remove copy, adjust one language in a group, re-export images, or continue a previous visual round, read `references/execution-flow.md` before editing. It contains the source-surface guard, grouped DOM patch discipline, export mode guard, and verification ladder.
+
+For `workspace-html` edits, patch all variants in the active `html_group` unless the user explicitly asks for one locale only. Record the affected variants and whether export refresh is required under `reports/` when the change is more than trivial.
+
 ## Project Workspace
 
 Runtime files live outside the repo in the current user's Documents folder, grouped directly by image project:
@@ -133,6 +145,7 @@ Use these rules when opening a full multilingual copy-recreation pipeline from r
 Read `workflow.config.json` or the references only when the request needs the full workflow:
 
 - Multi-language generation or batch export.
+- Existing generated HTML edits, direct localized variant patches, or final delivery re-export.
 - Platform specs, safe areas, canvas presets, or export limits.
 - Asset library metadata, five-view character packs, or external image generation.
 - QC failures, layout stability review, or handoff documentation.
@@ -155,19 +168,22 @@ Reference routing:
 
 - Read `references/six-phase-contract.md` only for phase gates, data handoffs, and external service boundaries.
 - Read `references/stage-guides.md` only for stage-specific rules, token contracts, validation checks, and export policy.
+- Read `references/execution-flow.md` for existing project edits, workspace HTML patches, multilingual synchronization, real PNG export, and completion verification.
 
 ## Operating Flow
 
-1. Confirm or create source tables: platform/spec data, SKU data, `copy_master`, `html_group`, and asset metadata.
-2. Choose short English kebab-case `project-id`; add `--subproject` only for isolated page/master groups inside one job.
-3. Build or choose a template using `template_id`, `canvas_w`, `canvas_h`, safe areas, and target platform rules.
-4. Create a project workspace with `npm run project:init -- --project <project-id> [--subproject <subproject-id>]`.
-5. Generate HTML previews with `npm run build -- --project <project-id> [--subproject <subproject-id>]`.
-6. Run `npm run quality-check -- --project <project-id> [--subproject <subproject-id>]` after every layout or text-affecting change.
-7. For visual iteration, open the generated `file://.../html/<html-group>/index*.html` in Codex Browser, save screenshots into `screenshots/`, then use multimodal reading to identify fixes. If the preview is already open, 刷新当前 Codex Browser 页面 after rebuilding.
-8. Keep the Codex Browser preview open until the image is accepted or the user stops the work. Do not close the debugging preview between unfinished rounds.
-9. Only prepare export outputs after QC has no errors.
-10. For multilingual work, preserve structure and hierarchy first; adjust language-specific typography only after the approved base layout is stable.
+1. Route the task: fast path, existing-project edit, complex recreation, multilingual/export, or full six-stage workflow.
+2. Confirm the source surface before editing: `template-source`, `workspace-html`, or `deliverable-copy`.
+3. Confirm or create source tables: platform/spec data, SKU data, `copy_master`, `html_group`, and asset metadata.
+4. Choose short English kebab-case `project-id`; add `--subproject` only for isolated page/master groups inside one job.
+5. Build or choose a template using `template_id`, `canvas_w`, `canvas_h`, safe areas, and target platform rules.
+6. Create a project workspace with `npm run project:init -- --project <project-id> [--subproject <subproject-id>]` when the workspace does not already exist.
+7. Generate HTML previews with `npm run build -- --project <project-id> [--subproject <subproject-id>]` only when the active surface allows rebuild.
+8. Run `npm run quality-check -- --project <project-id> [--subproject <subproject-id>]` after every layout or text-affecting source/template change, and run equivalent DOM checks after direct workspace HTML edits.
+9. For visual iteration, open the generated `file://.../html/<html-group>/index*.html` in Codex Browser, save screenshots into `screenshots/`, then use multimodal reading to identify fixes. If the preview is already open, 刷新当前 Codex Browser 页面 after rebuilding.
+10. Keep the Codex Browser preview open until the image is accepted or the user stops the work. Do not close the debugging preview between unfinished rounds.
+11. Only prepare export outputs after QC or equivalent DOM/layout checks have no blocking errors.
+12. For multilingual work, preserve structure and hierarchy first; adjust language-specific typography only after the approved base layout is stable.
 
 ## 抄图复刻流程
 
@@ -232,6 +248,12 @@ Browser/multimodal boundary:
 - Every build round should surface the local HTML path and `file_url` before screenshot review.
 - If Codex Browser cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
 
+## Export Mode Guard
+
+`npm run batch-export` prepares `reports/export-report.json`; do not assume it writes PNG files. When the user asks to export or re-export images, verify whether PNGs were actually created. If not, use a task-local browser export helper or system Chrome/Edge screenshot path and write the real output files plus a report under `reports/`.
+
+When real images are required, verify file existence, dimensions, language variants, and scale variants before reporting completion.
+
 ## Map Label Placement
 
 For geographic or region-label images, do not rely on bitmap color segmentation as semantic truth. Use OpenCV/Pillow only for visual hints such as color regions, centroids, available width, and debug overlays.
@@ -279,6 +301,7 @@ Before claiming a complex image HTML conversion is complete, report or verify:
 - Source asset path.
 - Preview path.
 - Report path.
+- Exported PNG paths and dimensions, when image export was requested.
 - Known omissions.
 
 For map or dense label work, also report:
@@ -297,7 +320,7 @@ npm run project:init -- --project <project-id> [--subproject <subproject-id>]
 npm run build -- --project <project-id> [--subproject <subproject-id>]
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>]
 npm run review:score -- --project <project-id> [--subproject <subproject-id>] --round 1 --source-image <path> --screenshot <path> --overall-score 90 --layout-score 90 --typography-score 90 --color-score 90 --asset-score 90 --issue "medium|layout|observed|expected|fix hint"
-npm run batch-export -- --project <project-id> [--subproject <subproject-id>]
+npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  # report/export plan; verify PNGs separately
 npm test
 ```
 
@@ -307,9 +330,11 @@ npm test
 - Unresolved template tokens in generated HTML.
 - Scrollbars, obvious text overflow, or critical missing assets after QC.
 - Multilingual variants that change visual hierarchy, price visibility, or CTA prominence.
+- Direct `workspace-html` edits followed by an unintended rebuild.
 - Required text exists only in an image, SVG outline, or canvas.
 - Text labels are not selectable.
 - Expected i18n or business metadata is missing.
 - Output was written to the repo root or the wrong project folder.
 - Complex map labels lack coordinate reports or debug artifacts.
+- The user requested image export but only `reports/export-report.json` was produced.
 - The page visually matches but the DOM contract fails.
