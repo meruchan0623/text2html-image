@@ -221,6 +221,12 @@ const europeIr = JSON.parse(fs.readFileSync(europeEntry.ir_path, 'utf8'));
 assert(europeIr.canvas.width === 1000 && europeIr.canvas.height === 1263, 'europe IR should preserve canvas size');
 assert(europeIr.layers.some((layer) => layer.type === 'svg'), 'europe IR should include inline svg layers');
 assert(europeIr.layers.some((layer) => layer.type === 'text' && layer.text.includes('歐洲')), 'europe IR should include title text layer');
+assert(europeEntry.svg_path, 'passing render profile entry should include svg_path');
+assert(fs.existsSync(europeEntry.svg_path), 'render-fast should write SVG for passing entry');
+const europeSvg = fs.readFileSync(europeEntry.svg_path, 'utf8');
+assert(europeSvg.includes('<svg'), 'compiled SVG should contain svg root');
+assert(europeSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
+assert(europeSvg.includes('歐洲'), 'compiled SVG should contain editable text content as SVG text');
 
 const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
 assert(bannerOutput, 'banner output should be generated');

@@ -1,8 +1,10 @@
+const fs = require('fs');
 const path = require('path');
 const { createProjectWorkspace, parseArgs, writeJson } = require('./utils/workflow-core');
 const { listHtmlEntries } = require('./utils/html-entries');
 const { inspectRenderProfile } = require('./utils/render-profile');
 const { compileEuropeLikeIr } = require('./utils/poster-ir');
+const { compileSvg } = require('./utils/svg-compiler');
 
 function main() {
   const args = parseArgs();
@@ -15,7 +17,12 @@ function main() {
       const irDir = path.join(projectPaths.reports, 'render-ir');
       const irPath = path.join(irDir, `${entry.html_group}.${entry.variant}.json`);
       writeJson(irPath, ir);
-      return { ...entry, ...profile, ir_path: irPath };
+      const svgDir = path.join(projectPaths.working, 'render-svg');
+      const svgPath = path.join(svgDir, `${entry.html_group}-${entry.variant}.svg`);
+      const svg = compileSvg(ir);
+      fs.mkdirSync(svgDir, { recursive: true });
+      fs.writeFileSync(svgPath, svg);
+      return { ...entry, ...profile, ir_path: irPath, svg_path: svgPath };
     }
     return { ...entry, ...profile };
   });
