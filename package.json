@@ -9,6 +9,8 @@
     "quality-check": "node scripts/quality-check.js",
     "review:score": "node scripts/review-score.js",
     "batch-export": "node scripts/batch-export.js",
+    "render:profile": "node scripts/render-fast.js --profile-only",
+    "export-fast": "node scripts/render-fast.js",
     "test": "node scripts/test.js"
   },
   "keywords": [
@@ -22,5 +24,10 @@
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "css-tree": "^3.2.1",
+    "parse5": "^8.0.1"
   }
 }

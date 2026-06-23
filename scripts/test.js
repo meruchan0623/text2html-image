@@ -11,6 +11,7 @@ const {
   validateScoreReport,
   validateWorkflow,
 } = require('./utils/workflow-core');
+const { listHtmlEntries } = require('./utils/html-entries');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -20,8 +21,24 @@ function read(file) {
   return fs.readFileSync(path.join(ROOT, file), 'utf8');
 }
 
-for (const script of ['start.js', 'build.js', 'quality-check.js', 'batch-export.js', 'project-init.js', 'review-score.js', 'test.js']) {
+for (const script of [
+  'start.js',
+  'build.js',
+  'quality-check.js',
+  'batch-export.js',
+  'project-init.js',
+  'review-score.js',
+  'render-fast.js',
+  'test.js',
+]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
+}
+
+const packageJson = JSON.parse(read('package.json'));
+assert(packageJson.scripts['render:profile'] === 'node scripts/render-fast.js --profile-only', 'package.json missing render:profile script');
+assert(packageJson.scripts['export-fast'] === 'node scripts/render-fast.js', 'package.json missing export-fast script');
+for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
+  assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
 
 const config = JSON.parse(read('workflow.config.json'));
@@ -82,9 +99,15 @@ assert(readmeBody.includes('index.<lang>.html'), 'README must document localized
 assert(readmeBody.includes('file://'), 'README must document direct file URL preview');
 assert(readmeBody.includes('刷新当前 Codex Browser 页面'), 'README must document refreshing the current Codex Browser page');
 assert(readmeBody.includes('图片未完成前保持该预览页打开'), 'README must document keeping the preview open until the image is done');
+assert(readmeBody.includes('npm run export-fast'), 'README must document direct HTML-to-PNG export');
+assert(readmeBody.includes('不通过浏览器截图'), 'README must state export-fast does not use browser screenshots');
 for (const term of noDebugBrowserTerms) {
   assert(!readmeBody.includes(term), `README.md must not mention ${term}`);
 }
+
+const skillBody = read('skills/text2html-image/SKILL.md');
+assert(skillBody.includes('npm run export-fast'), 'skill must document export-fast command');
+assert(skillBody.includes('direct HTML-to-SVG-to-PNG'), 'skill must describe direct HTML-to-SVG-to-PNG export');
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
   cwd: ROOT,
@@ -121,6 +144,11 @@ assert(defaultPaths.project_id === 'default', 'missing project should use defaul
 
 const outputs = renderRows(undefined, { projectId });
 assert(outputs.some((item) => item.status === 'built'), 'build did not generate any HTML previews');
+const htmlEntries = listHtmlEntries(projectPaths);
+assert(htmlEntries.length >= 3, 'html entries should enumerate generated canonical and localized previews');
+assert(htmlEntries.some((entry) => entry.variant === 'canonical'), 'html entries should include canonical index.html');
+assert(htmlEntries.some((entry) => entry.variant === 'zh-cn'), 'html entries should include zh-cn localized html');
+assert(htmlEntries.every((entry) => entry.file_url === toFileUrl(entry.html)), 'html entries should include correct file_url');
 const buildOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'build.js'),
   '--project', projectId,
@@ -165,7 +193,9 @@ const batchOutput = require('child_process').execFileSync(process.execPath, [
   cwd: ROOT,
   encoding: 'utf8',
 });
-assert(batchOutput.includes('Prepared export report'), 'batch-export should prepare an export report');
+assert(batchOutput.includes('Prepared report-only export report'), 'batch-export should prepare a report-only export report');
+assert(batchOutput.includes('report-only'), 'batch-export should say report-only');
+assert(batchOutput.includes('npm run export-fast'), 'batch-export should point to export-fast');
 const exportReportPath = path.join(projectPaths.reports, 'export-report.json');
 assert(fs.existsSync(exportReportPath), 'batch-export should write reports/export-report.json');
 assert(!fs.existsSync(path.join(projectPaths.exports, 'export-manifest.json')), 'batch-export must not write export-manifest.json');
@@ -173,6 +203,54 @@ const exportReport = JSON.parse(fs.readFileSync(exportReportPath, 'utf8'));
 assert(exportReport.exports.some((entry) => entry.variant === 'canonical'), 'batch-export should include canonical index.html');
 assert(exportReport.exports.some((entry) => entry.variant === 'zh-cn'), 'batch-export should include zh-cn localized html');
 assert(exportReport.exports.some((entry) => entry.variant === 'en-us'), 'batch-export should include en-us localized html');
+
+const profileOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'render-fast.js'),
+  '--project', projectId,
+  '--profile-only',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(profileOutput.includes('Render profile report written'), 'render-fast --profile-only should write a report');
+const profileReportPath = path.join(projectPaths.reports, 'render-profile-report.json');
+assert(fs.existsSync(profileReportPath), 'render-fast should write reports/render-profile-report.json');
+const profileReport = JSON.parse(fs.readFileSync(profileReportPath, 'utf8'));
+assert(profileReport.entries.length >= 3, 'render profile report should include html entries');
+assert(profileReport.entries.some((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass'), 'europe map should pass the first render profile');
+assert(profileReport.entries.some((entry) => entry.html_group === 'africa-esim-map' && entry.status === 'fail'), 'africa map should fail profile because of grid/filter/blend');
+assert(profileReport.entries.some((entry) => entry.unsupported_css.some((item) => item.property === 'mix-blend-mode')), 'profile should report unsupported mix-blend-mode');
+const europeEntry = profileReport.entries.find((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass');
+assert(europeEntry?.ir_path, 'passing render profile entry should include ir_path');
+assert(fs.existsSync(europeEntry.ir_path), 'render profile should write render IR for passing entry');
+const europeIr = JSON.parse(fs.readFileSync(europeEntry.ir_path, 'utf8'));
+assert(europeIr.canvas.width === 1000 && europeIr.canvas.height === 1263, 'europe IR should preserve canvas size');
+assert(europeIr.layers.some((layer) => layer.type === 'svg'), 'europe IR should include inline svg layers');
+assert(europeIr.layers.some((layer) => layer.type === 'text' && layer.text.includes('歐洲')), 'europe IR should include title text layer');
+assert(europeEntry.svg_path, 'passing render profile entry should include svg_path');
+assert(fs.existsSync(europeEntry.svg_path), 'render-fast should write SVG for passing entry');
+const europeSvg = fs.readFileSync(europeEntry.svg_path, 'utf8');
+assert(europeSvg.includes('<svg'), 'compiled SVG should contain svg root');
+assert(europeSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
+assert(europeSvg.includes('歐洲'), 'compiled SVG should contain editable text content as SVG text');
+
+const fastExportOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'render-fast.js'),
+  '--project', projectId,
+  '--group', 'europe-esim-map',
+  '--scale', '2',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(fastExportOutput.includes('Direct PNG export completed'), 'export-fast should complete for supported html group');
+const pngReportPath = path.join(projectPaths.reports, 'png-export-report.json');
+assert(fs.existsSync(pngReportPath), 'export-fast should write reports/png-export-report.json');
+const pngReport = JSON.parse(fs.readFileSync(pngReportPath, 'utf8'));
+assert(pngReport.status === 'pass', 'png export report should pass for europe group');
+assert(pngReport.exports.every((entry) => entry.scale === 2), 'png export report should preserve scale');
+assert(pngReport.exports.every((entry) => fs.existsSync(entry.png)), 'png export report should point to existing PNG files');
+assert(pngReport.exports.some((entry) => /europe-esim-map-canonical\.png$/.test(entry.png)), 'png export should include canonical output');
 
 const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
 assert(bannerOutput, 'banner output should be generated');

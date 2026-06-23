@@ -1,6 +1,6 @@
 # text2html-image Execution Flow
 
-Use this reference when a task may cause rework: existing project edits, direct generated HTML edits, multilingual variants, real PNG export, dense map/table posters, or final delivery checks.
+Use this reference when a task may cause rework: existing project edits, direct generated HTML edits, multilingual variants, real PNG export, dense map/table posters, direct renderer profile failures, or final delivery checks.
 
 ## 1. Pick the Active Surface
 
@@ -61,36 +61,43 @@ Before applying a multi-file direct edit, dry-run mentally or with local inspect
 
 If a visible business text node lacks a stable key, add the key while editing unless doing so would change the user's requested scope.
 
-## 4. Export Mode Guard
+## 4. Export Modes
 
 Never treat an export report as a PNG export.
 
-Current repo commands:
+- `batch-export`: report only. It writes `reports/export-report.json` and lists HTML entries plus expected PNG paths, but it does not create PNG files.
+- `render:profile`: compatibility check for the direct renderer. It writes `reports/render-profile-report.json` with pass/fail entries and unsupported CSS details.
+- `export-fast`: direct HTML-to-SVG-to-PNG export for HTML that passes the render profile. It does not use browser screenshots.
 
-- `npm run batch-export -- --project <project-id>` prepares `reports/export-report.json`; verify whether it writes PNG files before saying images were exported.
-- If real PNG files are required and the repo lacks a durable PNG command, use a task-local browser export helper or system Chrome/Edge screenshot path, then write the command and output files to `reports/`.
+When the user asks to "重新导出图", produce or refresh real PNG files, then verify file existence, dimensions, variants, and scale. For higher-resolution export through `export-fast`, keep the CSS layout canvas fixed and increase `--scale`.
 
-Target vocabulary for future tools:
+## 5. Direct Renderer Boundary
 
-- `export-plan`: report only.
-- `export-fast`: low-resource renderer for the constrained poster profile.
-- `export-browser`: high-fidelity browser export with local Chrome/Edge.
+The direct renderer supports a constrained poster profile:
 
-When the user asks to "重新导出图", produce or refresh real PNG files, then verify file existence, dimensions, variants, and scale. For higher-resolution export, keep the CSS layout viewport fixed and increase device scale factor.
+- fixed `.poster` canvas dimensions from inline pixel styles.
+- inline SVG passthrough.
+- fixed map labels and title text layers.
+- SVG output under `working/render-svg/`.
+- PNG output under `exports/`.
+- export report under `reports/png-export-report.json`.
 
-## 5. Verification Ladder
+It must fail-fast instead of silently degrading output when HTML/CSS requires unsupported rendering features such as `grid`, complex `flex`, `filter`, `mix-blend-mode`, `clip-path`, visual pseudo-elements, media queries, masks, or external HTTP assets.
+
+## 6. Verification Ladder
 
 Use the cheapest proof that can catch the current failure mode, then escalate only when needed:
 
 1. Static DOM contract: no scripts, expected image count, editable text count, i18n/business key count, local asset existence.
 2. HTML group consistency: canonical and localized variants share the expected structure and asset references.
-3. Layout check: page overflow and cell/text overflow, especially for tables and long locale strings.
-4. Visual preview: browser screenshot against reference or accepted design.
-5. Export audit: PNG file count, language variants, scale variants, and pixel dimensions.
+3. Render profile: direct renderer pass/fail and unsupported CSS reasons.
+4. Layout check: page overflow and cell/text overflow, especially for tables and long locale strings.
+5. Visual preview: browser screenshot against reference or accepted design.
+6. Export audit: PNG file count, language variants, scale variants, and pixel dimensions.
 
-If the in-app browser refuses `file://`, do not retry indefinitely or call the page broken. Use static DOM checks plus Playwright/system browser fallback.
+If the in-app browser refuses `file://`, do not retry indefinitely or call the page broken. Use static DOM checks plus direct renderer profile or system browser fallback as appropriate.
 
-## 6. Rework Prevention Reports
+## 7. Rework Prevention Reports
 
 For complex poster edits, prefer reports over prose. Use the closest existing report path, or write a small task-specific JSON under `reports/`:
 
@@ -105,7 +112,7 @@ For complex poster edits, prefer reports over prose. Use the closest existing re
 
 If a stage has no report or equivalent proof, say exactly which proof is missing instead of claiming the image is complete.
 
-## 7. Completion Checklist
+## 8. Completion Checklist
 
 Before final delivery, confirm:
 
@@ -115,4 +122,7 @@ Before final delivery, confirm:
 - Dense labels have coordinate/debug reports and omitted reasons.
 - QC or equivalent DOM checks passed for the affected HTML files.
 - Real PNG export was performed when requested, not only an export plan.
-- Exported PNG files have expected dimensions and language/scale coverage.
+- `reports/png-export-report.json` exists when direct PNG export was requested.
+- PNG files exist under `exports/`.
+- `output_pixels` equals `canvas * scale`.
+- Failed entries include unsupported CSS reasons.

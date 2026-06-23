@@ -150,6 +150,7 @@ Read `workflow.config.json` or the references only when the request needs the fu
 - Asset library metadata, five-view character packs, or external image generation.
 - QC failures, layout stability review, or handoff documentation.
 - Adding/changing workflow phases, data contracts, template token rules, or project workspace rules.
+- Direct PNG export, render profile failures, or final delivery verification.
 
 Reference paths are relative to this skill directory, not the caller's current working directory.
 
@@ -168,7 +169,7 @@ Reference routing:
 
 - Read `references/six-phase-contract.md` only for phase gates, data handoffs, and external service boundaries.
 - Read `references/stage-guides.md` only for stage-specific rules, token contracts, validation checks, and export policy.
-- Read `references/execution-flow.md` for existing project edits, workspace HTML patches, multilingual synchronization, real PNG export, and completion verification.
+- Read `references/execution-flow.md` for existing project edits, workspace HTML patches, multilingual synchronization, export mode selection, direct HTML-to-SVG-to-PNG boundaries, and completion verification.
 
 ## Operating Flow
 
@@ -250,7 +251,11 @@ Browser/multimodal boundary:
 
 ## Export Mode Guard
 
-`npm run batch-export` prepares `reports/export-report.json`; do not assume it writes PNG files. When the user asks to export or re-export images, verify whether PNGs were actually created. If not, use a task-local browser export helper or system Chrome/Edge screenshot path and write the real output files plus a report under `reports/`.
+`npm run batch-export` prepares `reports/export-report.json`; it is report-only and does not prove PNG files exist.
+
+Use `npm run export-fast -- --project <project-id> [--group <html-group>] [--scale 2]` when a direct HTML-to-SVG-to-PNG export is required and the HTML passes the render profile. This is not a browser screenshot path.
+
+`npm run render:profile -- --project <project-id> [--group <html-group>]` writes `reports/render-profile-report.json`. If a preview fails because of unsupported CSS, do not silently export a degraded image; report the unsupported CSS and use a separate high-fidelity fallback only when needed.
 
 When real images are required, verify file existence, dimensions, language variants, and scale variants before reporting completion.
 
@@ -321,6 +326,8 @@ npm run build -- --project <project-id> [--subproject <subproject-id>]
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>]
 npm run review:score -- --project <project-id> [--subproject <subproject-id>] --round 1 --source-image <path> --screenshot <path> --overall-score 90 --layout-score 90 --typography-score 90 --color-score 90 --asset-score 90 --issue "medium|layout|observed|expected|fix hint"
 npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  # report/export plan; verify PNGs separately
+npm run render:profile -- --project <project-id> [--group <html-group>]
+npm run export-fast -- --project <project-id> [--group <html-group>] [--scale 2]
 npm test
 ```
 
