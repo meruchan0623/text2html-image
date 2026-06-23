@@ -198,6 +198,23 @@ assert(exportReport.exports.some((entry) => entry.variant === 'canonical'), 'bat
 assert(exportReport.exports.some((entry) => entry.variant === 'zh-cn'), 'batch-export should include zh-cn localized html');
 assert(exportReport.exports.some((entry) => entry.variant === 'en-us'), 'batch-export should include en-us localized html');
 
+const profileOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'render-fast.js'),
+  '--project', projectId,
+  '--profile-only',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(profileOutput.includes('Render profile report written'), 'render-fast --profile-only should write a report');
+const profileReportPath = path.join(projectPaths.reports, 'render-profile-report.json');
+assert(fs.existsSync(profileReportPath), 'render-fast should write reports/render-profile-report.json');
+const profileReport = JSON.parse(fs.readFileSync(profileReportPath, 'utf8'));
+assert(profileReport.entries.length >= 3, 'render profile report should include html entries');
+assert(profileReport.entries.some((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass'), 'europe map should pass the first render profile');
+assert(profileReport.entries.some((entry) => entry.html_group === 'africa-esim-map' && entry.status === 'fail'), 'africa map should fail profile because of grid/filter/blend');
+assert(profileReport.entries.some((entry) => entry.unsupported_css.some((item) => item.property === 'mix-blend-mode')), 'profile should report unsupported mix-blend-mode');
+
 const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
 assert(bannerOutput, 'banner output should be generated');
 const bannerHtml = fs.readFileSync(bannerOutput.html, 'utf8');
