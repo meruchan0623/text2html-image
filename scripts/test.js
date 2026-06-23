@@ -214,6 +214,13 @@ assert(profileReport.entries.length >= 3, 'render profile report should include 
 assert(profileReport.entries.some((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass'), 'europe map should pass the first render profile');
 assert(profileReport.entries.some((entry) => entry.html_group === 'africa-esim-map' && entry.status === 'fail'), 'africa map should fail profile because of grid/filter/blend');
 assert(profileReport.entries.some((entry) => entry.unsupported_css.some((item) => item.property === 'mix-blend-mode')), 'profile should report unsupported mix-blend-mode');
+const europeEntry = profileReport.entries.find((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass');
+assert(europeEntry?.ir_path, 'passing render profile entry should include ir_path');
+assert(fs.existsSync(europeEntry.ir_path), 'render profile should write render IR for passing entry');
+const europeIr = JSON.parse(fs.readFileSync(europeEntry.ir_path, 'utf8'));
+assert(europeIr.canvas.width === 1000 && europeIr.canvas.height === 1263, 'europe IR should preserve canvas size');
+assert(europeIr.layers.some((layer) => layer.type === 'svg'), 'europe IR should include inline svg layers');
+assert(europeIr.layers.some((layer) => layer.type === 'text' && layer.text.includes('歐洲')), 'europe IR should include title text layer');
 
 const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
 assert(bannerOutput, 'banner output should be generated');

@@ -2,15 +2,23 @@ const path = require('path');
 const { createProjectWorkspace, parseArgs, writeJson } = require('./utils/workflow-core');
 const { listHtmlEntries } = require('./utils/html-entries');
 const { inspectRenderProfile } = require('./utils/render-profile');
+const { compileEuropeLikeIr } = require('./utils/poster-ir');
 
 function main() {
   const args = parseArgs();
   const projectPaths = createProjectWorkspace(args.project, { subprojectId: args.subproject });
   const entries = listHtmlEntries(projectPaths, { group: args.group });
-  const profileEntries = entries.map((entry) => ({
-    ...entry,
-    ...inspectRenderProfile(entry.html),
-  }));
+  const profileEntries = entries.map((entry) => {
+    const profile = inspectRenderProfile(entry.html);
+    if (profile.status === 'pass') {
+      const ir = compileEuropeLikeIr(entry.html);
+      const irDir = path.join(projectPaths.reports, 'render-ir');
+      const irPath = path.join(irDir, `${entry.html_group}.${entry.variant}.json`);
+      writeJson(irPath, ir);
+      return { ...entry, ...profile, ir_path: irPath };
+    }
+    return { ...entry, ...profile };
+  });
   const report = {
     generated_at: new Date().toISOString(),
     project_id: projectPaths.project_id,
