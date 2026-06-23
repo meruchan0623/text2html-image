@@ -99,9 +99,15 @@ assert(readmeBody.includes('index.<lang>.html'), 'README must document localized
 assert(readmeBody.includes('file://'), 'README must document direct file URL preview');
 assert(readmeBody.includes('刷新当前 Codex Browser 页面'), 'README must document refreshing the current Codex Browser page');
 assert(readmeBody.includes('图片未完成前保持该预览页打开'), 'README must document keeping the preview open until the image is done');
+assert(readmeBody.includes('npm run export-fast'), 'README must document direct HTML-to-PNG export');
+assert(readmeBody.includes('不通过浏览器截图'), 'README must state export-fast does not use browser screenshots');
 for (const term of noDebugBrowserTerms) {
   assert(!readmeBody.includes(term), `README.md must not mention ${term}`);
 }
+
+const skillBody = read('skills/text2html-image/SKILL.md');
+assert(skillBody.includes('npm run export-fast'), 'skill must document export-fast command');
+assert(skillBody.includes('direct HTML-to-SVG-to-PNG'), 'skill must describe direct HTML-to-SVG-to-PNG export');
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
   cwd: ROOT,

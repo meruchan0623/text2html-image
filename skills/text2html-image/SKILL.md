@@ -137,6 +137,7 @@ Read `workflow.config.json` or the references only when the request needs the fu
 - Asset library metadata, five-view character packs, or external image generation.
 - QC failures, layout stability review, or handoff documentation.
 - Adding/changing workflow phases, data contracts, template token rules, or project workspace rules.
+- Direct PNG export, render profile failures, or final delivery verification.
 
 Reference paths are relative to this skill directory, not the caller's current working directory.
 
@@ -155,6 +156,7 @@ Reference routing:
 
 - Read `references/six-phase-contract.md` only for phase gates, data handoffs, and external service boundaries.
 - Read `references/stage-guides.md` only for stage-specific rules, token contracts, validation checks, and export policy.
+- Read `references/execution-flow.md` for export mode selection and direct HTML-to-SVG-to-PNG boundaries.
 
 ## Operating Flow
 
@@ -232,6 +234,14 @@ Browser/multimodal boundary:
 - Every build round should surface the local HTML path and `file_url` before screenshot review.
 - If Codex Browser cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
 
+## Export Mode Guard
+
+`npm run batch-export` prepares `reports/export-report.json`; it is report-only and does not prove PNG files exist.
+
+Use `npm run export-fast -- --project <project-id> [--group <html-group>] [--scale 2]` when a direct HTML-to-SVG-to-PNG export is required and the HTML passes the render profile. This is not a browser screenshot path.
+
+`npm run render:profile -- --project <project-id> [--group <html-group>]` writes `reports/render-profile-report.json`. If a preview fails because of unsupported CSS, do not silently export a degraded image; report the unsupported CSS and use a separate high-fidelity fallback only when needed.
+
 ## Map Label Placement
 
 For geographic or region-label images, do not rely on bitmap color segmentation as semantic truth. Use OpenCV/Pillow only for visual hints such as color regions, centroids, available width, and debug overlays.
@@ -279,6 +289,7 @@ Before claiming a complex image HTML conversion is complete, report or verify:
 - Source asset path.
 - Preview path.
 - Report path.
+- Exported PNG paths and dimensions, when image export was requested.
 - Known omissions.
 
 For map or dense label work, also report:
@@ -298,6 +309,8 @@ npm run build -- --project <project-id> [--subproject <subproject-id>]
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>]
 npm run review:score -- --project <project-id> [--subproject <subproject-id>] --round 1 --source-image <path> --screenshot <path> --overall-score 90 --layout-score 90 --typography-score 90 --color-score 90 --asset-score 90 --issue "medium|layout|observed|expected|fix hint"
 npm run batch-export -- --project <project-id> [--subproject <subproject-id>]
+npm run render:profile -- --project <project-id> [--group <html-group>]
+npm run export-fast -- --project <project-id> [--group <html-group>] [--scale 2]
 npm test
 ```
 
@@ -312,4 +325,5 @@ npm test
 - Expected i18n or business metadata is missing.
 - Output was written to the repo root or the wrong project folder.
 - Complex map labels lack coordinate reports or debug artifacts.
+- The user requested image export but only `reports/export-report.json` was produced.
 - The page visually matches but the DOM contract fails.
