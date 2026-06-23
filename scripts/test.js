@@ -11,6 +11,7 @@ const {
   validateScoreReport,
   validateWorkflow,
 } = require('./utils/workflow-core');
+const { listHtmlEntries } = require('./utils/html-entries');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -137,6 +138,11 @@ assert(defaultPaths.project_id === 'default', 'missing project should use defaul
 
 const outputs = renderRows(undefined, { projectId });
 assert(outputs.some((item) => item.status === 'built'), 'build did not generate any HTML previews');
+const htmlEntries = listHtmlEntries(projectPaths);
+assert(htmlEntries.length >= 3, 'html entries should enumerate generated canonical and localized previews');
+assert(htmlEntries.some((entry) => entry.variant === 'canonical'), 'html entries should include canonical index.html');
+assert(htmlEntries.some((entry) => entry.variant === 'zh-cn'), 'html entries should include zh-cn localized html');
+assert(htmlEntries.every((entry) => entry.file_url === toFileUrl(entry.html)), 'html entries should include correct file_url');
 const buildOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'build.js'),
   '--project', projectId,
@@ -181,7 +187,9 @@ const batchOutput = require('child_process').execFileSync(process.execPath, [
   cwd: ROOT,
   encoding: 'utf8',
 });
-assert(batchOutput.includes('Prepared export report'), 'batch-export should prepare an export report');
+assert(batchOutput.includes('Prepared report-only export report'), 'batch-export should prepare a report-only export report');
+assert(batchOutput.includes('report-only'), 'batch-export should say report-only');
+assert(batchOutput.includes('npm run export-fast'), 'batch-export should point to export-fast');
 const exportReportPath = path.join(projectPaths.reports, 'export-report.json');
 assert(fs.existsSync(exportReportPath), 'batch-export should write reports/export-report.json');
 assert(!fs.existsSync(path.join(projectPaths.exports, 'export-manifest.json')), 'batch-export must not write export-manifest.json');
