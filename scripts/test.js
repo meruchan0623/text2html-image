@@ -228,6 +228,24 @@ assert(europeSvg.includes('<svg'), 'compiled SVG should contain svg root');
 assert(europeSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
 assert(europeSvg.includes('歐洲'), 'compiled SVG should contain editable text content as SVG text');
 
+const fastExportOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'render-fast.js'),
+  '--project', projectId,
+  '--group', 'europe-esim-map',
+  '--scale', '2',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(fastExportOutput.includes('Direct PNG export completed'), 'export-fast should complete for supported html group');
+const pngReportPath = path.join(projectPaths.reports, 'png-export-report.json');
+assert(fs.existsSync(pngReportPath), 'export-fast should write reports/png-export-report.json');
+const pngReport = JSON.parse(fs.readFileSync(pngReportPath, 'utf8'));
+assert(pngReport.status === 'pass', 'png export report should pass for europe group');
+assert(pngReport.exports.every((entry) => entry.scale === 2), 'png export report should preserve scale');
+assert(pngReport.exports.every((entry) => fs.existsSync(entry.png)), 'png export report should point to existing PNG files');
+assert(pngReport.exports.some((entry) => /europe-esim-map-canonical\.png$/.test(entry.png)), 'png export should include canonical output');
+
 const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
 assert(bannerOutput, 'banner output should be generated');
 const bannerHtml = fs.readFileSync(bannerOutput.html, 'utf8');
