@@ -20,8 +20,24 @@ function read(file) {
   return fs.readFileSync(path.join(ROOT, file), 'utf8');
 }
 
-for (const script of ['start.js', 'build.js', 'quality-check.js', 'batch-export.js', 'project-init.js', 'review-score.js', 'test.js']) {
+for (const script of [
+  'start.js',
+  'build.js',
+  'quality-check.js',
+  'batch-export.js',
+  'project-init.js',
+  'review-score.js',
+  'render-fast.js',
+  'test.js',
+]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
+}
+
+const packageJson = JSON.parse(read('package.json'));
+assert(packageJson.scripts['render:profile'] === 'node scripts/render-fast.js --profile-only', 'package.json missing render:profile script');
+assert(packageJson.scripts['export-fast'] === 'node scripts/render-fast.js', 'package.json missing export-fast script');
+for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
+  assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
 
 const config = JSON.parse(read('workflow.config.json'));
