@@ -21,6 +21,10 @@ function read(file) {
   return fs.readFileSync(path.join(ROOT, file), 'utf8');
 }
 
+function maybeReadAbsolute(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+}
+
 for (const script of [
   'start.js',
   'build.js',
@@ -59,13 +63,7 @@ for (const phase of config.workflow_phases) {
   assert(phase.owner_skill === 'text2html-image', `${phase.id} owner_skill must be text2html-image`);
 }
 
-const skillDirs = fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => entry.name)
-  .sort();
-assert(skillDirs.length === 1 && skillDirs[0] === 'text2html-image', 'skills/ must contain only text2html-image');
-
-const skillFiles = ['skills/text2html-image/SKILL.md'];
+const skillFiles = ['SKILL.md'];
 const noDebugBrowserTerms = ['local server', 'localhost', 'CDP', 'DevTools', 'remote-debugging'];
 
 for (const file of skillFiles) {
@@ -92,22 +90,20 @@ for (const file of skillFiles) {
   }
 }
 
-const readmeBody = read('README.md');
-assert(readmeBody.includes('skills/text2html-image/'), 'README must document the text2html-image skill path');
-assert(readmeBody.includes('text2html-image-project'), 'README must document the Documents workspace');
-assert(readmeBody.includes('index.<lang>.html'), 'README must document localized html variants');
-assert(readmeBody.includes('file://'), 'README must document direct file URL preview');
-assert(readmeBody.includes('刷新当前 Codex Browser 页面'), 'README must document refreshing the current Codex Browser page');
-assert(readmeBody.includes('图片未完成前保持该预览页打开'), 'README must document keeping the preview open until the image is done');
-assert(readmeBody.includes('npm run export-fast'), 'README must document direct HTML-to-PNG export');
-assert(readmeBody.includes('不通过浏览器截图'), 'README must state export-fast does not use browser screenshots');
-for (const term of noDebugBrowserTerms) {
-  assert(!readmeBody.includes(term), `README.md must not mention ${term}`);
+const repositoryEntry = maybeReadAbsolute(path.resolve(ROOT, '..', '..', 'SKILL.md'));
+if (repositoryEntry) {
+  assert(repositoryEntry.includes('skills/text2html-image/'), 'root SKILL.md must point to the canonical skill package');
+  assert(repositoryEntry.includes('Documents/text2html-image-project'), 'root SKILL.md must document the project workspace');
 }
 
-const skillBody = read('skills/text2html-image/SKILL.md');
+const skillBody = read('SKILL.md');
 assert(skillBody.includes('npm run export-fast'), 'skill must document export-fast command');
 assert(skillBody.includes('direct HTML-to-SVG-to-PNG'), 'skill must describe direct HTML-to-SVG-to-PNG export');
+assert(skillBody.includes('## Self-Contained Skill Package'), 'skill must document self-contained package execution');
+assert(skillBody.includes('## Layered PNG + HTML Pitfalls'), 'skill must document layered PNG pitfalls from recent work');
+assert(skillBody.includes('same-canvas transparent PNG layers'), 'skill must prefer same-canvas transparent PNG layers');
+assert(skillBody.includes('PNG layers must not contain poster-level title'), 'skill must forbid localized poster text in PNG layers');
+assert(skillBody.includes('data-i18n-key'), 'skill must require i18n metadata for editable text');
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
   cwd: ROOT,

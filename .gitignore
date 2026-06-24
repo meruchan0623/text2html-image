@@ -37,6 +37,9 @@ temp/
 # Cache
 .cache/
 *.cache
+.codex_assets/
+.codex_ardot_shots/
+.superpowers/
 
 # Test coverage
 coverage/
