@@ -5,7 +5,7 @@ description: Use when generating, validating, localizing, or exporting editable 
 
 # text2html-image
 
-Use this as the single skill for this repository. It should run from the repo root because `scripts/`, `config/`, `templates/`, `data/`, and `workflow.config.json` are shared runtime resources. If the current working directory is elsewhere, locate or switch to that repo root before using repo commands.
+Use this as the canonical skill package. It should run from this skill directory because `scripts/`, `config/`, `templates/`, `data/`, `assets/`, `package.json`, and `workflow.config.json` are bundled runtime resources. If the current working directory is elsewhere, locate or switch to this directory before using repo commands.
 
 ## Core Rule
 
@@ -49,6 +49,18 @@ For ordinary requests like creating, recreating, or editing one poster/banner, a
 - Any user-provided image paths or local assets needed for the current output.
 
 Then build the preview with `npm run build -- --project <project-id>`. Run QC only after a concrete HTML/CSS change or before export.
+
+## Self-Contained Skill Package
+
+The skill root is the package root. Run commands from the directory that contains this `SKILL.md`:
+
+```bash
+npm test
+npm run project:init -- --project <project-id>
+npm run build -- --project <project-id>
+```
+
+Do not write generated work into the skill directory or repository root. Keep runtime image projects under `Documents/text2html-image-project/`.
 
 ## Execution Router
 
@@ -139,6 +151,18 @@ Use these rules when opening a full multilingual copy-recreation pipeline from r
 - When syncing final deliverables to an `outputs/` folder, make the HTML self-contained for preview. Copy required assets next to the HTML or rewrite asset paths so the output directory can be opened independently from the project workspace.
 - After every rebuild that changes HTML structure, resync the latest HTML, CSS, assets, and export reports to the deliverable folder. A stale copied HTML folder can make final outputs disagree with project previews.
 - Report DOM contracts along with images: canvas size, script count, image count, i18n node count, business key count, scrollbar status, and any language-specific exceptions. These checks catch regressions that visual review can miss.
+
+## Layered PNG + HTML Pitfalls
+
+Use these rules for complex illustrated posters where a flat sticker-sheet asset causes positioning, alpha, or I18N rework.
+
+- Do not generate a loose asset sticker sheet for complex posters. Prefer same-canvas transparent PNG layers plus editable HTML/CSS/SVG overlay.
+- Every PNG layer must use the final canvas dimensions and origin. Preserve alpha, keep transparent regions transparent, and verify dimensions before reporting success.
+- PNG layers must not contain poster-level title, step copy, CTA, legal text, labels, or other text that needs localization. Those belong in DOM text with `data-i18n-key`.
+- Keep CSS-rebuildable geometry out of PNG layers: large rectangles, circles, rounded cards, pills, button bases, notice bars, simple borders, and simple icons.
+- Use clear layer names and z-index roles such as `background-art.png`, `device-art.png`, optional `foreground-art.png`, and an HTML text/vector layer.
+- If a device or screen layer still contains microcopy from the reference image, report it as a known limitation instead of calling the poster fully editable.
+- Check `script_count`, editable text count, `data-i18n-key` count, PNG dimensions, alpha extrema, and visible layer paths before completion.
 
 ## Escalation Triggers
 

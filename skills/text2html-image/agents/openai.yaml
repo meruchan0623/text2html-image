@@ -1,4 +1,4 @@
 interface:
   display_name: "text2html-image"
-  short_description: "HTML/CSS ecommerce image pipeline"
-  default_prompt: "Use $text2html-image to generate, validate, localize, and export editable ecommerce poster HTML."
+  short_description: "Self-contained editable poster image skill"
+  default_prompt: "Use $text2html-image to generate, validate, localize, layer, and export editable ecommerce poster HTML from its bundled skill package."
