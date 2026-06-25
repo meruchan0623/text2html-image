@@ -62,6 +62,34 @@ npm run build -- --project <project-id>
 
 Do not write generated work into the skill directory or repository root. Keep runtime image projects under `Documents/text2html-image-project/`.
 
+## Flood Cutout Asset Cleanup
+
+When a bitmap layer must be composited over HTML/CSS, clean it with edge-connected flood cutout before accepting it as a transparent PNG. This is required for AI-generated maps, characters, devices, landmarks, and irregular sticker-like assets that show gradient glow, gray matte, soft halos, or non-transparent outer backgrounds.
+
+Use `npm run flood-cutout -- --input <source.png>` from the skill root. The tool removes only background pixels connected to the canvas edge, then cleans the immediate edge ring so the delivered transparent layer does not keep glow or gradient haze. It must preserve internal background-colored holes that are not edge-connected.
+
+Required outputs:
+
+- `*-transparent.png`: cleaned transparent layer.
+- `*-mask-debug.png`: black/white debug mask showing the final transparentized background and glow cleanup area.
+- `*-cutout-report.json`: dimensions, thresholds, removed pixel counts, alpha cleanup counts, warnings, and output paths.
+
+Do not use prompt wording, CSS filters, `mix-blend-mode`, opacity tricks, or a white/gray matte as a substitute for real transparency. If the report warns that the removed area ratio is too high or too low, inspect the mask debug before using the asset.
+
+## Repository Hygiene
+
+Keep the skill package limited to reusable runtime resources: `SKILL.md`, `agents/`, `scripts/`, `references/`, `config/`, `templates/`, `data/`, `package*.json`, `workflow.config.json`, and intentionally reusable `assets/`.
+
+Generated image projects, screenshots, exports, copied deliverables, one-off work helpers, and user/reference image folders are not part of the skill. They belong under the configured project workspace or a task-local output folder, not in this repo.
+
+Only keep files under `assets/` when they are reusable skill fixtures with clear metadata, license/source, dimensions, and an active template or test dependency. If an image asset was created for one poster or one client round, list it for user confirmation before deletion instead of treating it as bundled skill data.
+
+Deletion review rules:
+
+- Safe cleanup candidates: `.DS_Store`, empty directories, caches, generated exports, screenshots, temporary `work/` helpers, stale reports, and detached deliverable copies.
+- Confirm before deleting: tracked assets, templates, copy rows, `workflow.config.json`, scripts, references, and any workspace project that still contains source images or final exports.
+- Before removing a tracked asset, grep for its basename in templates, data, reports, and references; do not delete it if any active template or copy row still points at it.
+
 ## Execution Router
 
 Before changing an existing project, identify the active edit surface:
@@ -103,6 +131,7 @@ Use `--subproject <subproject-id>` when one user job contains multiple page-leve
 - Same-page or same-master multilingual files must live in one `html/<html-group>/` directory.
 - `index.html` is the canonical preview for the group.
 - Localized variants use `index.<lang>.html`, for example `index.zh-cn.html`, `index.en-us.html`, `index.ja-jp.html`.
+- Locale labels can be product-specific, such as `zh-sgmy`; if a locale code changes, update `copy_master.lang`, generated `index.<lang>.html`, export names, reports, deliverable file names, and any manually maintained variant list together.
 - Prefer an explicit `html_group` field in `data/copy_master.json`; otherwise the script infers one from output/template fields.
 - Do not overwrite the only baseline during translation. Keep the canonical HTML and emit separate localized files.
 
@@ -138,7 +167,8 @@ Use these rules when opening a full multilingual copy-recreation pipeline from r
 - Build scripts may render old sample rows in addition to the active project rows. When that happens, scope review, QC interpretation, export, and final delivery to the intended `html_group` rather than every preview printed by `npm run build`.
 - Do not assume `npm run batch-export` writes PNG files. Check what it actually produces. If it only writes a manifest/report, use a local export helper or Chrome headless screenshots for real image output.
 - Playwright being installed does not mean its browser binary is available. If Playwright fails because the cached Chromium executable is missing, prefer an installed system browser such as Google Chrome or Microsoft Edge before changing HTML/CSS.
-- Keep one-off export helpers outside shared repo scripts unless the behavior is generally useful. A temporary helper can live in the task workspace `work/`, while durable export behavior should be promoted intentionally later.
+- Keep one-off export helpers outside shared repo scripts unless the behavior is generally useful. A temporary helper can live in the task workspace `work/`, while durable export behavior should be promoted intentionally later. One-off helpers should export the generated HTML as-is; they should not recreate the poster with a different DOM, inject `<script>`, or bypass the editability contract.
+- If an emergency Pillow/canvas-style raster fallback is used to unblock a visual preview, label it as non-authoritative and non-editable. Do not deliver it as the final skill output when editable HTML text is required.
 - Always run both page-level and cell-level overflow checks for dense multilingual tables. A page can have no scrollbars while individual cells still overflow their columns.
 - For local cell overflow detection, compare the text element bounding box with its parent cell, not only `document.scrollWidth` or page scrollbars.
 - Do not rely on `scrollHeight / lineHeight` to count visual lines in flex table cells; it can misreport centered single-line flex content. Use `Range.getClientRects()` or explicit span counts when checking real line breaks.
@@ -150,7 +180,8 @@ Use these rules when opening a full multilingual copy-recreation pipeline from r
 - Map color tweaks through CSS filters can be iterative and unstable. Record whether the desired direction is "more blue", "lighter", "closer to 4G/5G badge", or "less dominant", then verify against exports rather than filter values alone.
 - When syncing final deliverables to an `outputs/` folder, make the HTML self-contained for preview. Copy required assets next to the HTML or rewrite asset paths so the output directory can be opened independently from the project workspace.
 - After every rebuild that changes HTML structure, resync the latest HTML, CSS, assets, and export reports to the deliverable folder. A stale copied HTML folder can make final outputs disagree with project previews.
-- Report DOM contracts along with images: canvas size, script count, image count, i18n node count, business key count, scrollbar status, and any language-specific exceptions. These checks catch regressions that visual review can miss.
+- Report DOM contracts along with images: canvas size, script count, image count, i18n node count, business key count, scrollbar status, cell overflow list, selectable text status, and any language-specific exceptions. These checks catch regressions that visual review can miss.
+- When copying final PNGs and HTML to a detached `outputs/` folder, also copy the export report. The report should name the workspace project root, active `html_group`, every language variant, PNG dimensions, byte sizes, and source HTML path so later agents can trace the deliverable back to editable HTML.
 
 ## Layered PNG + HTML Pitfalls
 
@@ -158,11 +189,26 @@ Use these rules for complex illustrated posters where a flat sticker-sheet asset
 
 - Do not generate a loose asset sticker sheet for complex posters. Prefer same-canvas transparent PNG layers plus editable HTML/CSS/SVG overlay.
 - Every PNG layer must use the final canvas dimensions and origin. Preserve alpha, keep transparent regions transparent, and verify dimensions before reporting success.
+- For irregular or AI-generated bitmap layers, run flood cutout first and use the resulting `*-transparent.png`; do not place glow-cutout, gray-matte, or softly faded background assets as final layers.
+- Transparent PNG acceptance requires fully transparent exterior pixels, no visible gradient glow around the silhouette, and a saved `*-mask-debug.png` plus `*-cutout-report.json`.
 - PNG layers must not contain poster-level title, step copy, CTA, legal text, labels, or other text that needs localization. Those belong in DOM text with `data-i18n-key`.
 - Keep CSS-rebuildable geometry out of PNG layers: large rectangles, circles, rounded cards, pills, button bases, notice bars, simple borders, and simple icons.
 - Use clear layer names and z-index roles such as `background-art.png`, `device-art.png`, optional `foreground-art.png`, and an HTML text/vector layer.
 - If a device or screen layer still contains microcopy from the reference image, report it as a known limitation instead of calling the poster fully editable.
 - Check `script_count`, editable text count, `data-i18n-key` count, PNG dimensions, alpha extrema, and visible layer paths before completion.
+
+## Phone Poster Layering Pitfalls
+
+Use these rules for phone-UI travel/eSIM posters and other same-canvas illustrated ads where device mockups, small icon assets, QR codes, and editable marketing copy overlap.
+
+- If a same-canvas layer touches the canvas edge, such as bottom waves, skyline art, or a decorative sticker anchored at the edge, edge-flood cleanup can sample the subject as background or remove almost nothing. Inspect `*-mask-debug.png` whenever `removed_area_ratio_too_low` or `removed_area_ratio_too_high` appears; do not accept the transparent layer until the exterior region is truly transparent or the layer is cropped/padded for safe edge sampling.
+- Do not feed feathered or semi-transparent masks into flood cutout as final art. Partial alpha that is not removed can become a dark opaque seam after PNG compositing. Use a hard mask for the removable exterior or explicitly clean near-transparent edge pixels before placing the layer.
+- For icon-sized assets inside editable UI, such as the airplane in a `Travel eSIM` pill or the three feature-card icons, prefer inline SVG/CSS recreation. Use a cropped PNG only when texture, painterly shading, or source fidelity matters more than clean editability; verify that the crop has no background matte before shipping.
+- QR codes and scannable codes are bitmap truth assets. Crop them from the reference into the project `source/` folder, copy them with the deliverable asset pack, preserve contrast and square geometry, and never redraw, OCR, blur, or scale them through CSS filters.
+- Device mockups need a separate `phone safe-area` contract: keep the bezel/shadow, clipped screen background, and DOM screen UI in distinct z-index layers. Scale the phone shell and inner UI together, and verify no card, ring, or QR container is hidden by the shell or by an oversized screen background.
+- When enlarging a phone or feature cards to fill white space, preserve translation resilience first. Use `minmax(0, 1fr)`, `min-width: 0`, tight but readable `line-height`, and `overflow-wrap: anywhere` on labels that can expand; avoid one global text scale that makes S8N/localized copy overflow.
+- Left-side feature cards must leave the underlying landmark line art intentionally visible. Tighten card height, gap, and padding before moving the card stack down; do not cover skyline/landmark art unless the reference clearly does.
+- Detached deliverables may have a different path depth than the workspace. A workspace file such as `html/<group>/index.html` may use `../../source/...`, while `outputs/<deliverable>/html/index.html` may need `../source/...`. Verify every local `img src` by resolving it from the delivered HTML path, not only from the workspace preview.
 
 ## Escalation Triggers
 
@@ -281,6 +327,8 @@ Use `npm run export-fast -- --project <project-id> [--group <html-group>] [--sca
 
 `npm run render:profile -- --project <project-id> [--group <html-group>]` writes `reports/render-profile-report.json`. If a preview fails because of unsupported CSS, do not silently export a degraded image; report the unsupported CSS and use a separate high-fidelity fallback only when needed.
 
+When using a Playwright/browser screenshot fallback, set the viewport to the CSS canvas size and increase `deviceScaleFactor` only for higher-resolution output. Do not change CSS dimensions to get a larger export.
+
 When real images are required, verify file existence, dimensions, language variants, and scale variants before reporting completion.
 
 ## Map Label Placement
@@ -328,6 +376,11 @@ Before claiming a complex image HTML conversion is complete, report or verify:
 - i18n metadata count.
 - Selectable text status.
 - Source asset path.
+- Resolved local image paths from the active HTML path.
+- Detached deliverable asset path status, if an `outputs/` copy exists.
+- QR/scannable-code crop path and rendered dimensions, when a code appears in the reference.
+- Phone safe-area and z-index status, when a device mockup contains editable DOM UI.
+- Translation overflow-safety notes for enlarged phone UI, feature cards, or dense labels.
 - Preview path.
 - Report path.
 - Exported PNG paths and dimensions, when image export was requested.
@@ -352,6 +405,7 @@ npm run review:score -- --project <project-id> [--subproject <subproject-id>] --
 npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  # report/export plan; verify PNGs separately
 npm run render:profile -- --project <project-id> [--group <html-group>]
 npm run export-fast -- --project <project-id> [--group <html-group>] [--scale 2]
+npm run flood-cutout -- --input <source.png> [--output <clean.png>] [--mask <mask-debug.png>] [--report <report.json>]
 npm test
 ```
 
@@ -366,6 +420,15 @@ npm test
 - Text labels are not selectable.
 - Expected i18n or business metadata is missing.
 - Output was written to the repo root or the wrong project folder.
+- A task-specific source image, generated PNG, screenshot, or deliverable has been added to the skill repo without a reusable asset reason and metadata.
+- A transparent bitmap layer still has visible exterior glow, gray matte, or partial-alpha haze after flood cutout.
+- A flood cutout report warns about removed area ratio and the mask debug has not been inspected.
+- A semi-transparent mask or partial-alpha cutout creates a dark compositing seam around a layer.
+- A QR/scannable code is missing, redrawn, filtered, blurred, or not resolvable from the final delivered HTML.
+- A detached `outputs/` HTML copy has broken local image paths after moving files out of the workspace.
+- Device screen UI is partially hidden by the phone shell, clipped safe area, oversized internal containers, or incorrect z-index.
+- Enlarged phone/card layout has not been checked for S8N or translated-copy overflow.
 - Complex map labels lack coordinate reports or debug artifacts.
 - The user requested image export but only `reports/export-report.json` was produced.
+- The final deliverable was produced by a non-editable raster fallback while the request required editable HTML text.
 - The page visually matches but the DOM contract fails.

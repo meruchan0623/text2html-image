@@ -6,6 +6,8 @@ Use this reference only when stage rules are unclear, when extending templates, 
 
 - Backgrounds and patches must not contain flattened text, logos, prices, CTAs, or legal copy.
 - Hero, product, and character assets should be transparent PNG when compositing is required.
+- For irregular bitmap cutouts, run `npm run flood-cutout -- --input <source.png>` and use the generated `*-transparent.png` as the compositing asset. Keep `*-mask-debug.png` and `*-cutout-report.json` in `working/` or `reports/` for review.
+- Reject transparent assets that still depend on gradient glow, gray matte, or semi-transparent exterior haze to blend into the poster.
 - Five-view character packs should include `front.png`, `front_3q.png`, `side.png`, `back_3q.png`, `back.png`, `contact-sheet.png`, and `asset.json`.
 - Record source, license, dimensions, transparency, angle, style, and usage scene.
 - Treat GPT Images 2 or other image generation as an external asset producer: require source references, action prompt, target use case, local output files, and metadata before claiming completion.

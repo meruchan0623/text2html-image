@@ -11,6 +11,7 @@
     "batch-export": "node scripts/batch-export.js",
     "render:profile": "node scripts/render-fast.js --profile-only",
     "export-fast": "node scripts/render-fast.js",
+    "flood-cutout": "node scripts/flood-cutout.js",
     "test": "node scripts/test.js"
   },
   "keywords": [
@@ -28,6 +29,7 @@
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "css-tree": "^3.2.1",
-    "parse5": "^8.0.1"
+    "parse5": "^8.0.1",
+    "pngjs": "^7.0.0"
   }
 }

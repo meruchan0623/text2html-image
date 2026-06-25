@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { PNG } = require('pngjs');
 const {
   ROOT,
   createProjectWorkspace,
@@ -33,6 +34,7 @@ for (const script of [
   'project-init.js',
   'review-score.js',
   'render-fast.js',
+  'flood-cutout.js',
   'test.js',
 ]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
@@ -41,9 +43,11 @@ for (const script of [
 const packageJson = JSON.parse(read('package.json'));
 assert(packageJson.scripts['render:profile'] === 'node scripts/render-fast.js --profile-only', 'package.json missing render:profile script');
 assert(packageJson.scripts['export-fast'] === 'node scripts/render-fast.js', 'package.json missing export-fast script');
+assert(packageJson.scripts['flood-cutout'] === 'node scripts/flood-cutout.js', 'package.json missing flood-cutout script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
   assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
+assert(packageJson.dependencies?.pngjs || packageJson.devDependencies?.pngjs, 'package.json missing pngjs');
 
 const config = JSON.parse(read('workflow.config.json'));
 assert(Array.isArray(config.workflow_phases), 'workflow.config.json missing workflow_phases');
@@ -102,8 +106,23 @@ assert(skillBody.includes('direct HTML-to-SVG-to-PNG'), 'skill must describe dir
 assert(skillBody.includes('## Self-Contained Skill Package'), 'skill must document self-contained package execution');
 assert(skillBody.includes('## Layered PNG + HTML Pitfalls'), 'skill must document layered PNG pitfalls from recent work');
 assert(skillBody.includes('same-canvas transparent PNG layers'), 'skill must prefer same-canvas transparent PNG layers');
+assert(skillBody.includes('## Flood Cutout Asset Cleanup'), 'skill must document flood cutout asset cleanup');
+assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cutout command');
+assert(skillBody.includes('*-mask-debug.png'), 'skill must require mask debug output');
+assert(skillBody.includes('*-cutout-report.json'), 'skill must require cutout report output');
 assert(skillBody.includes('PNG layers must not contain poster-level title'), 'skill must forbid localized poster text in PNG layers');
 assert(skillBody.includes('data-i18n-key'), 'skill must require i18n metadata for editable text');
+assert(skillBody.includes('## Phone Poster Layering Pitfalls'), 'skill must document phone poster layering pitfalls');
+assert(skillBody.includes('same-canvas layer touches the canvas edge'), 'skill must document same-canvas edge flood-cutout risk');
+assert(skillBody.includes('Partial alpha that is not removed can become a dark opaque seam'), 'skill must document partial-alpha seam risk');
+assert(skillBody.includes('the airplane in a `Travel eSIM` pill'), 'skill must prefer SVG/CSS for small UI art assets');
+assert(skillBody.includes('QR codes and scannable codes are bitmap truth assets'), 'skill must require QR/scannable codes as cropped bitmap assets');
+assert(skillBody.includes('phone safe-area'), 'skill must document phone safe-area layering checks');
+assert(skillBody.includes('overflow-wrap: anywhere'), 'skill must document translation-resilient enlarged layouts');
+assert(skillBody.includes('outputs/<deliverable>/html/index.html'), 'skill must document detached deliverable path depth checks');
+assert(skillBody.includes('Resolved local image paths from the active HTML path'), 'completion contract must verify image paths from active HTML');
+assert(skillBody.includes('QR/scannable-code crop path'), 'completion contract must include QR crop verification');
+assert(skillBody.includes('Device screen UI is partially hidden'), 'stop conditions must catch phone UI occlusion');
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
   cwd: ROOT,
@@ -320,5 +339,73 @@ const savedScoreReport = JSON.parse(fs.readFileSync(subprojectScoreReportPath, '
 assert(savedScoreReport.overall_score === 91, 'review-score should preserve overall score');
 assert(savedScoreReport.subproject_id === 'page-master-a', 'review-score should preserve subproject id');
 assert(savedScoreReport.issues[0].fix_hint === 'move hero up', 'review-score should parse issue fix hint');
+
+const floodInputPath = path.join(projectPaths.working, 'flood-cutout-input.png');
+const floodOutputPath = path.join(projectPaths.working, 'flood-cutout-output.png');
+const floodMaskPath = path.join(projectPaths.working, 'flood-cutout-mask-debug.png');
+const floodReportPath = path.join(projectPaths.reports, 'flood-cutout-report.json');
+const floodPng = new PNG({ width: 12, height: 12 });
+function setPixel(png, x, y, rgba) {
+  const offset = (png.width * y + x) << 2;
+  png.data[offset] = rgba[0];
+  png.data[offset + 1] = rgba[1];
+  png.data[offset + 2] = rgba[2];
+  png.data[offset + 3] = rgba[3];
+}
+function getPixel(png, x, y) {
+  const offset = (png.width * y + x) << 2;
+  return [png.data[offset], png.data[offset + 1], png.data[offset + 2], png.data[offset + 3]];
+}
+for (let y = 0; y < floodPng.height; y += 1) {
+  for (let x = 0; x < floodPng.width; x += 1) {
+    setPixel(floodPng, x, y, [245, 242, 238, 255]);
+  }
+}
+for (let y = 3; y <= 8; y += 1) {
+  for (let x = 3; x <= 8; x += 1) {
+    setPixel(floodPng, x, y, [20, 90, 150, 255]);
+  }
+}
+for (let y = 4; y <= 7; y += 1) {
+  for (let x = 4; x <= 7; x += 1) {
+    setPixel(floodPng, x, y, [245, 242, 238, 255]);
+  }
+}
+for (let x = 2; x <= 9; x += 1) {
+  setPixel(floodPng, x, 2, [223, 220, 216, 255]);
+  setPixel(floodPng, x, 9, [223, 220, 216, 255]);
+}
+for (let y = 2; y <= 9; y += 1) {
+  setPixel(floodPng, 2, y, [223, 220, 216, 255]);
+  setPixel(floodPng, 9, y, [223, 220, 216, 255]);
+}
+fs.writeFileSync(floodInputPath, PNG.sync.write(floodPng));
+
+const floodOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'flood-cutout.js'),
+  '--input', floodInputPath,
+  '--output', floodOutputPath,
+  '--mask', floodMaskPath,
+  '--report', floodReportPath,
+  '--tolerance', '24',
+  '--edge-cleanup', '2',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(floodOutput.includes('Flood cutout completed'), 'flood-cutout should report completion');
+assert(fs.existsSync(floodOutputPath), 'flood-cutout should write transparent PNG');
+assert(fs.existsSync(floodMaskPath), 'flood-cutout should write mask debug PNG');
+assert(fs.existsSync(floodReportPath), 'flood-cutout should write JSON report');
+const floodResult = PNG.sync.read(fs.readFileSync(floodOutputPath));
+assert(getPixel(floodResult, 0, 0)[3] === 0, 'external background should become fully transparent');
+assert(getPixel(floodResult, 5, 5)[3] === 255, 'internal background-colored hole should be preserved because it is not edge-connected');
+assert(getPixel(floodResult, 2, 2)[3] === 0, 'edge glow ring should be removed');
+assert(getPixel(floodResult, 3, 3)[3] === 255, 'foreground body should remain opaque');
+const floodReport = JSON.parse(fs.readFileSync(floodReportPath, 'utf8'));
+assert(floodReport.mode === 'edge-flood', 'flood report should name edge-flood mode');
+assert(floodReport.removed_pixels > 0, 'flood report should count removed pixels');
+assert(floodReport.edge_cleanup_pixels > 0, 'flood report should count edge cleanup pixels');
+assert(floodReport.warnings.length === 0, `flood report should not warn for fixture: ${floodReport.warnings.join('; ')}`);
 
 console.log(`Tests passed. Generated ${outputs.filter((item) => item.status === 'built').length} preview(s).`);
