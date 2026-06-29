@@ -306,6 +306,18 @@ assert(skillBody.includes('overflow-wrap: anywhere'), 'skill must document trans
 assert(skillBody.includes('outputs/<deliverable>/html/index.html'), 'skill must document detached deliverable path depth checks');
 assert(skillBody.includes('Resolved local image paths from the active HTML path'), 'completion contract must verify image paths from active HTML');
 assert(skillBody.includes('QR/scannable-code crop path'), 'completion contract must include QR crop verification');
+assert(skillBody.includes('The preferred future layout is adaptive'), 'skill must document the preferred adaptive layout');
+assert(skillBody.includes('Current runtime truth'), 'skill must document current runtime truth');
+assert(skillBody.includes('Future target'), 'skill must document future target state');
+assert(skillBody.includes('Before creating or editing output files'), 'skill must document output file precedence');
+assert(skillBody.includes('If both html/index.html and html/<html-group>/index.html exist'), 'skill must document grouped evidence preference');
+assert(skillBody.includes('Run evidence activation'), 'skill must document run evidence activation');
+assert(skillBody.includes('Do not migrate or delete old folders unless the user explicitly requests a migration task.'), 'skill must avoid undocumented legacy evidence migration');
+assert(skillBody.includes('One durable summary file'), 'skill must define one durable summary artifact');
+assert(skillBody.includes('Two durable project-level report files'), 'skill must define two durable project-level reports');
+assert(skillBody.includes('Three or more durable project-level reports'), 'skill must define three-or-more durable project-level report behavior');
+assert(skillBody.includes('runs/latest/scores/round-NN.json'), 'skill must document run-level score path');
+assert(skillBody.includes('Existing historical and current runtime folders'), 'skill must preserve legacy runtime folders unless requested');
 assert(skillBody.includes('Device screen UI is partially hidden'), 'stop conditions must catch phone UI occlusion');
 assert(skillBody.includes('npm run audit:dom'), 'skill must document audit:dom command');
 assert(skillBody.includes('DOM editability report path'), 'completion contract must include DOM editability report');
@@ -313,6 +325,24 @@ assert(skillBody.includes('dom-editability-report.json'), 'skill must mention do
 const executionFlow = read('references/execution-flow.md');
 assert(executionFlow.includes('dom-editability-report.json'), 'execution flow must include DOM editability report');
 assert(executionFlow.includes('dom-editability-summary.md'), 'execution flow must include DOM editability summary');
+assert(executionFlow.includes('Stable project-level examples'), 'execution flow must document stable project-level example artifacts');
+assert(executionFlow.includes('Run-level examples'), 'execution flow must document run-level example artifacts');
+assert(executionFlow.includes('generated `html/index*.html` or `html/<html-group>/index*.html`'), 'execution flow must document adaptive workspace-html paths');
+assert(executionFlow.includes('active single-group `html/` path or active `html_group`'), 'execution flow must document single-group and grouped patch scope');
+assert(executionFlow.includes('record the affected variants under `runs/latest/reports/` when run evidence is active'), 'execution flow must document adaptive patch report paths');
+assert(executionFlow.includes('two durable project-level report files may also stay at root'), 'execution flow must document two-report root threshold');
+assert(executionFlow.includes('three or more durable reports'), 'execution flow must document report-set threshold');
+assert(executionFlow.includes('Promote `runs/latest/` to a named run only when'), 'execution flow must document run promotion rule');
+assert(executionFlow.includes('runs/latest/reports/intake-report.json'), 'execution flow must document intake run report');
+const stageGuides = read('references/stage-guides.md');
+assert(stageGuides.includes('reports/export-report.json'), 'stage-guides must mention export-report.json');
+assert(stageGuides.includes('Current `npm run batch-export` is report-only'), 'stage-guides must mention batch-export report-only mode');
+assert(stageGuides.includes('One HTML group -> direct `html/index.html`'), 'stage-guides must document single-group html output path');
+assert(stageGuides.includes('Multiple HTML groups -> `html/<html-group>/`.'), 'stage-guides must document multi-group html output path');
+assert(stageGuides.includes('One export group -> direct `exports/`'), 'stage-guides must document single export-group path');
+assert(stageGuides.includes('Multiple delivery/export packs -> `exports/<delivery-id-or-group>/`'), 'stage-guides must document multi-delivery export path');
+assert(stageGuides.includes('Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/`'), 'stage-guides must document run-level iterative diagnostics path');
+assert(!stageGuides.includes('exports/export-manifest.json'), 'stage-guides should not require export manifest path');
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
   cwd: ROOT,

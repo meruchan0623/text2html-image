@@ -95,28 +95,90 @@ Deletion review rules:
 Before changing an existing project, identify the active edit surface:
 
 - `template-source`: edit `templates/<template_id>/`; rebuild after the change.
-- `workspace-html`: edit generated `html/<html-group>/index*.html`; do not rebuild before export unless the change is intentionally backported or discarded.
+- `workspace-html`: edit generated HTML under `html/index*.html` for single-group projects or `html/<html-group>/index*.html` for multi-group projects; do not rebuild before export unless the change is intentionally backported or discarded.
 - `deliverable-copy`: edit a self-contained final output folder; sync back or mark it detached.
 
 If the user asks to patch an existing preview, remove copy, adjust one language in a group, re-export images, or continue a previous visual round, read `references/execution-flow.md` before editing. It contains the source-surface guard, grouped DOM patch discipline, export mode guard, and verification ladder.
 
-For `workspace-html` edits, patch all variants in the active `html_group` unless the user explicitly asks for one locale only. Record the affected variants and whether export refresh is required under `reports/` when the change is more than trivial.
+For `workspace-html` edits, patch all variants in the active `html_group` unless the user explicitly asks for one locale only. Under current scripts, workspace HTML is commonly emitted as `html/<html-group>/`; patch variants accordingly unless a single-group adaptive layout is already active for that project. Record the affected variants and whether export refresh is required under `reports/` when the change is more than trivial.
 
 ## Project Workspace
 
-Runtime files live outside the repo in the current user's Documents folder, grouped directly by image project:
+Runtime files live outside the repo in the current user's Documents folder. The preferred future layout is adaptive: keep stable project entrypoints shallow, add subdirectories only when there is more than one group or when process evidence must be retained.
+
+This is a preferred future output contract for generated workspaces. Current scripts are unchanged, so existing/historical folders may still follow legacy grouped paths until runtime behavior is updated.
+
+Current runtime truth is existing generated files on disk. Future target is adaptive shallow single-group output first, with grouped output only when needed.
+
+For a single-group project:
 
 ```text
 <Documents>/text2html-image-project/<project-id>/
-<Documents>/text2html-image-project/<project-id>/<subproject-id>/
-├── source/       原始素材和参考图
-├── working/      中间文件、草稿、辅助数据
-├── html/         可编辑 HTML/CSS 预览
-├── screenshots/  浏览器截图
-├── scores/       抄图/复刻每轮评分 JSON
-├── exports/      最终导出图片目标
-└── reports/      build、QC、汇总报告
+├── source/
+├── html/
+│   ├── index.html
+│   ├── index.<lang>.html
+│   └── master.css
+├── exports/
+│   └── index.png
+└── project-summary.json
 ```
+
+For a multi-group project:
+
+```text
+<Documents>/text2html-image-project/<project-id>/
+├── source/
+├── html/<html-group>/
+├── exports/<delivery-id-or-group>/
+└── project-summary.json
+```
+
+For complex iteration that must retain process evidence, add process evidence under `runs/` (optional):
+
+```text
+<Documents>/text2html-image-project/<project-id>/
+└── runs/
+    ├── latest/
+    │   ├── working/
+    │   ├── screenshots/
+    │   ├── scores/
+    │   └── reports/
+    └── YYYY-MM-DD-rNN-<reason>/
+```
+
+Directory creation rules:
+
+Define stable summary/report as user-facing, accepted artifacts meant for handoff (for example `project-summary.json`, `delivery-audit.json`, `qc-summary.json`, `export-audit.json`, `user-acceptance.json`). A **stable report** is durable project-level handoff evidence; temporary `runs/latest/` evidence is not stable by itself.
+
+- One durable summary file: keep `project-summary.json` at project root.
+- Two durable project-level report files may stay at project root when names are self-explanatory and not mixed report types.
+- Three or more durable project-level reports, or mixed report types that need grouping, create `reports/` and keep report names specific.
+- Temporary run reports stay under `runs/latest/reports/` and do not count as durable project-level reports.
+- Existing historical project summaries/reports may remain where they already are; do not move or rewrite them to fit this preference unless the user explicitly requests migration.
+
+Before creating or editing output files:
+
+- Detect active project layout from existing files first.
+- If both html/index.html and html/<html-group>/index.html exist, grouped evidence wins; use `html/<html-group>/index.html` as grouped/current-script layout.
+- If html/<html-group>/index.html exists (and no conflicting newer grouped evidence exists), treat it as grouped/current-script output.
+- If neither grouped layout evidence exists and html/index.html is active, use single-group shallow output.
+- If neither exists and the user/project is clearly single-group, use the preferred future shallow layout.
+- If neither exists and grouping is needed, use the current script-compatible grouped layout until runtime scripts are updated.
+- If there is only one HTML group, write `index.html`, localized `index.<lang>.html`, and `master.css` directly under `html/`.
+- If there are two or more HTML groups, write them under `html/<html-group>/`.
+- If there is only one export group, write PNG/WebP/JPG outputs directly under `exports/`.
+- If there are two or more delivery groups, write them under `exports/<delivery-id-or-group>/`.
+Run evidence activation:
+
+- If `runs/latest/` already exists, keep using it for run evidence.
+- If current task needs reviewable iteration evidence, reference-image scoring rounds, final export/delivery audit, or reusable failure investigation: create/use `runs/latest/` first and place screenshots/scores/working/reports there.
+- Otherwise, default to existing/current script-supported legacy locations such as `screenshots/`, `scores/`, `working/`, and `reports/` (runtime scripts are unchanged, so existing files on disk remain source-of-truth).
+- Promote `runs/latest/` to `runs/YYYY-MM-DD-rNN-<reason>/` only for accepted milestones, final delivery checkpoints, or reusable failure evidence.
+
+Do not preserve every micro-iteration as a named run. Named runs should exist only when they support later review: user acceptance, delivery/export proof, reusable failure analysis, or before/after audit evidence. Temporary browser screenshots, MCP captures, mask experiments, and one-off work files should stay in `runs/latest/working/` unless they become part of that proof.
+
+Existing historical and current runtime folders may still use the older `source/`, `working/`, `html/`, `screenshots/`, `scores/`, `exports/`, `reports/` layout. Do not migrate or delete old folders unless the user explicitly requests a migration task.
 
 Image project folders must stay shallow and self-contained. Do not place repo configuration, skill files, package files, or global manifests inside image project folders. Keep generator runtime files such as `workflow.config.json`, `package.json`, `scripts/`, `templates/`, and skill source files in the repo only.
 
@@ -124,13 +186,13 @@ Do not generate `project-manifest.json` inside image project folders. If a comma
 
 Default project id is `default`. Prefer an explicit English kebab-case project id. Project and subproject ids are sanitized to lowercase ASCII kebab-case and capped at 20 characters.
 
-Use `--subproject <subproject-id>` when one user job contains multiple page-level image masters that need isolated rounds, screenshots, and exports.
+Use `--subproject <subproject-id>` when one user job contains multiple page-level image masters that need isolated rounds, screenshots, and exports. This remains the existing script behavior; adaptive flattening is a documentation contract and does not alter `--subproject` semantics until scripts are updated.
 
 ## HTML Grouping
 
-- Same-page or same-master multilingual files must live in one `html/<html-group>/` directory.
-- `index.html` is the canonical preview for the group.
-- Localized variants use `index.<lang>.html`, for example `index.zh-cn.html`, `index.en-us.html`, `index.ja-jp.html`.
+- Same-page or same-master multilingual files belong to one HTML output group.
+- Single-group projects may keep `index.html` directly under `html/`; multi-group projects keep each group under `html/<html-group>/`.
+- `index.<lang>.html` variants (for example `index.zh-cn.html`, `index.en-us.html`, `index.ja-jp.html`) live in that group path.
 - Locale labels can be product-specific, such as `zh-sgmy`; if a locale code changes, update `copy_master.lang`, generated `index.<lang>.html`, export names, reports, deliverable file names, and any manually maintained variant list together.
 - Prefer an explicit `html_group` field in `data/copy_master.json`; otherwise the script infers one from output/template fields.
 - Do not overwrite the only baseline during translation. Keep the canonical HTML and emit separate localized files.
@@ -139,8 +201,8 @@ Use `--subproject <subproject-id>` when one user job contains multiple page-leve
 
 Use these rules for coverage posters that combine a background map with editable HTML tables, especially multilingual eSIM region maps.
 
-- Decide the source of truth before editing. If the user asks to directly tune generated `html/<html-group>/index*.html`, do not run `npm run build` again until the direct edits are either accepted and backported to templates or intentionally discarded. A rebuild can overwrite generated HTML/CSS changes.
-- Keep a clear split between template source and generated workspace. Template fixes belong in `templates/<template_id>/`; emergency visual fixes can be made in the generated `html/<html-group>/` files, but then either sync the same change to every localized `index.<lang>.html` or document that only the canonical preview was edited.
+- Decide the source of truth before editing. If the user asks to directly tune generated `html/index*.html` or `html/<html-group>/index*.html`, do not run `npm run build` again until the direct edits are either accepted and backported to templates or intentionally discarded. A rebuild can overwrite generated HTML/CSS changes.
+- Keep a clear split between template source and generated workspace. Template fixes belong in `templates/<template_id>/`; emergency visual fixes can be made in generated HTML files (`html/index*.html` for active single-group or `html/<html-group>/index*.html` for grouped/current-script output), but then either sync the same change to every localized `index.<lang>.html` or document that only the canonical preview was edited.
 - For multilingual groups, a shared `master.css` does not update per-language asset references. If a map image changes in `index.html`, also grep and replace all `index.*.html` variants before exporting.
 - When left and right tables have different row counts, define the row height from the taller table container. For example, set `--coverage-table-height`, derive `--coverage-row-height: calc(var(--coverage-table-height) / 10)`, make the left table use `repeat(10, minmax(0, 1fr))`, and make the right table use the same row height for its 9 rows. Do not let each table auto-size independently.
 - Put map imagery in a deterministic layer below the table and above the card surface. A common stack is card background, map `z-index: 2`, title/table/notice `z-index: 3`, with `isolation: isolate` on the card when blending or transparency could leak.
@@ -163,7 +225,7 @@ Use these rules when opening a full multilingual copy-recreation pipeline from r
 
 - Verify the reference canvas from the actual image dimensions before choosing a target size. Do not assume platform defaults such as 1600 x 1200 when the reference layout is 1404 x 1120.
 - If a template needs many custom copy fields, confirm the renderer supports arbitrary row fields before designing the template. If it only supports a fixed schema, make the smallest compatible renderer change so country names, carriers, and language-specific fields stay in `copy_master` instead of being hard-coded.
-- Treat `html_group` as the contract for batch multilingual output. All localized pages for one visual should land under one `html/<html-group>/` directory with one shared CSS file and stable `index.<lang>.html` names.
+- Treat `html_group` as the contract for batch multilingual output. For single-group projects, localized pages may land under `html/index*.html`; for multi-group projects they should land under `html/<html-group>/index*.html`, all with one shared CSS file and stable `index.<lang>.html` names.
 - Build scripts may render old sample rows in addition to the active project rows. When that happens, scope review, QC interpretation, export, and final delivery to the intended `html_group` rather than every preview printed by `npm run build`.
 - Do not assume `npm run batch-export` writes PNG files. Check what it actually produces. If it only writes a manifest/report, use a local export helper or Chrome headless screenshots for real image output.
 - Playwright being installed does not mean its browser binary is available. If Playwright fails because the cached Chromium executable is missing, prefer an installed system browser such as Google Chrome or Microsoft Edge before changing HTML/CSS.
@@ -251,7 +313,7 @@ Reference routing:
 6. Create a project workspace with `npm run project:init -- --project <project-id> [--subproject <subproject-id>]` when the workspace does not already exist.
 7. Generate HTML previews with `npm run build -- --project <project-id> [--subproject <subproject-id>]` only when the active surface allows rebuild.
 8. Run `npm run quality-check -- --project <project-id> [--subproject <subproject-id>]` after every layout or text-affecting source/template change, and run equivalent DOM checks after direct workspace HTML edits.
-9. For visual iteration, open the generated `file://.../html/<html-group>/index*.html` in Codex Browser, save screenshots into `screenshots/`, then use multimodal reading to identify fixes. If the preview is already open, 刷新当前 Codex Browser 页面 after rebuilding.
+9. Before visual iteration or scoring, resolve the active HTML path using the Project Workspace path decision rules: grouped evidence wins; otherwise use active shallow single-group files or current script-compatible layout. For visual iteration, open the generated `file://.../html/index*.html` (single-group) or `file://.../html/<html-group>/index*.html` (multi-group) in Codex Browser, save current iterative screenshots under `runs/latest/screenshots/` when runs-based evidence is active; otherwise keep screenshots in the existing/current script-supported location. Then use multimodal reading to identify fixes. If the preview is already open, 刷新当前 Codex Browser 页面 after rebuilding.
 10. Keep the Codex Browser preview open until the image is accepted or the user stops the work. Do not close the debugging preview between unfinished rounds.
 11. Only prepare export outputs after QC or equivalent DOM/layout checks have no blocking errors.
 12. For multilingual work, preserve structure and hierarchy first; adjust language-specific typography only after the approved base layout is stable.
@@ -278,9 +340,9 @@ Loop:
 4. Open the generated preview in Codex Browser via the `file_url` printed by `npm run build`.
 5. If the preview is already open from an earlier round, 刷新当前 Codex Browser 页面 after rebuilding instead of opening a new debugging surface.
 6. Keep the preview open while the image is unfinished.
-7. Capture a browser screenshot into `screenshots/round-NN.png`.
+7. Capture a browser screenshot into `runs/latest/screenshots/round-NN.png` when run evidence is active; otherwise keep using the current/existing screenshot location (for example `screenshots/round-NN.png`).
 8. Use multimodal reading to compare the screenshot with the reference image.
-9. Write `scores/round-NN.json` with the score schema below, preferably via `npm run review:score -- --project <project-id> ...`.
+9. If `runs/latest/` is active, write scoring/review JSON under `runs/latest/scores/round-NN.json` and related reports under `runs/latest/reports/`; otherwise use the current/legacy `scores/round-NN.json` (and existing report locations).
 10. Fix the lowest-scoring dimension first and repeat until `overall_score >= 90` or the user stops the loop.
 
 Score report schema:

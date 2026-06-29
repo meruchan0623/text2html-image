@@ -101,4 +101,10 @@ Errors block export. Warnings identify missing optional assets or incomplete pro
 - Required fields: `source_row_id`, `template_id`, `platform`, `canvas_w`, `canvas_h`, `lang`, `sku`, `title`, `cta`, `export_name`.
 - Adjust typography and line-height in language-specific CSS; do not turn text into images.
 - Run `npm run batch-export -- --project <project-id> [--subproject <subproject-id>]` only after QC has no errors.
-- Current export is manifest-only and writes project `exports/export-manifest.json`; real screenshot export must wait until final assets and browser rendering runtime are verified.
+- Current `npm run batch-export` is report-only and writes `reports/export-report.json`; it does not create PNG files. Real PNG files require `npm run export-fast` for supported render profiles or an explicit browser screenshot/export fallback.
+- Adaptive grouping rule:
+  - One HTML group -> direct `html/index.html`, `html/index.<lang>.html`.
+  - Multiple HTML groups -> `html/<html-group>/`.
+  - One export group -> direct `exports/`.
+  - Multiple delivery/export packs -> `exports/<delivery-id-or-group>/`.
+  - Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/` unless promoted; otherwise preserve current script/legacy locations if no run evidence is active.

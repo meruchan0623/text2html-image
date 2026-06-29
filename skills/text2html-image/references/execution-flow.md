@@ -9,12 +9,12 @@ Before editing, state which surface owns the next change:
 | Surface | Edit here | Rebuild? | Use when |
 | --- | --- | --- | --- |
 | `template-source` | `templates/<template_id>/master.html` and `master.css` | Yes | The change should survive future builds. |
-| `workspace-html` | generated `html/<html-group>/index*.html` | No, unless backporting or discarding direct edits | The user asks to tune an existing generated preview or exported poster. |
+| `workspace-html` | generated `html/index*.html` or `html/<html-group>/index*.html` | No, unless backporting or discarding direct edits | The user asks to tune an existing generated preview or exported poster. |
 | `deliverable-copy` | self-contained final output folder | No, unless syncing back intentionally | The user asks to patch already packaged delivery files. |
 
-If the surface is `workspace-html`, patch every `index*.html` in the active `html_group` unless the user explicitly scopes the request to one locale. Do not run `npm run build` before export; it can overwrite the direct edits.
+If the surface is `workspace-html`, resolve the active HTML path from files on disk first. Patch every `index*.html` in the active single-group `html/` path or active `html_group` unless the user explicitly scopes the request to one locale. Do not run `npm run build` before export; it can overwrite the direct edits.
 
-When no patching script exists for the needed edit, write or update a small report under `reports/` with:
+When no patching script exists for the needed edit, write or update a small report under `runs/latest/reports/` when run evidence is active; otherwise use the current/legacy `reports/` path. Include:
 
 ```json
 {
@@ -53,11 +53,11 @@ Prefer stable keys over text search:
 
 Before applying a multi-file direct edit, dry-run mentally or with local inspection:
 
-1. Identify the active `html_group`.
-2. List every `index*.html` variant under that group.
+1. Identify the active single-group `html/` path or active `html_group`.
+2. List every `index*.html` variant under that path or group.
 3. Locate the same keyed node in every affected file.
 4. Apply the same semantic edit to all affected variants.
-5. Re-read the changed nodes and record the affected variants in `reports/`.
+5. Re-read the changed nodes and record the affected variants under `runs/latest/reports/` when run evidence is active; otherwise use the current/legacy `reports/` path.
 
 If a visible business text node lacks a stable key, add the key while editing unless doing so would change the user's requested scope.
 
@@ -99,20 +99,30 @@ If the in-app browser refuses `file://`, do not retry indefinitely or call the p
 
 ## 7. Rework Prevention Reports
 
-For complex poster edits, prefer reports over prose. Use the closest existing report path, or write a small task-specific JSON under `reports/`:
+For complex poster edits, prefer structured evidence over prose. One durable summary can stay at project root as `project-summary.json`; two durable project-level report files may also stay at root when names are self-explanatory and not mixed report types. Use project-level `reports/` when there are three or more durable reports, or mixed report types that need grouping. Iteration-specific reports should go under `runs/latest/reports/` unless promoted to a named run.
 
-- `intake-report.json`
-- `html-patch-report.json`
-- `layout-impact-report.json`
-- `dom-contract-report.json`
-- `dom-editability-report.json`
-- `dom-editability-summary.md`
-- `locale-risk-report.json`
-- `render-profile-report.json`
-- `png-export-report.json`
-- `delivery-audit-report.json`
+Stable project-level examples:
 
-If a stage has no report or equivalent proof, say exactly which proof is missing instead of claiming the image is complete.
+- `project-summary.json`
+- `delivery-audit.json`
+- `reports/qc-summary.json`
+- `reports/export-audit.json`
+- `reports/user-acceptance.json`
+
+Run-level examples:
+
+- `runs/latest/reports/intake-report.json`
+- `runs/latest/reports/html-patch-report.json`
+- `runs/latest/reports/layout-impact-report.json`
+- `runs/latest/reports/dom-contract-report.json`
+- `runs/latest/reports/dom-editability-report.json`
+- `runs/latest/reports/dom-editability-summary.md`
+- `runs/latest/reports/locale-risk-report.json`
+- `runs/latest/reports/render-profile-report.json`
+
+Promote `runs/latest/` to a named run only when the evidence needs to survive: accepted visual milestone, final delivery, reusable failure, or before/after audit. Use names such as `2026-06-29-r01-layout`, `2026-06-29-r02-i18n`, or `2026-06-29-r03-export`.
+
+If a stage has no report or equivalent evidence/proof, say exactly which evidence is missing instead of claiming the image is complete.
 
 ## 8. Completion Checklist
 
