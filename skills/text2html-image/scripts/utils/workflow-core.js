@@ -333,7 +333,7 @@ function validateWorkflow(options = {}) {
   if (!rows.length) errors.push('data/copy_master.json has no data rows');
 
   for (const row of rows) {
-    for (const field of ['source_row_id', 'template_id', 'platform', 'canvas_w', 'canvas_h', 'lang', 'sku', 'title', 'cta', 'export_name']) {
+    for (const field of ['source_row_id', 'template_id', 'platform', 'canvas_w', 'canvas_h', 'lang', 'sku', 'title', 'export_name']) {
       if (row[field] === undefined || row[field] === '') errors.push(`${row.source_row_id || 'unknown row'} missing ${field}`);
     }
 

@@ -374,6 +374,7 @@ Before claiming a complex image HTML conversion is complete, report or verify:
 - Script count.
 - Editable text count.
 - i18n metadata count.
+- DOM editability report path, including editable text count, i18n metadata count, business key count, script count, image count, and asset text risk count.
 - Selectable text status.
 - Source asset path.
 - Resolved local image paths from the active HTML path.
@@ -401,6 +402,7 @@ npm run start
 npm run project:init -- --project <project-id> [--subproject <subproject-id>]
 npm run build -- --project <project-id> [--subproject <subproject-id>]
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>]
+npm run audit:dom -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
 npm run review:score -- --project <project-id> [--subproject <subproject-id>] --round 1 --source-image <path> --screenshot <path> --overall-score 90 --layout-score 90 --typography-score 90 --color-score 90 --asset-score 90 --issue "medium|layout|observed|expected|fix hint"
 npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  # report/export plan; verify PNGs separately
 npm run render:profile -- --project <project-id> [--group <html-group>]
@@ -420,6 +422,7 @@ npm test
 - Text labels are not selectable.
 - Expected i18n or business metadata is missing.
 - Output was written to the repo root or the wrong project folder.
+- `reports/dom-editability-report.json` has `status: "fail"` for the affected HTML group.
 - A task-specific source image, generated PNG, screenshot, or deliverable has been added to the skill repo without a reusable asset reason and metadata.
 - A transparent bitmap layer still has visible exterior glow, gray matte, or partial-alpha haze after flood cutout.
 - A flood cutout report warns about removed area ratio and the mask debug has not been inspected.

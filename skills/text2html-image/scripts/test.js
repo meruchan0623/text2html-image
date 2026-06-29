@@ -13,6 +13,7 @@ const {
   validateWorkflow,
 } = require('./utils/workflow-core');
 const { listHtmlEntries } = require('./utils/html-entries');
+const { inspectHtmlEditability } = require('./utils/dom-editability-core');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -26,6 +27,187 @@ function maybeReadAbsolute(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
 }
 
+const testFixturePaths = [];
+function writeTestFixture(relativePath, content) {
+  const target = path.join(ROOT, relativePath);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, content);
+  testFixturePaths.push(target);
+}
+
+function cleanupTestFixtures() {
+  for (const file of testFixturePaths.reverse()) {
+    fs.rmSync(file, { force: true });
+  }
+  for (const dir of [
+    'templates/T01_price_type',
+    'templates/banner_zh_hkmo',
+    'templates/europe_esim_map',
+    'templates/travel_esim_usage_query',
+    'templates/africa_esim_map',
+    'assets/source',
+    'templates',
+    'assets',
+  ]) {
+    try {
+      fs.rmdirSync(path.join(ROOT, dir));
+    } catch (_error) {
+      // Directory may be non-empty with user files; only test-created files are removed above.
+    }
+  }
+}
+
+function prepareTestFixtures() {
+  cleanupTestFixtures();
+  process.on('exit', cleanupTestFixtures);
+
+  writeTestFixture('assets/source/hong-kong-skyline.jpg', 'fixture skyline');
+  writeTestFixture('assets/source/hk-disneyland-castle.jpg', 'fixture castle');
+  writeTestFixture('assets/source/xian-city-wall.jpg', 'fixture wall');
+
+  writeTestFixture('templates/T01_price_type/master.html', `<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <h1 class="title" data-i18n-key="title">{{title}}</h1>
+    <p class="subtitle" data-i18n-key="subtitle">{{subtitle}}</p>
+    <div class="price" data-sku="{{sku}}"><span>{{currency}}</span><strong>{{price}}</strong><span>{{unit}}</span></div>
+    <a class="cta" data-i18n-key="cta">{{cta}}</a>
+    <small class="disclaimer" data-i18n-key="disclaimer">{{disclaimer}}</small>
+  </main>
+</body>
+</html>
+`);
+  writeTestFixture('templates/T01_price_type/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #f7fbff; overflow: visible; }
+.title { position: absolute; left: 64px; top: 80px; font-size: 64px; margin: 0; }
+.subtitle { position: absolute; left: 64px; top: 170px; font-size: 32px; margin: 0; }
+.price { position: absolute; left: 64px; top: 360px; font-size: 56px; }
+.cta { position: absolute; left: 64px; bottom: 140px; font-size: 34px; }
+.disclaimer { position: absolute; left: 64px; bottom: 70px; font-size: 18px; }
+`);
+
+  writeTestFixture('templates/banner_zh_hkmo/master.html', `<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <img class="skyline" src="{{bg_asset}}" data-asset-text-policy="preserve-raster" alt="">
+    <section class="center-card">
+      <h1 class="title" data-i18n-key="title">{{title}}</h1>
+      <p class="subtitle" data-i18n-key="subtitle">{{subtitle}}</p>
+      <span class="cta" data-i18n-key="cta">{{cta}}</span>
+    </section>
+    <figure class="panel panel-castle"><img src="{{patch_asset_1}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+    <figure class="panel panel-wall"><img src="{{patch_asset_2}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+  </main>
+</body>
+</html>
+`);
+  writeTestFixture('templates/banner_zh_hkmo/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #dfeffc; overflow: visible; }
+.skyline { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.center-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 420px; height: 260px; background: rgba(255,255,255,.9); }
+.title { margin: 44px 0 0; text-align: center; font-size: 60px; }
+.subtitle, .cta { display: block; text-align: center; font-size: 28px; }
+.panel { position: absolute; margin: 0; }
+.panel img { width: 180px; height: 120px; object-fit: cover; }
+.panel-castle { left: 90px; bottom: 40px; }
+.panel-wall { right: 90px; bottom: 40px; }
+`);
+
+  writeTestFixture('templates/europe_esim_map/master.html', `<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <svg class="map-base" width="1000" height="1263" viewBox="0 0 1000 1263" aria-hidden="true">
+      <rect x="120" y="180" width="760" height="760" rx="80" fill="#e8f1ff" stroke="#315ba8" stroke-width="12"/>
+      <path d="M240 420 C360 300 510 310 620 440 S720 700 560 780 S260 750 240 580 Z" fill="#5f83d5"/>
+    </svg>
+    <span class="map-label label-lg" data-country-code="FR" data-i18n-key="country.fr" style="left: 480px; top: 560px;">法國</span>
+    <div class="title-pill" data-i18n-key="title">{{title}}</div>
+  </main>
+</body>
+</html>
+`);
+  writeTestFixture('templates/europe_esim_map/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #ffffff; overflow: visible; }
+.map-base { position: absolute; left: 0; top: 0; }
+.map-label { position: absolute; color: #fff; font-weight: 700; transform: translate(-50%, -50%); }
+.label-lg { font-size: 28px; }
+.title-pill { position: absolute; left: 560px; top: 1130px; width: 370px; height: 72px; display: flex; align-items: center; justify-content: center; color: white; background: #415BA8; border-radius: 36px; }
+`);
+
+  writeTestFixture('templates/travel_esim_usage_query/master.html', `<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <h1 class="title" data-i18n-key="title">{{title}}</h1>
+    <p class="subtitle" data-i18n-key="subtitle">{{subtitle}}</p>
+    <section class="phone" data-sku="{{sku}}">
+      <strong data-i18n-key="remaining_label">{{remaining_label}}</strong>
+      <span>{{remaining_value}} {{remaining_unit}}</span>
+    </section>
+  </main>
+</body>
+</html>
+`);
+  writeTestFixture('templates/travel_esim_usage_query/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #f5f8ff; overflow: visible; }
+.title { position: absolute; left: 80px; top: 90px; font-size: 72px; }
+.subtitle { position: absolute; left: 80px; top: 190px; font-size: 30px; }
+.phone { position: absolute; left: 340px; top: 360px; width: 420px; height: 620px; border: 8px solid #222; border-radius: 42px; }
+`);
+
+  writeTestFixture('templates/africa_esim_map/master.html', `<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <h1 class="title" data-i18n-key="title">{{title}}</h1>
+    <img class="map" src="{{hero_asset}}" data-asset-text-policy="preserve-raster" alt="">
+    <section class="country-grid" data-sku="{{sku}}">
+      <span data-country-code="DZ" data-i18n-key="country.dz">{{country_dz}}</span>
+      <span data-country-code="CD" data-i18n-key="country.cd">{{country_cd}}</span>
+      <span data-country-code="EG" data-i18n-key="country.eg">{{country_eg}}</span>
+    </section>
+  </main>
+</body>
+</html>
+`);
+  writeTestFixture('templates/africa_esim_map/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #ffffff; overflow: visible; }
+.title { position: absolute; left: 80px; top: 70px; font-size: 52px; }
+.map { position: absolute; left: 420px; top: 240px; width: 560px; height: 560px; mix-blend-mode: multiply; }
+.country-grid { position: absolute; left: 80px; top: 220px; width: 420px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+`);
+}
+
+prepareTestFixtures();
+
 for (const script of [
   'start.js',
   'build.js',
@@ -35,6 +217,7 @@ for (const script of [
   'review-score.js',
   'render-fast.js',
   'flood-cutout.js',
+  'audit-dom.js',
   'test.js',
 ]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
@@ -44,6 +227,7 @@ const packageJson = JSON.parse(read('package.json'));
 assert(packageJson.scripts['render:profile'] === 'node scripts/render-fast.js --profile-only', 'package.json missing render:profile script');
 assert(packageJson.scripts['export-fast'] === 'node scripts/render-fast.js', 'package.json missing export-fast script');
 assert(packageJson.scripts['flood-cutout'] === 'node scripts/flood-cutout.js', 'package.json missing flood-cutout script');
+assert(packageJson.scripts['audit:dom'] === 'node scripts/audit-dom.js', 'package.json missing audit:dom script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
   assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
@@ -123,6 +307,12 @@ assert(skillBody.includes('outputs/<deliverable>/html/index.html'), 'skill must 
 assert(skillBody.includes('Resolved local image paths from the active HTML path'), 'completion contract must verify image paths from active HTML');
 assert(skillBody.includes('QR/scannable-code crop path'), 'completion contract must include QR crop verification');
 assert(skillBody.includes('Device screen UI is partially hidden'), 'stop conditions must catch phone UI occlusion');
+assert(skillBody.includes('npm run audit:dom'), 'skill must document audit:dom command');
+assert(skillBody.includes('DOM editability report path'), 'completion contract must include DOM editability report');
+assert(skillBody.includes('dom-editability-report.json'), 'skill must mention dom-editability-report.json');
+const executionFlow = read('references/execution-flow.md');
+assert(executionFlow.includes('dom-editability-report.json'), 'execution flow must include DOM editability report');
+assert(executionFlow.includes('dom-editability-summary.md'), 'execution flow must include DOM editability summary');
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
   cwd: ROOT,
@@ -198,8 +388,34 @@ for (const output of buildReport.outputs.filter((item) => item.status === 'built
   assert(output.file_url === toFileUrl(output.html), `build report output should include file_url: ${output.html}`);
 }
 
+const firstHtmlOutput = outputs.find((item) => item.status === 'built');
+const firstHtmlAudit = inspectHtmlEditability(firstHtmlOutput.html);
+assert(firstHtmlAudit.status !== 'fail', `generated HTML should not fail DOM audit: ${firstHtmlOutput.html}`);
+assert(firstHtmlAudit.metrics.script_count === 0, 'generated HTML should not contain script tags');
+assert(firstHtmlAudit.metrics.editable_text_node_count > 0, 'generated HTML should expose editable DOM text nodes');
+assert(firstHtmlAudit.metrics.image_count >= 0, 'DOM audit should report image count');
+assert(Array.isArray(firstHtmlAudit.risks), 'DOM audit should report risk array');
+
 const qc = validateWorkflow({ projectId });
 assert(qc.errors.length === 0, `quality errors: ${qc.errors.join('; ')}`);
+
+const domAuditOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'audit-dom.js'),
+  '--project', projectId,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(domAuditOutput.includes('DOM editability audit written'), 'audit-dom should print report path');
+const domAuditReportPath = path.join(projectPaths.reports, 'dom-editability-report.json');
+const domAuditSummaryPath = path.join(projectPaths.reports, 'dom-editability-summary.md');
+assert(fs.existsSync(domAuditReportPath), 'audit-dom should write reports/dom-editability-report.json');
+assert(fs.existsSync(domAuditSummaryPath), 'audit-dom should write reports/dom-editability-summary.md');
+const domAuditReport = JSON.parse(fs.readFileSync(domAuditReportPath, 'utf8'));
+assert(domAuditReport.project_id === projectPaths.project_id, 'DOM audit report should include project id');
+assert(domAuditReport.summary.entry_count >= 3, 'DOM audit should include generated HTML entries');
+assert(domAuditReport.summary.script_count === 0, 'DOM audit should count zero scripts for generated previews');
+assert(domAuditReport.entries.every((entry) => entry.html.startsWith(projectPaths.html)), 'DOM audit entries should stay inside project html dir');
 
 const batchOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'batch-export.js'),

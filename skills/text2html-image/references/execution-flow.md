@@ -88,7 +88,7 @@ It must fail-fast instead of silently degrading output when HTML/CSS requires un
 
 Use the cheapest proof that can catch the current failure mode, then escalate only when needed:
 
-1. Static DOM contract: no scripts, expected image count, editable text count, i18n/business key count, local asset existence.
+1. Static DOM contract: no scripts, expected image count, editable text count, i18n/business key count, local asset existence, and `reports/dom-editability-report.json` status.
 2. HTML group consistency: canonical and localized variants share the expected structure and asset references.
 3. Render profile: direct renderer pass/fail and unsupported CSS reasons.
 4. Layout check: page overflow and cell/text overflow, especially for tables and long locale strings.
@@ -105,6 +105,8 @@ For complex poster edits, prefer reports over prose. Use the closest existing re
 - `html-patch-report.json`
 - `layout-impact-report.json`
 - `dom-contract-report.json`
+- `dom-editability-report.json`
+- `dom-editability-summary.md`
 - `locale-risk-report.json`
 - `render-profile-report.json`
 - `png-export-report.json`

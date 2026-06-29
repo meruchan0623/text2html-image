@@ -12,6 +12,7 @@
     "render:profile": "node scripts/render-fast.js --profile-only",
     "export-fast": "node scripts/render-fast.js",
     "flood-cutout": "node scripts/flood-cutout.js",
+    "audit:dom": "node scripts/audit-dom.js",
     "test": "node scripts/test.js"
   },
   "keywords": [
