@@ -306,6 +306,12 @@ assert(skillBody.includes('overflow-wrap: anywhere'), 'skill must document trans
 assert(skillBody.includes('outputs/<deliverable>/html/index.html'), 'skill must document detached deliverable path depth checks');
 assert(skillBody.includes('Resolved local image paths from the active HTML path'), 'completion contract must verify image paths from active HTML');
 assert(skillBody.includes('QR/scannable-code crop path'), 'completion contract must include QR crop verification');
+assert(skillBody.includes('## Draw/Edit Rework Guard'), 'skill must document draw/edit rework guard');
+assert(skillBody.includes('prompt_only is not a finished transparent asset'), 'skill must block prompt-only transparent layers from final HTML');
+assert(skillBody.includes('flood-cutout is not semantic segmentation'), 'skill must document flood-cutout semantic boundary');
+assert(skillBody.includes('current preview edit'), 'skill must document current preview edit guard');
+assert(skillBody.includes('resolved from the delivered HTML path'), 'skill must require delivered HTML asset path checks');
+assert(skillBody.includes('QR/barcode assets are bitmap truth assets'), 'skill must preserve scannable bitmap assets');
 assert(skillBody.includes('The preferred future layout is adaptive'), 'skill must document the preferred adaptive layout');
 assert(skillBody.includes('Current runtime truth'), 'skill must document current runtime truth');
 assert(skillBody.includes('Future target'), 'skill must document future target state');
@@ -334,6 +340,8 @@ assert(executionFlow.includes('two durable project-level report files may also s
 assert(executionFlow.includes('three or more durable reports'), 'execution flow must document report-set threshold');
 assert(executionFlow.includes('Promote `runs/latest/` to a named run only when'), 'execution flow must document run promotion rule');
 assert(executionFlow.includes('runs/latest/reports/intake-report.json'), 'execution flow must document intake run report');
+assert(executionFlow.includes('Do not promote a micro-adjustment into a full regeneration'), 'execution flow must block broad regeneration for micro-edits');
+assert(executionFlow.includes('sync-back decision'), 'execution flow must record deliverable-copy sync-back decisions');
 const stageGuides = read('references/stage-guides.md');
 assert(stageGuides.includes('reports/export-report.json'), 'stage-guides must mention export-report.json');
 assert(stageGuides.includes('Current `npm run batch-export` is report-only'), 'stage-guides must mention batch-export report-only mode');
@@ -342,7 +350,19 @@ assert(stageGuides.includes('Multiple HTML groups -> `html/<html-group>/`.'), 's
 assert(stageGuides.includes('One export group -> direct `exports/`'), 'stage-guides must document single export-group path');
 assert(stageGuides.includes('Multiple delivery/export packs -> `exports/<delivery-id-or-group>/`'), 'stage-guides must document multi-delivery export path');
 assert(stageGuides.includes('Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/`'), 'stage-guides must document run-level iterative diagnostics path');
+assert(stageGuides.includes('Prompt package is not an asset'), 'stage guides must separate prompt packages from usable assets');
+assert(stageGuides.includes('Current preview edit checklist'), 'stage guides must document current preview edits');
+assert(stageGuides.includes('Detached outputs path checklist'), 'stage guides must document detached output path checks');
 assert(!stageGuides.includes('exports/export-manifest.json'), 'stage-guides should not require export manifest path');
+
+const rootReadmePath = path.join(ROOT, '..', '..', 'README.md');
+if (fs.existsSync(rootReadmePath)) {
+  const rootReadmeBody = fs.readFileSync(rootReadmePath, 'utf8');
+  assert(rootReadmeBody.includes('抄图、拆图、生成 HTML'), 'root README must explain the core workflow');
+  assert(rootReadmeBody.includes('prompt_only 不是资产'), 'root README must explain prompt-only asset status');
+  assert(rootReadmeBody.includes('当前预览微调'), 'root README must explain current preview edits');
+  assert(rootReadmeBody.includes('outputs 路径检查'), 'root README must explain detached output path checks');
+}
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
   cwd: ROOT,

@@ -12,6 +12,13 @@ Use this reference only when stage rules are unclear, when extending templates, 
 - Record source, license, dimensions, transparency, angle, style, and usage scene.
 - Treat GPT Images 2 or other image generation as an external asset producer: require source references, action prompt, target use case, local output files, and metadata before claiming completion.
 
+### Prompt package is not an asset
+
+- Treat ChatGPT Images 2 / Codex image generation prompts as `prompt_only` until real PNG outputs are supplied.
+- A usable transparent layer must include the PNG file, expected dimensions, alpha audit, and a report path.
+- Do not place `prompt_only` layers into HTML, exports, screenshots, or delivery reports.
+- If image generation is unavailable, record the prompt package path and stop the asset at review state.
+
 Asset index records should follow this shape:
 
 ```json
@@ -79,6 +86,14 @@ Supported loop:
 - Keep language overrides scoped to `styles/<lang>.css`.
 - Do not change approved hierarchy during multilingual adaptation unless QC proves it cannot fit.
 
+### Current preview edit checklist
+
+- Start from the HTML path the user is currently viewing.
+- Classify the surface as `workspace-html` or `deliverable-copy`.
+- For `workspace-html`, edit the active group and keep language variants synchronized unless the user requests one locale only.
+- For `deliverable-copy`, fix that delivery copy and record whether the fix must be synced back to the workspace.
+- Do not rebuild just to fix a local icon, QR code, phone safe-area, text position, or asset path.
+
 ## 5. 布局稳固性审核
 
 Run `npm run quality-check` after rendering or any layout/text-affecting edit.
@@ -108,3 +123,11 @@ Errors block export. Warnings identify missing optional assets or incomplete pro
   - One export group -> direct `exports/`.
   - Multiple delivery/export packs -> `exports/<delivery-id-or-group>/`.
   - Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/` unless promoted; otherwise preserve current script/legacy locations if no run evidence is active.
+
+### Detached outputs path checklist
+
+- Copy HTML, CSS, `source/`, `layers/`, screenshots, and reports as a single delivery set.
+- Resolve every local `img src` from the delivered HTML path, not from the workspace preview path.
+- Rewrite paths when needed, for example from `../../source/qr-code.png` to `../source/qr-code.png`.
+- Keep QR/barcode assets as bitmap files and verify they render in the detached delivery path.
+- Do not report delivery complete if any image path in the delivered HTML is unresolved.

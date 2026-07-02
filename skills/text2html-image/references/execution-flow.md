@@ -14,6 +14,20 @@ Before editing, state which surface owns the next change:
 
 If the surface is `workspace-html`, resolve the active HTML path from files on disk first. Patch every `index*.html` in the active single-group `html/` path or active `html_group` unless the user explicitly scopes the request to one locale. Do not run `npm run build` before export; it can overwrite the direct edits.
 
+## Existing Preview Micro-Edit Guard
+
+Do not promote a micro-adjustment into a full regeneration. If the user points to an already-open `file://` preview and asks for a local fix, keep the work on that active surface unless they explicitly ask to rebuild templates.
+
+1. Capture the active HTML path from the user's browser or request.
+2. Classify the path:
+   - `workspace-html`: generated project HTML under `html/` or `html/<html-group>/`.
+   - `deliverable-copy`: detached output HTML under `outputs/`, a task-local delivery folder, or another copied package.
+3. For `workspace-html`, patch the active HTML/CSS/assets and decide whether the change must be backported to templates.
+4. For `deliverable-copy`, patch the delivered copy first, then make a sync-back decision:
+   - `sync_back_required`: the workspace/template must receive the same fix.
+   - `delivery_only`: the copied output is intentionally detached.
+5. Record the decision in the report or final message with the active HTML path and affected asset paths.
+
 When no patching script exists for the needed edit, write or update a small report under `runs/latest/reports/` when run evidence is active; otherwise use the current/legacy `reports/` path. Include:
 
 ```json

@@ -272,6 +272,19 @@ Use these rules for phone-UI travel/eSIM posters and other same-canvas illustrat
 - Left-side feature cards must leave the underlying landmark line art intentionally visible. Tighten card height, gap, and padding before moving the card stack down; do not cover skyline/landmark art unless the reference clearly does.
 - Detached deliverables may have a different path depth than the workspace. A workspace file such as `html/<group>/index.html` may use `../../source/...`, while `outputs/<deliverable>/html/index.html` may need `../source/...`. Verify every local `img src` by resolving it from the delivered HTML path, not only from the workspace preview.
 
+## Draw/Edit Rework Guard
+
+Use these rules before starting or continuing a poster recreation, transparent-layer package, current preview edit, or detached `outputs/` delivery.
+
+- `prompt_only is not a finished transparent asset`. A prompt package for ChatGPT Images 2, Codex image generation, or any external image model only means the layer request is ready. Do not place that layer into final HTML until real PNG outputs exist, match the expected canvas/bbox contract, and have an audit report.
+- `flood-cutout is not semantic segmentation`. It removes edge-connected background and near-edge glow from a supplied bitmap. It cannot decide which part of a full ghost poster is the phone, map, person, or background. If the source is a full poster, return to layer planning, model-assisted visual review, manual crop, or user-supplied layers before using `flood-cutout`.
+- For a current preview edit, start from the HTML path the user is actually viewing. Decide whether the active surface is `workspace-html` or `deliverable-copy` before editing. Do not rebuild or regenerate the full page just to fix a QR code, icon, copy position, phone safe-area, or asset path.
+- QR/barcode assets are bitmap truth assets. Crop them from the reference or original source image, keep them as PNG assets in the project asset pack, and verify they resolve from both the workspace HTML path and any detached delivery path.
+- Small single-color icons, such as a plane next to `Travel eSIM`, should be recreated as inline SVG/CSS unless source fidelity requires a PNG crop. Record SVG recreation as an editable substitute, not a pixel-perfect crop.
+- When syncing to `outputs/`, asset paths must be resolved from the delivered HTML path. A workspace path like `../../source/qr-code.png` may need to become `../source/qr-code.png` in `outputs/html/index.html`.
+- When making a design more visually full, scale phone shells and internal UI as a group. Preserve translation resilience with `min-width: 0`, `minmax(0, 1fr)`, tight readable `line-height`, and `overflow-wrap: anywhere` for long S8N/localized text.
+- If the user asks for a beginner-readable workflow explanation, update README or another explicit local guide instead of leaving the flow only in chat.
+
 ## Escalation Triggers
 
 Read `workflow.config.json` or the references only when the request needs the full workflow:
