@@ -51,3 +51,6 @@ coverage/
 # Backup files
 *.bak
 *.backup
+
+# Local documentation
+/docs/
