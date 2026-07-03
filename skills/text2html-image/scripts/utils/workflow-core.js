@@ -6,6 +6,7 @@ const { pathToFileURL } = require('url');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PROJECT_DIRS = ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports'];
 const MAX_PROJECT_SLUG_LENGTH = 20;
+const MAX_PROJECT_FOLDER_NAME_LENGTH = 80;
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), 'utf8'));
@@ -70,13 +71,30 @@ function sanitizeProjectId(projectId, fallback = 'default') {
   return sanitized || fallback;
 }
 
+function truncateFolderName(value, maxLength = MAX_PROJECT_FOLDER_NAME_LENGTH) {
+  if (value.length <= maxLength) return value;
+  const truncated = value.slice(0, maxLength).replace(/-+$/g, '');
+  return truncated || value.slice(0, maxLength);
+}
+
+function sanitizeProjectFolderName(projectId, fallback = 'default') {
+  const value = String(projectId || fallback).trim();
+  const normalized = value
+    .normalize('NFKC')
+    .replace(/[\\/:\0]/g, '-')
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .replace(/[-_]{2,}/g, '-');
+  return truncateFolderName(normalized || fallback);
+}
+
 function getWorkspaceRoot(config = loadConfig()) {
   return path.resolve(expandHome(config.workspace_root || '$DOCUMENTS/text2html-image-project'));
 }
 
 function getProjectPaths(projectId, config = loadConfig(), options = {}) {
-  const safeProjectId = sanitizeProjectId(projectId || config.default_project_id || 'default');
-  const safeSubprojectId = options.subprojectId ? sanitizeProjectId(options.subprojectId, '') : '';
+  const safeProjectId = sanitizeProjectFolderName(projectId || config.default_project_id || 'default');
+  const safeSubprojectId = options.subprojectId ? sanitizeProjectFolderName(options.subprojectId, '') : '';
   const workspaceRoot = getWorkspaceRoot(config);
   const projectRoot = path.join(workspaceRoot, safeProjectId);
   const activeRoot = safeSubprojectId ? path.join(projectRoot, safeSubprojectId) : projectRoot;
@@ -218,6 +236,8 @@ function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, annotatio
     'Browser annotation capability is optional and must be probed in the current session before use.',
     'Do not claim annotation usage unless a session probe succeeds.',
     `Annotation fallback: ${annotationCapability.fallback}`,
+    '',
+    'Required final-response handoff for every image-edit round: include the active Markdown preview link, the plain absolute local HTML file path, and this report path so the browser preview can be reopened without discovery.',
     '',
     '## Links',
     '',
@@ -435,6 +455,7 @@ function validateWorkflow(options = {}) {
 module.exports = {
   ROOT,
   PROJECT_DIRS,
+  MAX_PROJECT_FOLDER_NAME_LENGTH,
   MAX_PROJECT_SLUG_LENGTH,
   createProjectWorkspace,
   expandHome,
@@ -448,6 +469,7 @@ module.exports = {
   loadConfig,
   loadCopyRows,
   renderRows,
+  sanitizeProjectFolderName,
   sanitizeProjectId,
   safeLang,
   validateScoreReport,

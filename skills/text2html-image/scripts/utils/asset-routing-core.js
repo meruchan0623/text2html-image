@@ -9,6 +9,16 @@ const HARD_TO_VECTOR_KINDS = new Set(['person', 'map', 'cloud', 'skyline', 'land
 const HARD_TO_VECTOR_ALLOWED_ROUTES = new Set(['reference_cutout', 'regenerated_image', 'locked_base_layer', 'review']);
 const COMPLEX_KINDS = new Set(['person', 'character', 'mascot', 'map', 'globe', 'cloud', 'skyline', 'landmark', 'device', 'product_render', 'illustration', 'complex_art', 'application_icon', 'app_icon', 'complex_icon', 'brand_icon', 'multicolor_icon', 'screenshot_icon']);
 const FIXED_COMPLEX_ASSET_INSTRUCTION = '人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行。';
+const IMAGEGEN_FORBIDDEN_BACKGROUNDS = [
+  'green screen',
+  'green background',
+  'chroma key background',
+  'white matte',
+  'gray matte',
+  'beige matte',
+  'colored matte',
+  'gradient background',
+];
 
 function readImageDimensions(imagePath) {
   const buffer = fs.readFileSync(imagePath);
@@ -175,10 +185,12 @@ function decisionReason(element, route, score) {
 function promptFor(element, canvas) {
   return [
     FIXED_COMPLEX_ASSET_INSTRUCTION,
-    `Generate an isolated transparent PNG asset for: ${element.description || element.id}.`,
+    `Generate an isolated transparent PNG with alpha channel for: ${element.description || element.id}.`,
     `Canvas context: source poster ${canvas.width}x${canvas.height}.`,
     'Match the reference style, lighting, and perspective. Do not include text, logo copy, UI labels, QR codes, or background panels.',
-    'Output should be a clean standalone subject with transparent background for HTML/CSS placement.',
+    'Output must be a clean standalone subject with real transparent background for HTML/CSS placement: exterior pixels outside the subject must have alpha 0.',
+    'No green screen, green background, chroma key background, white matte, gray matte, beige matte, colored matte, or gradient background.',
+    'Return PNG output only; do not fake transparency with a solid color background.',
   ].join(' ');
 }
 
@@ -230,6 +242,10 @@ function routeAssets(options) {
         route: item.route,
         status: 'prompt_only',
         expected_output: item.expected_output,
+        required_format: 'png',
+        requires_alpha_channel: true,
+        exterior_alpha: 0,
+        forbidden_backgrounds: IMAGEGEN_FORBIDDEN_BACKGROUNDS,
         prompt: promptFor(item, dimensions),
         blocked_from_final_html: true,
       })),
