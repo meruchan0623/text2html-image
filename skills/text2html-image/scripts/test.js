@@ -274,7 +274,7 @@ for (const file of skillFiles) {
   assert(body.includes('## Escalation Triggers'), `${file} must document escalation triggers`);
   assert(body.includes('## Project Workspace'), `${file} must document the project workspace`);
   assert(body.includes('text2html-image-project'), `${file} must document the image project workspace`);
-  assert(body.includes('/Users/<user>/Documents/text2html-image-project'), `${file} must explicitly document the system Documents output root`);
+  assert(body.includes('~/Documents/text2html-image-project'), `${file} must explicitly document the system Documents output root`);
   assert(body.includes('Do not use CloudStorage, OneDrive, or localized `文档` paths'), `${file} must forbid cloud/localized document output roots`);
   assert(body.includes('## HTML Grouping'), `${file} must document html grouping`);
   assert(body.includes('## 抄图复刻流程'), `${file} must document the copy-image workflow`);
@@ -419,7 +419,7 @@ if (fs.existsSync(rootReadmePath)) {
   assert(rootReadmeBody.includes('平文本报告必须包含本地 HTML 文件路径'), 'root README must document local HTML paths in plain-text reports');
   assert(rootReadmeBody.includes('带 alpha 透明通道的 PNG'), 'root README must tell users to request alpha PNG assets');
   assert(rootReadmeBody.includes('不要绿幕、绿色背景'), 'root README must forbid green-screen generated assets');
-  assert(rootReadmeBody.includes('/Users/<user>/Documents/text2html-image-project'), 'root README must explicitly document the system Documents output root');
+  assert(rootReadmeBody.includes('~/Documents/text2html-image-project'), 'root README must explicitly document the system Documents output root');
   assert(rootReadmeBody.includes('不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径'), 'root README must forbid cloud/localized document output roots');
 }
 

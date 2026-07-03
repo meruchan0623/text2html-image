@@ -138,19 +138,13 @@ flowchart TD
 
 ### Step 2：确认项目和路径
 
-运行命令的位置是 skill 根目录：
-
-```bash
-/Users/tashima_meru/Develop/text2html-image/skills/text2html-image
-```
-
 生成项目默认放在：
 
 ```text
-/Users/<user>/Documents/text2html-image-project/<project-id>/
+~/Documents/text2html-image-project/<project-id>/
 ```
 
-所有项目输出都必须落在系统用户目录下的 `Documents/text2html-image-project`。不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径。
+所有项目输出都必须落在用户主目录下的 `~/Documents/text2html-image-project`。不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径。
 
 不要把项目输出写到 skill repo 根目录里。
 

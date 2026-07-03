@@ -69,7 +69,7 @@ Locate this skill directory before running commands (the runtime working directo
 
 Install as a discoverable skill for both agents with `npm run install:all` (or `npm run install:claude` / `npm run install:codex`).
 
-Do not write generated work into the skill directory or repository root. Keep runtime image projects under the system user-home Documents folder: `/Users/<user>/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths for generated project output.
+Do not write generated work into the skill directory or repository root. Keep runtime image projects under the system user-home Documents folder: `~/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths for generated project output.
 
 ## Flood Cutout Asset Cleanup
 
@@ -113,7 +113,7 @@ For `workspace-html` edits, patch all variants in the active `html_group` unless
 
 ## Project Workspace
 
-Runtime files live outside the repo in the current user's system Documents folder. The only output root is `/Users/<user>/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths. The preferred future layout is adaptive: keep stable project entrypoints shallow, add subdirectories only when there is more than one group or when process evidence must be retained.
+Runtime files live outside the repo in the current user's system Documents folder. The only output root is `~/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths. The preferred future layout is adaptive: keep stable project entrypoints shallow, add subdirectories only when there is more than one group or when process evidence must be retained.
 
 This is a preferred future output contract for generated workspaces. Current scripts are unchanged, so existing/historical folders may still follow legacy grouped paths until runtime behavior is updated.
 
