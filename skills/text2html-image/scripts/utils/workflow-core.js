@@ -9,7 +9,8 @@ const MAX_PROJECT_SLUG_LENGTH = 20;
 const MAX_PROJECT_FOLDER_NAME_LENGTH = 80;
 
 function readJson(relativePath) {
-  return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), 'utf8'));
+  const target = path.isAbsolute(relativePath) ? relativePath : path.join(ROOT, relativePath);
+  return JSON.parse(fs.readFileSync(target, 'utf8'));
 }
 
 function writeJson(targetPath, value) {
@@ -135,8 +136,8 @@ function createProjectWorkspace(projectId, options = {}) {
   return paths;
 }
 
-function loadCopyRows() {
-  const copyMaster = readJson('data/copy_master.json');
+function loadCopyRows(copyDataPath = 'data/copy_master.json') {
+  const copyMaster = readJson(copyDataPath);
   return Array.isArray(copyMaster.data) ? copyMaster.data : [];
 }
 
@@ -306,7 +307,8 @@ function copyTemplateAssets(templateId, outputDir) {
   }
 }
 
-function renderRows(rows = loadCopyRows(), options = {}) {
+function renderRows(rows, options = {}) {
+  const activeRows = rows || loadCopyRows(options.copyDataPath);
   const outputs = [];
   const projectPaths = createProjectWorkspace(options.projectId, { subprojectId: options.subprojectId });
   const canonicalGroups = new Set();
@@ -314,7 +316,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
   const previewLinksReport = path.join(projectPaths.reports, 'preview-links.md');
   const annotationCapability = getAnnotationCapability();
 
-  for (const row of rows) {
+  for (const row of activeRows) {
     const templatePath = path.join(ROOT, 'templates', row.template_id, 'master.html');
     if (!fs.existsSync(templatePath)) {
       outputs.push({ row: row.source_row_id, status: 'skipped', error: `missing template ${row.template_id}` });
@@ -396,7 +398,7 @@ function validateWorkflow(options = {}) {
   const errors = [];
   const warnings = [];
   const config = loadConfig();
-  const rows = loadCopyRows();
+  const rows = options.rows || loadCopyRows(options.copyDataPath);
   const projectPaths = getProjectPaths(options.projectId, config, { subprojectId: options.subprojectId });
 
   if (!Array.isArray(config.workflow_phases) || config.workflow_phases.length !== 6) {
@@ -415,7 +417,9 @@ function validateWorkflow(options = {}) {
   }
   if (!config.copy_image_review?.score_schema) errors.push('workflow.config.json missing copy_image_review.score_schema');
 
-  if (!rows.length) errors.push('data/copy_master.json has no data rows');
+  if (!rows.length) {
+    warnings.push('data/copy_master.json has no active copy rows');
+  }
 
   for (const row of rows) {
     for (const field of ['source_row_id', 'template_id', 'platform', 'canvas_w', 'canvas_h', 'lang', 'sku', 'title', 'export_name']) {

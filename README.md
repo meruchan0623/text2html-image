@@ -172,12 +172,12 @@ npm run route:assets -- --project <project-id>
 
 ### Step 4：准备内容和模板
 
-fast path 只读最少文件：
+fast path 只读最少文件。当前仓库不再内置业务样例行；如果任务使用临时或项目级 copy 数据，构建时显式传 `--copy-data <copy-data.json>`：
 
 ```text
-data/copy_master.json
+<copy-data.json> 或 data/copy_master.json
 templates/<template_id>/master.html
-templates/<template_id>/master.css
+templates/<template_id>/master.css 或当前 workspace HTML
 当前任务需要的图片或资产
 ```
 
@@ -189,7 +189,7 @@ templates/<template_id>/master.css
 
 ```bash
 npm run project:init -- --project <project-id>
-npm run build -- --project <project-id>
+npm run build -- --project <project-id> --copy-data <copy-data.json>
 npm run route:assets -- --project <project-id>
 ```
 
@@ -197,7 +197,7 @@ npm run route:assets -- --project <project-id>
 
 ```bash
 npm run project:init -- --project <project-id> --subproject <subproject-id>
-npm run build -- --project <project-id> --subproject <subproject-id>
+npm run build -- --project <project-id> --subproject <subproject-id> --copy-data <copy-data.json>
 ```
 
 build 后要记录：
@@ -326,7 +326,7 @@ flowchart LR
 
 ```json
 {
-  "project_id": "travel-esim-banner",
+  "project_id": "copy-image-poster",
   "round": 1,
   "overall_score": 90,
   "layout_score": 90,

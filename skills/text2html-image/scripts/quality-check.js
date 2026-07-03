@@ -2,7 +2,7 @@ const { createProjectWorkspace, parseArgs, validateWorkflow, writeJson } = requi
 
 const args = parseArgs();
 const projectPaths = createProjectWorkspace(args.project, { subprojectId: args.subproject });
-const result = validateWorkflow({ projectId: args.project, subprojectId: args.subproject });
+const result = validateWorkflow({ projectId: args.project, subprojectId: args.subproject, copyDataPath: args['copy-data'] });
 const report = {
   generated_at: new Date().toISOString(),
   project_id: projectPaths.project_id,

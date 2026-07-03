@@ -34,7 +34,7 @@ When no patching script exists for the needed edit, write or update a small repo
 {
   "source_surface": "workspace-html",
   "rebuild_allowed": false,
-  "html_group": "africa-esim-map",
+  "html_group": "copy-complex-poster",
   "affected_variants": ["index.html", "index.zh-tw.html"],
   "required_export_refresh": true
 }

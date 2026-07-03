@@ -42,13 +42,13 @@ Asset index records should follow this shape:
 
 ```json
 {
-  "asset_id": "hero_sim_girl_front",
+  "asset_id": "hero_product_character_front",
   "asset_type": "hero",
-  "path": "assets/heroes/hero_sim_girl_front.png",
+  "path": "assets/heroes/hero_product_character_front.png",
   "format": "png",
   "transparent": true,
   "angle": "front",
-  "usage_scene": "travel-esim-poster",
+  "usage_scene": "copy-image-poster",
   "license": "provided-by-user"
 }
 ```
@@ -57,12 +57,12 @@ Asset index records should follow this shape:
 
 - Define platform/channel, image type, canvas width/height, export format, safe areas, and font fallback rules before rendering.
 - Use `workflow.config.json`, `config/canvas_specs.json`, and `config/platform_rules.json` as the current sources of truth.
-- Choose a template type from `workflow.config.json` and keep mandatory zones separate: title, hero, benefits, price, CTA, disclaimer.
+- Choose or create an explicit `template_id` for the current task and keep mandatory zones separate: title, hero, benefits, price, CTA, disclaimer. `workflow.config.json` may have no bundled template list.
 - Prefer a `layout.json` record with explicit pixel boxes:
 
 ```json
 {
-  "template_id": "T01_price_type",
+  "template_id": "copy_basic_poster",
   "canvas": {"width": 1024, "height": 1280},
   "zones": {
     "title": {"x": 50, "y": 50, "w": 924, "h": 180},
@@ -83,7 +83,7 @@ Asset index records should follow this shape:
 - Use `npm run route:assets` to generate the initial routing table and ImageGen prompt-only package from an agent/human-supplied element list.
 - Keep independently adjustable complex art as separate `<img>` nodes with explicit CSS `left`, `top`, `width`, `height`, and `z-index`; record them in `reports/split-art-assets.json`.
 - Remove stale CSS/SVG/PIL geometric placeholders after PNG art replaces them, and report the clean state as `old_geometric_css=false`.
-- Run `npm run build -- --project <project-id> [--subproject <subproject-id>]` to render `data/copy_master.json` through `templates/<template_id>/master.html`.
+- Run `npm run build -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]` to render selected copy rows through `templates/<template_id>/master.html`.
 
 Supported scalar tokens:
 

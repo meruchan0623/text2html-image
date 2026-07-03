@@ -43,11 +43,11 @@ function cleanupTestFixtures() {
     fs.rmSync(file, { force: true });
   }
   for (const dir of [
-    'templates/T01_price_type',
-    'templates/banner_zh_hkmo',
-    'templates/europe_esim_map',
-    'templates/travel_esim_usage_query',
-    'templates/africa_esim_map',
+    'templates/copy_basic_poster',
+    'templates/copy_layered_banner',
+    'templates/copy_vector_poster',
+    'templates/copy_phone_poster',
+    'templates/copy_complex_poster',
     'assets/source',
     'templates',
     'assets',
@@ -64,11 +64,11 @@ function prepareTestFixtures() {
   cleanupTestFixtures();
   process.on('exit', cleanupTestFixtures);
 
-  writeTestFixture('assets/source/hong-kong-skyline.jpg', 'fixture skyline');
-  writeTestFixture('assets/source/hk-disneyland-castle.jpg', 'fixture castle');
-  writeTestFixture('assets/source/xian-city-wall.jpg', 'fixture wall');
+  writeTestFixture('assets/source/sample-background.jpg', 'fixture background');
+  writeTestFixture('assets/source/sample-panel-left.jpg', 'fixture left panel');
+  writeTestFixture('assets/source/sample-panel-right.jpg', 'fixture right panel');
 
-  writeTestFixture('templates/T01_price_type/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_basic_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -86,7 +86,7 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/T01_price_type/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_basic_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #f7fbff; overflow: visible; }
 .title { position: absolute; left: 64px; top: 80px; font-size: 64px; margin: 0; }
 .subtitle { position: absolute; left: 64px; top: 170px; font-size: 32px; margin: 0; }
@@ -95,7 +95,7 @@ function prepareTestFixtures() {
 .disclaimer { position: absolute; left: 64px; bottom: 70px; font-size: 18px; }
 `);
 
-  writeTestFixture('templates/banner_zh_hkmo/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_layered_banner/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -104,31 +104,31 @@ function prepareTestFixtures() {
 </head>
 <body class="{{lang_class}}">
   <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
-    <img class="skyline" src="{{bg_asset}}" data-asset-text-policy="preserve-raster" alt="">
+    <img class="background-art" src="{{bg_asset}}" data-asset-text-policy="preserve-raster" alt="">
     <section class="center-card">
       <h1 class="title" data-i18n-key="title">{{title}}</h1>
       <p class="subtitle" data-i18n-key="subtitle">{{subtitle}}</p>
       <span class="cta" data-i18n-key="cta">{{cta}}</span>
     </section>
-    <figure class="panel panel-castle"><img src="{{patch_asset_1}}" data-asset-text-policy="preserve-raster" alt=""></figure>
-    <figure class="panel panel-wall"><img src="{{patch_asset_2}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+    <figure class="panel panel-left"><img src="{{patch_asset_1}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+    <figure class="panel panel-right"><img src="{{patch_asset_2}}" data-asset-text-policy="preserve-raster" alt=""></figure>
   </main>
 </body>
 </html>
 `);
-  writeTestFixture('templates/banner_zh_hkmo/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_layered_banner/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #dfeffc; overflow: visible; }
-.skyline { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.background-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .center-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 420px; height: 260px; background: rgba(255,255,255,.9); }
 .title { margin: 44px 0 0; text-align: center; font-size: 60px; }
 .subtitle, .cta { display: block; text-align: center; font-size: 28px; }
 .panel { position: absolute; margin: 0; }
 .panel img { width: 180px; height: 120px; object-fit: cover; }
-.panel-castle { left: 90px; bottom: 40px; }
-.panel-wall { right: 90px; bottom: 40px; }
+.panel-left { left: 90px; bottom: 40px; }
+.panel-right { right: 90px; bottom: 40px; }
 `);
 
-  writeTestFixture('templates/europe_esim_map/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_vector_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -147,7 +147,7 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/europe_esim_map/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_vector_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #ffffff; overflow: visible; }
 .map-base { position: absolute; left: 0; top: 0; }
 .map-label { position: absolute; color: #fff; font-weight: 700; transform: translate(-50%, -50%); }
@@ -155,7 +155,7 @@ function prepareTestFixtures() {
 .title-pill { position: absolute; left: 560px; top: 1130px; width: 370px; height: 72px; display: flex; align-items: center; justify-content: center; color: white; background: #415BA8; border-radius: 36px; }
 `);
 
-  writeTestFixture('templates/travel_esim_usage_query/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_phone_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -174,14 +174,14 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/travel_esim_usage_query/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_phone_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #f5f8ff; overflow: visible; }
 .title { position: absolute; left: 80px; top: 90px; font-size: 72px; }
 .subtitle { position: absolute; left: 80px; top: 190px; font-size: 30px; }
 .phone { position: absolute; left: 340px; top: 360px; width: 420px; height: 620px; border: 8px solid #222; border-radius: 42px; }
 `);
 
-  writeTestFixture('templates/africa_esim_map/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_complex_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -201,7 +201,7 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/africa_esim_map/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_complex_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #ffffff; overflow: visible; }
 .title { position: absolute; left: 80px; top: 70px; font-size: 52px; }
 .map { position: absolute; left: 420px; top: 240px; width: 560px; height: 560px; mix-blend-mode: multiply; }
@@ -327,7 +327,7 @@ assert(skillBody.includes('data-i18n-key'), 'skill must require i18n metadata fo
 assert(skillBody.includes('## Phone Poster Layering Pitfalls'), 'skill must document phone poster layering pitfalls');
 assert(skillBody.includes('same-canvas layer touches the canvas edge'), 'skill must document same-canvas edge flood-cutout risk');
 assert(skillBody.includes('Partial alpha that is not removed can become a dark opaque seam'), 'skill must document partial-alpha seam risk');
-assert(skillBody.includes('the airplane in a `Travel eSIM` pill'), 'skill must prefer SVG/CSS for small UI art assets');
+assert(skillBody.includes('a small plane icon in a product pill'), 'skill must prefer SVG/CSS for small UI art assets');
 assert(skillBody.includes('QR codes and scannable codes are bitmap truth assets'), 'skill must require QR/scannable codes as cropped bitmap assets');
 assert(skillBody.includes('phone safe-area'), 'skill must document phone safe-area layering checks');
 assert(skillBody.includes('overflow-wrap: anywhere'), 'skill must document translation-resilient enlarged layouts');
@@ -438,10 +438,10 @@ const verboseStartOutput = require('child_process').execFileSync(process.execPat
 assert(verboseStartOutput.includes('text2html-image workflow phases:'), 'verbose start output should print phase details');
 assert(verboseStartOutput.includes('input:'), 'verbose start output should include phase inputs');
 
-assert(sanitizeProjectId('Travel eSIM Banner For HKMO Long Name') === 'travel-esim-banner', 'project ids should be kebab-case and max 20 chars');
+assert(sanitizeProjectId('Copy Image Poster With Long Name') === 'copy-image-poster', 'project ids should be kebab-case and max 20 chars');
 assert(sanitizeProjectId('Page Master A') === 'page-master-a', 'subproject ids should be kebab-case');
-assert(sanitizeProjectFolderName('非洲多国覆盖表-国家覆盖表-清爽商务风') === '非洲多国覆盖表-国家覆盖表-清爽商务风', 'project folder names should preserve Chinese title and notes');
-assert(sanitizeProjectFolderName('Global Roaming Coverage / Country Coverage Table / Clean Business Style') === 'Global-Roaming-Coverage-Country-Coverage-Table-Clean-Business-Style', 'project folder names should keep readable English notes');
+assert(sanitizeProjectFolderName('商品主图复刻-价格促销海报-清爽商务风') === '商品主图复刻-价格促销海报-清爽商务风', 'project folder names should preserve Chinese title and notes');
+assert(sanitizeProjectFolderName('Product Poster Recreation / Price Promo / Clean Business Style') === 'Product-Poster-Recreation-Price-Promo-Clean-Business-Style', 'project folder names should keep readable English notes');
 assert(sanitizeProjectFolderName('  :::  ') === 'default', 'empty project folder names should fall back to default');
 
 const projectId = 'test-default-project';
@@ -454,21 +454,105 @@ assert(projectPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2ht
 assert(!/CloudStorage|OneDrive|文档/.test(projectPaths.root), `project root must not use cloud/localized document folders: ${projectPaths.root}`);
 assert(projectPaths.root.endsWith(path.join('text2html-image-project', projectId)), 'project root should be directly under text2html-image-project');
 
-const subprojectPaths = createProjectWorkspace('Travel eSIM Banner For HKMO Long Name', { subprojectId: 'Page Master A' });
-assert(subprojectPaths.project_id === 'Travel-eSIM-Banner-For-HKMO-Long-Name', 'project folder name should preserve readable title words');
+const subprojectPaths = createProjectWorkspace('Copy Image Poster With Long Name', { subprojectId: 'Page Master A' });
+assert(subprojectPaths.project_id === 'Copy-Image-Poster-With-Long-Name', 'project folder name should preserve readable title words');
 assert(subprojectPaths.subproject_id === 'Page-Master-A', 'subproject folder name should preserve readable title words');
 assert(subprojectPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `subproject root must be under system Documents text2html-image-project: ${subprojectPaths.root}`);
-assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'Travel-eSIM-Banner-For-HKMO-Long-Name', 'Page-Master-A')), 'subproject root should use shallow nesting under readable project folder');
+assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'Copy-Image-Poster-With-Long-Name', 'Page-Master-A')), 'subproject root should use shallow nesting under readable project folder');
 
-const chineseProjectPaths = createProjectWorkspace('欧洲多国流量包-国家覆盖表-简洁蓝白商务风');
-assert(chineseProjectPaths.project_id === '欧洲多国流量包-国家覆盖表-简洁蓝白商务风', 'Chinese project title and inferred image type/style notes should become the folder name');
-assert(chineseProjectPaths.root.endsWith(path.join('text2html-image-project', '欧洲多国流量包-国家覆盖表-简洁蓝白商务风')), 'Chinese project root should stay readable under text2html-image-project');
+const chineseProjectPaths = createProjectWorkspace('商品主图复刻-价格促销海报-清爽商务风');
+assert(chineseProjectPaths.project_id === '商品主图复刻-价格促销海报-清爽商务风', 'Chinese project title and inferred image type/style notes should become the folder name');
+assert(chineseProjectPaths.root.endsWith(path.join('text2html-image-project', '商品主图复刻-价格促销海报-清爽商务风')), 'Chinese project root should stay readable under text2html-image-project');
 
 const defaultPaths = getProjectPaths();
 assert(defaultPaths.project_id === 'default', 'missing project should use default project id');
 assert(defaultPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `default project root must be under system Documents text2html-image-project: ${defaultPaths.root}`);
 
-const outputs = renderRows(undefined, { projectId });
+const fixtureCopyRows = [
+  {
+    source_row_id: 'COPY_BASIC_ZH_CN',
+    template_id: 'copy_basic_poster',
+    platform: 'custom_poster',
+    canvas_w: 1024,
+    canvas_h: 1280,
+    lang: 'zh-cn',
+    sku: 'COPY-BASIC',
+    title: '基础抄图海报',
+    subtitle: '可编辑文案层',
+    cta: '立即查看',
+    disclaimer: '示例文案仅用于测试',
+    price: '29.99',
+    currency: '$',
+    unit: '',
+    html_group: 'copy-basic-poster',
+    export_name: 'copy-basic-poster-zh-cn-1024x1280',
+  },
+  {
+    source_row_id: 'COPY_LAYERED_ZH_CN',
+    template_id: 'copy_layered_banner',
+    platform: 'custom_banner',
+    canvas_w: 1536,
+    canvas_h: 500,
+    lang: 'zh-cn',
+    sku: 'COPY-LAYERED',
+    title: '分层抄图横幅',
+    subtitle: '图片资产进入 source',
+    cta: '24H 支持',
+    bg_asset: 'assets/source/sample-background.jpg',
+    patch_assets: 'assets/source/sample-panel-left.jpg;assets/source/sample-panel-right.jpg',
+    html_group: 'copy-layered-banner',
+    export_name: 'copy-layered-banner-zh-cn-1536x500',
+  },
+  {
+    source_row_id: 'COPY_VECTOR_ZH_TW',
+    template_id: 'copy_vector_poster',
+    platform: 'custom_poster',
+    canvas_w: 1000,
+    canvas_h: 1263,
+    lang: 'zh-tw',
+    sku: 'COPY-VECTOR',
+    title: '向量抄圖海報',
+    cta: 'coverage',
+    html_group: 'copy-vector-poster',
+    export_name: 'copy-vector-poster-zh-tw-1000x1263',
+  },
+  {
+    source_row_id: 'COPY_PHONE_EN_US',
+    template_id: 'copy_phone_poster',
+    platform: 'custom_poster',
+    canvas_w: 1086,
+    canvas_h: 1448,
+    lang: 'en-us',
+    sku: 'COPY-PHONE',
+    title: 'Phone Poster',
+    subtitle: 'Editable phone UI',
+    remaining_label: 'Remaining data',
+    remaining_value: '1.25',
+    remaining_unit: 'GB',
+    html_group: 'copy-phone-poster',
+    export_name: 'copy-phone-poster-en-us-1086x1448',
+  },
+  {
+    source_row_id: 'COPY_COMPLEX_ZH_CN',
+    template_id: 'copy_complex_poster',
+    platform: 'custom_poster',
+    canvas_w: 1404,
+    canvas_h: 1120,
+    lang: 'zh-cn',
+    sku: 'COPY-COMPLEX',
+    title: '复杂资产抄图海报',
+    hero_asset: 'source/complex-layer.png',
+    country_dz: '区域 A',
+    country_cd: '区域 B',
+    country_eg: '区域 C',
+    html_group: 'copy-complex-poster',
+    export_name: 'copy-complex-poster-zh-cn-1404x1120',
+  },
+];
+const fixtureCopyDataPath = path.join(projectPaths.working, 'copy-master-fixture.json');
+fs.writeFileSync(fixtureCopyDataPath, `${JSON.stringify({ data: fixtureCopyRows }, null, 2)}\n`);
+
+const outputs = renderRows(fixtureCopyRows, { projectId });
 assert(outputs.some((item) => item.status === 'built'), 'build did not generate any HTML previews');
 const htmlEntries = listHtmlEntries(projectPaths);
 assert(htmlEntries.length >= 3, 'html entries should enumerate generated canonical and localized previews');
@@ -478,6 +562,7 @@ assert(htmlEntries.every((entry) => entry.file_url === toFileUrl(entry.html)), '
 const buildOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'build.js'),
   '--project', projectId,
+  '--copy-data', fixtureCopyDataPath,
 ], {
   cwd: ROOT,
   encoding: 'utf8',
@@ -538,7 +623,7 @@ assert(firstHtmlAudit.metrics.editable_text_node_count > 0, 'generated HTML shou
 assert(firstHtmlAudit.metrics.image_count >= 0, 'DOM audit should report image count');
 assert(Array.isArray(firstHtmlAudit.risks), 'DOM audit should report risk array');
 
-const qc = validateWorkflow({ projectId });
+const qc = validateWorkflow({ projectId, rows: fixtureCopyRows });
 assert(qc.errors.length === 0, `quality errors: ${qc.errors.join('; ')}`);
 
 const domAuditOutput = require('child_process').execFileSync(process.execPath, [
@@ -595,27 +680,27 @@ const profileReportPath = path.join(projectPaths.reports, 'render-profile-report
 assert(fs.existsSync(profileReportPath), 'render-fast should write reports/render-profile-report.json');
 const profileReport = JSON.parse(fs.readFileSync(profileReportPath, 'utf8'));
 assert(profileReport.entries.length >= 3, 'render profile report should include html entries');
-assert(profileReport.entries.some((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass'), 'europe map should pass the first render profile');
-assert(profileReport.entries.some((entry) => entry.html_group === 'africa-esim-map' && entry.status === 'fail'), 'africa map should fail profile because of grid/filter/blend');
+assert(profileReport.entries.some((entry) => entry.html_group === 'copy-vector-poster' && entry.status === 'pass'), 'vector poster should pass the first render profile');
+assert(profileReport.entries.some((entry) => entry.html_group === 'copy-complex-poster' && entry.status === 'fail'), 'complex poster should fail profile because of grid/filter/blend');
 assert(profileReport.entries.some((entry) => entry.unsupported_css.some((item) => item.property === 'mix-blend-mode')), 'profile should report unsupported mix-blend-mode');
-const europeEntry = profileReport.entries.find((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass');
-assert(europeEntry?.ir_path, 'passing render profile entry should include ir_path');
-assert(fs.existsSync(europeEntry.ir_path), 'render profile should write render IR for passing entry');
-const europeIr = JSON.parse(fs.readFileSync(europeEntry.ir_path, 'utf8'));
-assert(europeIr.canvas.width === 1000 && europeIr.canvas.height === 1263, 'europe IR should preserve canvas size');
-assert(europeIr.layers.some((layer) => layer.type === 'svg'), 'europe IR should include inline svg layers');
-assert(europeIr.layers.some((layer) => layer.type === 'text' && layer.text.includes('歐洲')), 'europe IR should include title text layer');
-assert(europeEntry.svg_path, 'passing render profile entry should include svg_path');
-assert(fs.existsSync(europeEntry.svg_path), 'render-fast should write SVG for passing entry');
-const europeSvg = fs.readFileSync(europeEntry.svg_path, 'utf8');
-assert(europeSvg.includes('<svg'), 'compiled SVG should contain svg root');
-assert(europeSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
-assert(europeSvg.includes('歐洲'), 'compiled SVG should contain editable text content as SVG text');
+const vectorEntry = profileReport.entries.find((entry) => entry.html_group === 'copy-vector-poster' && entry.status === 'pass');
+assert(vectorEntry?.ir_path, 'passing render profile entry should include ir_path');
+assert(fs.existsSync(vectorEntry.ir_path), 'render profile should write render IR for passing entry');
+const vectorIr = JSON.parse(fs.readFileSync(vectorEntry.ir_path, 'utf8'));
+assert(vectorIr.canvas.width === 1000 && vectorIr.canvas.height === 1263, 'vector poster IR should preserve canvas size');
+assert(vectorIr.layers.some((layer) => layer.type === 'svg'), 'vector poster IR should include inline svg layers');
+assert(vectorIr.layers.some((layer) => layer.type === 'text' && layer.text.includes('向量')), 'vector poster IR should include title text layer');
+assert(vectorEntry.svg_path, 'passing render profile entry should include svg_path');
+assert(fs.existsSync(vectorEntry.svg_path), 'render-fast should write SVG for passing entry');
+const vectorSvg = fs.readFileSync(vectorEntry.svg_path, 'utf8');
+assert(vectorSvg.includes('<svg'), 'compiled SVG should contain svg root');
+assert(vectorSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
+assert(vectorSvg.includes('向量'), 'compiled SVG should contain editable text content as SVG text');
 
 const fastExportOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'render-fast.js'),
   '--project', projectId,
-  '--group', 'europe-esim-map',
+  '--group', 'copy-vector-poster',
   '--scale', '2',
 ], {
   cwd: ROOT,
@@ -625,12 +710,12 @@ assert(fastExportOutput.includes('Direct PNG export completed'), 'export-fast sh
 const pngReportPath = path.join(projectPaths.reports, 'png-export-report.json');
 assert(fs.existsSync(pngReportPath), 'export-fast should write reports/png-export-report.json');
 const pngReport = JSON.parse(fs.readFileSync(pngReportPath, 'utf8'));
-assert(pngReport.status === 'pass', 'png export report should pass for europe group');
+assert(pngReport.status === 'pass', 'png export report should pass for vector poster group');
 assert(pngReport.exports.every((entry) => entry.scale === 2), 'png export report should preserve scale');
 assert(pngReport.exports.every((entry) => fs.existsSync(entry.png)), 'png export report should point to existing PNG files');
-assert(pngReport.exports.some((entry) => /europe-esim-map-canonical\.png$/.test(entry.png)), 'png export should include canonical output');
+assert(pngReport.exports.some((entry) => /copy-vector-poster-canonical\.png$/.test(entry.png)), 'png export should include canonical output');
 
-const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
+const bannerOutput = outputs.find((item) => item.export_name === 'copy-layered-banner-zh-cn-1536x500');
 assert(bannerOutput, 'banner output should be generated');
 const bannerHtml = fs.readFileSync(bannerOutput.html, 'utf8');
 const bannerRealDir = path.dirname(fs.realpathSync(bannerOutput.html));
@@ -641,7 +726,7 @@ for (const srcMatch of bannerHtml.matchAll(/<img src="([^"]+)"/g)) {
   assert(fs.existsSync(path.resolve(path.dirname(bannerOutput.html), src)), `image path should resolve via Documents symlink: ${src}`);
   assert(fs.existsSync(path.resolve(bannerRealDir, src)), `image path should resolve via real filesystem path: ${src}`);
 }
-for (const panelClass of ['panel-castle', 'panel-wall']) {
+for (const panelClass of ['panel-left', 'panel-right']) {
   const srcMatch = bannerHtml.match(new RegExp(`<figure class="panel ${panelClass}">[\\s\\S]*?<img src="([^"]+)"`));
   assert(srcMatch, `${panelClass} should render an image src`);
   assert(!srcMatch[1].startsWith('../../../../assets/'), `${panelClass} should not use hard-coded repo-relative asset paths`);
