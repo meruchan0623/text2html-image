@@ -26,6 +26,7 @@ flowchart TD
 - `prompt_only 不是资产`：外部图像模型 prompt 包只说明请求已准备好，不能直接放进 HTML。
 - `当前预览微调`：用户指向已打开的 `file://` 预览时，先修当前 HTML/CSS/资产路径，不要全量重建。
 - `outputs 路径检查`：交付副本里的图片路径要从交付 HTML 自己的位置解析。
+- `复杂资产先路由`：人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行。
 - 二维码和条码必须是从原图或源素材裁切的位图资产；小飞机、小功能图标优先 SVG/CSS 重绘。
 
 ## 这个 skill 到底做什么
@@ -145,8 +146,10 @@ flowchart TD
 生成项目默认放在：
 
 ```text
-~/Documents/text2html-image-project/<project-id>/
+/Users/<user>/Documents/text2html-image-project/<project-id>/
 ```
+
+所有项目输出都必须落在系统用户目录下的 `Documents/text2html-image-project`。不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径。
 
 不要把项目输出写到 skill repo 根目录里。
 
@@ -161,6 +164,8 @@ flowchart TD
 | `editable text layer` | 标题、价格、CTA、说明、国家名、SKU | HTML DOM 文本 |
 | `editable vector layer` | 简单卡片、边框、圆角、图标、线条 | CSS/SVG |
 | `debug/report layer` | 截图、坐标报告、评分 JSON | 只做证据，不出现在页面 UI |
+
+`app_icon`、`application_icon`、`complex_icon`、人物、地图、云、天际线、地标和地球等难以矢量复刻的元素，必须先进入资产路由报告，再选择抠图或反向生成提示词再生图。只有 `simple_icon` 这类单色简单图标才默认允许 SVG/CSS 重绘。
 
 ### Step 4：准备内容和模板
 
@@ -195,7 +200,17 @@ build 后要记录：
 
 - 本地 HTML 路径。
 - build 输出的 `file_url`。
+- build 输出的 Markdown 预览链接。
+- `reports/preview-links.md`，里面保留可重新打开的 HTML 链接清单。
 - 当前 `html_group`。
+
+平文本报告必须包含本地 HTML 文件路径。只给 `file://` 链接或 Markdown 链接不够。
+
+最终回复里也要显式给出：
+
+- 可点击的 HTML Markdown 链接。
+- 纯文本绝对路径，方便不能打开 `file://` 的客户端手动复制。
+- `reports/preview-links.md` 路径。
 
 ### Step 6：浏览器预览和截图对比
 
@@ -208,6 +223,8 @@ build 后要记录：
 5. 重复直到视觉接近，或用户停止。
 
 不要只凭代码猜测效果。
+
+Codex Browser 的元素/画圈标注能力不是固定保证。使用前要先在当前会话探测；如果探测失败，就用普通截图、DOM 快照、坐标说明或单独的视觉标注报告替代，不要声称已经使用了内置标注。
 
 ### Step 7：检查可编辑合同
 

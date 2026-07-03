@@ -60,7 +60,7 @@ npm run project:init -- --project <project-id>
 npm run build -- --project <project-id>
 ```
 
-Do not write generated work into the skill directory or repository root. Keep runtime image projects under `Documents/text2html-image-project/`.
+Do not write generated work into the skill directory or repository root. Keep runtime image projects under the system user-home Documents folder: `/Users/<user>/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths for generated project output.
 
 ## Flood Cutout Asset Cleanup
 
@@ -104,7 +104,7 @@ For `workspace-html` edits, patch all variants in the active `html_group` unless
 
 ## Project Workspace
 
-Runtime files live outside the repo in the current user's Documents folder. The preferred future layout is adaptive: keep stable project entrypoints shallow, add subdirectories only when there is more than one group or when process evidence must be retained.
+Runtime files live outside the repo in the current user's system Documents folder. The only output root is `/Users/<user>/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths. The preferred future layout is adaptive: keep stable project entrypoints shallow, add subdirectories only when there is more than one group or when process evidence must be retained.
 
 This is a preferred future output contract for generated workspaces. Current scripts are unchanged, so existing/historical folders may still follow legacy grouped paths until runtime behavior is updated.
 
@@ -259,6 +259,29 @@ Use these rules for complex illustrated posters where a flat sticker-sheet asset
 - If a device or screen layer still contains microcopy from the reference image, report it as a known limitation instead of calling the poster fully editable.
 - Check `script_count`, editable text count, `data-i18n-key` count, PNG dimensions, alpha extrema, and visible layer paths before completion.
 
+## Complex Art Asset Split Contract
+
+Use this when a poster contains complex non-text art such as people, maps, globes, clouds, landmarks, skylines, devices, mascots, product renders, or dense illustrations.
+
+- 固定规则：人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行。
+- Hard-to-vector kinds include `person`, `map`, `cloud`, `skyline`, `landmark`, `globe`, `application_icon`, `app_icon`, and `complex_icon`. They may route only to `reference_cutout`, `regenerated_image`, `locked_base_layer`, or `review`.
+- `simple_icon` is the exception for single-color or simple glyphs that can be recreated cleanly as inline SVG/CSS.
+- Do not recreate complex art with CSS circles, rounded rectangles, clip-paths, SVG/PIL geometry, or code-drawn placeholder PNGs unless the user explicitly requests a vector-style approximation.
+- Choose an asset source strategy before coding:
+  - `reference_cutout`: crop from the reference image and clean transparency.
+  - `regenerated_image`: reverse-prompt and generate a replacement art asset.
+  - `user_provided_asset`: use a supplied bitmap asset.
+  - `licensed_asset`: use a documented external asset.
+- Every independently adjustable visual subject must be a separate PNG and a separate DOM node.
+- Do not fuse separately movable subjects into one same-canvas PNG unless the user explicitly approves a locked composition.
+- Required examples: map/globe -> `globe-map.png`, left cloud -> `cloud-left.png`, right cloud -> `cloud-right.png`, skyline -> `skyline.png`, person/mascot -> `traveler.png`.
+- Every art asset must have explicit CSS placement: `left`, `top`, `width`, `height`, and `z-index`.
+- Write `reports/split-art-assets.json` with each asset's source path, `asset_source_type`, output path, placement, dimensions, alpha extrema, mask/debug path, and known limitations.
+- Write `reports/asset-provenance.json` when complex art assets are cut out, regenerated, externally licensed, or user-provided. Provenance must prove the final PNG is not a CSS/SVG/PIL geometric placeholder.
+- Every complex element must include routing difficulty fields: `cutout_feasibility`, `regeneration_fit`, `difficulty_signals`, `decision_reason`, and `requires_imagegen_prompt`.
+- For `regenerated_image`, write `reports/asset-generation-prompts.json` with `prompt_only` entries. A prompt package is never a final asset and must not be inserted into HTML.
+- The final HTML must pass: `script_count == 0`, no unapproved complex art SVG placeholders, `image_count == expected independent asset count`, all image paths resolve from the active or delivered HTML path, and `old_geometric_css=false` for replaced art.
+
 ## Phone Poster Layering Pitfalls
 
 Use these rules for phone-UI travel/eSIM posters and other same-canvas illustrated ads where device mockups, small icon assets, QR codes, and editable marketing copy overlap.
@@ -343,7 +366,61 @@ Inputs:
 - target canvas width and height
 - optional style, copy, brand, asset, or text-editability constraints
 
-Before the loop, decide which parts are bitmap base assets and which parts must remain editable HTML/SVG. If text editability is required, never use OCR output as final rendered pixels. If a clean no-text base image is available, prefer base image plus editable text overlay.
+## Reverse Prompt Asset Routing
+
+Use this before recreating or editing any reference image unless the user is only changing existing text in an already editable HTML file.
+
+Before writing HTML/CSS, create a short reverse prompt / visual brief from the reference image. The brief is not the final art prompt and is not a source of business truth. It is a planning artifact used to classify visible elements and decide their implementation route.
+
+Required outputs:
+
+- `reports/reverse-prompt-brief.md`
+- `reports/asset-routing-table.json`
+- `reports/asset-generation-prompts.json` when any element is routed to `regenerated_image`
+
+The brief must describe canvas size and aspect ratio, main layout structure, text hierarchy, repeated tables or lists, simple vector-editable shapes, complex art subjects, background/decorative layers, likely editable/localizable content, and likely bitmap-only content.
+
+Then produce an asset routing table. Every meaningful visible element must be assigned one route:
+
+- `editable_text`
+- `editable_vector`
+- `reference_cutout`
+- `regenerated_image`
+- `locked_base_layer`
+- `omit_or_simplify`
+
+Example routing entry:
+
+```json
+{
+  "id": "globe_map",
+  "description": "Pale 3D globe with Europe map and orange location pin",
+  "route": "regenerated_image",
+  "cutout_feasibility": "low",
+  "regeneration_fit": "high",
+  "difficulty_signals": ["partially_occluded", "style_consistency_needed"],
+  "decision_reason": "Complex decorative art is not suitable for CSS/SVG geometry and the reference is partly covered by text.",
+  "requires_imagegen_prompt": true,
+  "adjustability": "independent img layer with left/top/width/height/z-index",
+  "expected_output": "assets/globe-map.png"
+}
+```
+
+Route visible elements as follows:
+
+- User-facing copy, prices, CTAs, legal copy, titles, table text, country names, operators, labels, and translatable content -> `editable_text`.
+- Cards, panels, borders, dividers, dots, pills, badges, simple icons, notice bars, and regular geometric UI -> `editable_vector`.
+- People, maps, clouds, skylines, landmarks, globes, and application icons that are hard to reproduce with SVG or line geometry -> `reference_cutout` or `regenerated_image`.
+- Complex art that exists clearly in the reference and has enough resolution or separable boundaries -> `reference_cutout`.
+- Complex art that is low-resolution, partly covered by text, visually noisy, hard to cut cleanly, or needs a consistent illustrated style -> `regenerated_image`.
+- Large decorative texture or background art that should not be edited separately and does not contain required text -> `locked_base_layer`.
+- Tiny details that do not affect the message, are not visible at target size, or would harm editability -> `omit_or_simplify`.
+
+Use `npm run route:assets -- --project <project-id> --source-image <path> --elements <json-or-path>` to write the routing reports. The script reads agent/human-supplied element candidates; it does not claim to semantically detect all people, maps, clouds, logos, or text from pixels alone.
+
+When an element may need later movement, scaling, replacement, localization, or independent visual tuning, it must be a separate asset and a separate DOM node. Do not merge it into a same-canvas PNG unless the user explicitly approves a locked composition.
+
+Before the loop, decide which parts are bitmap base assets and which parts must remain editable HTML/SVG. If text editability is required, never use OCR output as final rendered pixels. If a clean no-text base image is available, prefer base image plus editable text overlay. Do not start the HTML/CSS recreation until the reverse prompt brief and asset routing table exist for reference-image recreation work.
 
 Loop:
 
@@ -393,6 +470,19 @@ Browser/multimodal boundary:
 - Reuse the generated `file_url` and 刷新当前 Codex Browser 页面 between rebuilds.
 - Every build round should surface the local HTML path and `file_url` before screenshot review.
 - If Codex Browser cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
+
+## Final Preview Links
+
+Every build or final delivery should surface a clickable local preview target for the active HTML. Every plain-text report or final response that references an HTML preview must include the local HTML file path. `npm run build` writes `reports/preview-links.md` and each built output in `reports/build-report.json` includes:
+
+- `html`: absolute local HTML path.
+- `file_url`: `file://` URL for Codex Browser or another local browser surface.
+- `markdown_link`: Markdown link using the `file_url`.
+- `codex_browser_hint`: `open_or_refresh_file_url`.
+
+In final responses, include the active HTML as a Markdown link and include the plain absolute local HTML file path next to it for clients that do not open `file://` links. Keep `reports/preview-links.md` with the project evidence so a later agent can reopen the same preview without re-running discovery.
+
+Codex Browser annotation capability is optional. Probe the current Codex session before using browser-native element annotation, for example by checking whether an annotation screenshot command is exposed and succeeds. Do not claim Codex Browser annotation was used unless the current session probe succeeds. If the probe fails or the client does not expose annotation commands, use ordinary browser screenshots, DOM snapshots, coordinate notes, or a task-local visual annotation report instead.
 
 ## Export Mode Guard
 
@@ -458,9 +548,27 @@ Before claiming a complex image HTML conversion is complete, report or verify:
 - Phone safe-area and z-index status, when a device mockup contains editable DOM UI.
 - Translation overflow-safety notes for enlarged phone UI, feature cards, or dense labels.
 - Preview path.
+- Local HTML file path.
+- Preview Markdown link and `reports/preview-links.md` path.
 - Report path.
 - Exported PNG paths and dimensions, when image export was requested.
 - Known omissions.
+
+For reference-image recreation or image-editing tasks, also report:
+
+- Reverse prompt brief path.
+- Asset routing table path.
+- Count of routed elements by route type.
+- `cutout_feasibility`, `regeneration_fit`, difficulty signals, and decision reason for every routed element.
+- Asset generation prompt package path when any route is `regenerated_image`.
+- Complex art asset count.
+- Expected vs actual independent PNG asset list.
+- Asset source type for every complex art asset.
+- Whether every complex art asset is independently movable in HTML/CSS.
+- CSS placement for every complex art asset: `left`, `top`, `width`, `height`, and `z-index`.
+- Alpha extrema and mask/debug path for every PNG that was cut out or regenerated.
+- Whether stale CSS/SVG/PIL geometric placeholders remain, reported as `old_geometric_css=false` when clean.
+- Screenshot path and DOM contract result after the routed asset strategy is implemented.
 
 For map or dense label work, also report:
 
@@ -478,6 +586,7 @@ npm run project:init -- --project <project-id> [--subproject <subproject-id>]
 npm run build -- --project <project-id> [--subproject <subproject-id>]
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>]
 npm run audit:dom -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
+npm run route:assets -- --project <project-id> --source-image <path> --elements <json-or-path> [--subproject <subproject-id>]
 npm run review:score -- --project <project-id> [--subproject <subproject-id>] --round 1 --source-image <path> --screenshot <path> --overall-score 90 --layout-score 90 --typography-score 90 --color-score 90 --asset-score 90 --issue "medium|layout|observed|expected|fix hint"
 npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  # report/export plan; verify PNGs separately
 npm run render:profile -- --project <project-id> [--group <html-group>]
@@ -510,3 +619,14 @@ npm test
 - The user requested image export but only `reports/export-report.json` was produced.
 - The final deliverable was produced by a non-editable raster fallback while the request required editable HTML text.
 - The page visually matches but the DOM contract fails.
+- A copy/recreation task started HTML/CSS implementation before `reports/reverse-prompt-brief.md` and `reports/asset-routing-table.json` were created.
+- `reports/asset-routing-table.json` lacks `cutout_feasibility`, `regeneration_fit`, `difficulty_signals`, or `decision_reason` for any complex element.
+- An element with `cutout_feasibility: "low"` was routed to `reference_cutout` without explicit user approval.
+- An element routed to `regenerated_image` has no `prompt_only` entry in `reports/asset-generation-prompts.json`.
+- A hard-to-vector element such as `person`, `map`, `cloud`, `skyline`, `application_icon`, `app_icon`, or `complex_icon` was routed to `editable_vector` or `editable_text`.
+- Complex visual elements were not assigned an explicit route: `editable_text`, `editable_vector`, `reference_cutout`, `regenerated_image`, `locked_base_layer`, or `omit_or_simplify`.
+- Complex visual art requested as cutout or regenerated imagery was implemented with CSS/SVG/PIL geometric placeholders.
+- Multiple independently adjustable art subjects are fused into one PNG without explicit user approval.
+- A regenerated or cutout bitmap asset was inserted before transparency cleanup and mask/debug inspection.
+- Final HTML contains stale geometric CSS for art that has supposedly been replaced by PNG assets.
+- Asset provenance is unclear: the report does not say whether each complex art asset is `reference_cutout`, `regenerated_image`, `user_provided_asset`, or `licensed_asset`.

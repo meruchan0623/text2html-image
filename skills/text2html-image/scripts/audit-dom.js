@@ -29,7 +29,8 @@ function writeMarkdownSummary(report, summaryPath) {
     lines.push(`### ${entry.html_group} / ${entry.variant}`);
     lines.push('');
     lines.push(`- Status: \`${entry.status}\``);
-    lines.push(`- HTML: \`${entry.html}\``);
+    lines.push(`- Local HTML file path: \`${entry.html}\``);
+    lines.push(`- File URL: \`${entry.file_url}\``);
     lines.push(`- Canvas: ${entry.canvas ? `${entry.canvas.width} x ${entry.canvas.height}` : 'missing'}`);
     lines.push(`- Editable text nodes: ${entry.metrics.editable_text_node_count}`);
     lines.push(`- i18n keys: ${entry.metrics.i18n_key_count}`);

@@ -6,6 +6,7 @@ const {
   createProjectWorkspace,
   getProjectPaths,
   getUserDocumentsDir,
+  getWorkspaceRoot,
   renderRows,
   sanitizeProjectId,
   toFileUrl,
@@ -14,6 +15,7 @@ const {
 } = require('./utils/workflow-core');
 const { listHtmlEntries } = require('./utils/html-entries');
 const { inspectHtmlEditability } = require('./utils/dom-editability-core');
+const { routeAssets } = require('./utils/asset-routing-core');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -218,6 +220,7 @@ for (const script of [
   'render-fast.js',
   'flood-cutout.js',
   'audit-dom.js',
+  'route-assets.js',
   'test.js',
 ]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
@@ -228,6 +231,7 @@ assert(packageJson.scripts['render:profile'] === 'node scripts/render-fast.js --
 assert(packageJson.scripts['export-fast'] === 'node scripts/render-fast.js', 'package.json missing export-fast script');
 assert(packageJson.scripts['flood-cutout'] === 'node scripts/flood-cutout.js', 'package.json missing flood-cutout script');
 assert(packageJson.scripts['audit:dom'] === 'node scripts/audit-dom.js', 'package.json missing audit:dom script');
+assert(packageJson.scripts['route:assets'] === 'node scripts/route-assets.js', 'package.json missing route:assets script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
   assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
@@ -236,7 +240,9 @@ assert(packageJson.dependencies?.pngjs || packageJson.devDependencies?.pngjs, 'p
 const config = JSON.parse(read('workflow.config.json'));
 assert(Array.isArray(config.workflow_phases), 'workflow.config.json missing workflow_phases');
 assert(config.workflow_phases.length === 6, 'workflow must have six phases');
-assert(config.workspace_root.includes('text2html-image-project'), 'workflow.config.json must set text2html-image-project workspace_root');
+assert(config.workspace_root === '$DOCUMENTS/text2html-image-project', 'workflow.config.json must use the system Documents text2html-image-project workspace_root');
+assert(!/CloudStorage|OneDrive|文档/.test(config.workspace_root), 'workflow.config.json must not point output projects at cloud/localized document folders');
+assert(getWorkspaceRoot(config) === path.join(getUserDocumentsDir(), 'text2html-image-project'), 'workspace_root must resolve to the system Documents text2html-image-project folder');
 assert(config.project_directory_schema?.root_pattern === '<project_id>', 'workflow.config.json should use one folder per image project');
 assert(config.project_directory_schema?.subproject_root_pattern === '<project_id>/<subproject_id>', 'workflow.config.json missing shallow subproject root pattern');
 assert(!config.project_directory_schema?.manifest_file, 'image project outputs must not create project manifest files');
@@ -267,6 +273,8 @@ for (const file of skillFiles) {
   assert(body.includes('## Escalation Triggers'), `${file} must document escalation triggers`);
   assert(body.includes('## Project Workspace'), `${file} must document the project workspace`);
   assert(body.includes('text2html-image-project'), `${file} must document the image project workspace`);
+  assert(body.includes('/Users/<user>/Documents/text2html-image-project'), `${file} must explicitly document the system Documents output root`);
+  assert(body.includes('Do not use CloudStorage, OneDrive, or localized `文档` paths'), `${file} must forbid cloud/localized document output roots`);
   assert(body.includes('## HTML Grouping'), `${file} must document html grouping`);
   assert(body.includes('## 抄图复刻流程'), `${file} must document the copy-image workflow`);
   assert(body.includes('多模态读取'), `${file} must document multimodal screenshot review`);
@@ -290,6 +298,22 @@ assert(skillBody.includes('direct HTML-to-SVG-to-PNG'), 'skill must describe dir
 assert(skillBody.includes('## Self-Contained Skill Package'), 'skill must document self-contained package execution');
 assert(skillBody.includes('## Layered PNG + HTML Pitfalls'), 'skill must document layered PNG pitfalls from recent work');
 assert(skillBody.includes('same-canvas transparent PNG layers'), 'skill must prefer same-canvas transparent PNG layers');
+assert(skillBody.includes('## Complex Art Asset Split Contract'), 'skill must document complex art asset splitting');
+assert(skillBody.includes('reports/split-art-assets.json'), 'skill must require split art asset reporting');
+assert(skillBody.includes('asset_source_type'), 'skill must require complex art asset provenance');
+assert(skillBody.includes('old_geometric_css=false'), 'skill must require stale geometric CSS checks');
+assert(skillBody.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'skill must include the fixed complex asset routing prompt');
+assert(skillBody.includes('application_icon'), 'skill must document application_icon routing');
+assert(skillBody.includes('app_icon'), 'skill must document app_icon routing');
+assert(skillBody.includes('complex_icon'), 'skill must document complex_icon routing');
+assert(skillBody.includes('simple_icon'), 'skill must keep simple_icon as vector-editable');
+assert(skillBody.includes('## Reverse Prompt Asset Routing'), 'skill must document reverse prompt asset routing');
+assert(skillBody.includes('reports/reverse-prompt-brief.md'), 'skill must require reverse prompt brief output');
+assert(skillBody.includes('reports/asset-routing-table.json'), 'skill must require asset routing table output');
+assert(skillBody.includes('route": "regenerated_image"'), 'skill must document regenerated image routing');
+assert(skillBody.includes('cutout_feasibility'), 'skill must document cutout feasibility scoring');
+assert(skillBody.includes('regeneration_fit'), 'skill must document regeneration fit scoring');
+assert(skillBody.includes('asset-generation-prompts.json'), 'skill must document image generation prompt package');
 assert(skillBody.includes('## Flood Cutout Asset Cleanup'), 'skill must document flood cutout asset cleanup');
 assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cutout command');
 assert(skillBody.includes('*-mask-debug.png'), 'skill must require mask debug output');
@@ -328,9 +352,21 @@ assert(skillBody.includes('Device screen UI is partially hidden'), 'stop conditi
 assert(skillBody.includes('npm run audit:dom'), 'skill must document audit:dom command');
 assert(skillBody.includes('DOM editability report path'), 'completion contract must include DOM editability report');
 assert(skillBody.includes('dom-editability-report.json'), 'skill must mention dom-editability-report.json');
+assert(skillBody.includes('## Final Preview Links'), 'skill must document final preview links');
+assert(skillBody.includes('preview-links.md'), 'skill must require a preview links report');
+assert(skillBody.includes('Every plain-text report or final response that references an HTML preview must include the local HTML file path'), 'skill must require local HTML file paths in plain-text reports');
+assert(skillBody.includes('Codex Browser annotation capability is optional'), 'skill must document optional Codex annotation capability');
+assert(skillBody.includes('Do not claim Codex Browser annotation was used unless the current session probe succeeds'), 'skill must forbid unverified annotation claims');
 const executionFlow = read('references/execution-flow.md');
+assert(executionFlow.includes('Reference Image Asset Routing'), 'execution flow must document reference image asset routing');
+assert(executionFlow.includes('asset-routing-table.json'), 'execution flow must include asset routing table evidence');
+assert(executionFlow.includes('asset-provenance.json'), 'execution flow must include asset provenance evidence');
+assert(executionFlow.includes('split-art-assets.json'), 'execution flow must include split art assets evidence');
+assert(executionFlow.includes('asset-generation-prompts.json'), 'execution flow must include generated prompt package evidence');
+assert(executionFlow.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'execution flow must include the fixed complex asset routing prompt');
 assert(executionFlow.includes('dom-editability-report.json'), 'execution flow must include DOM editability report');
 assert(executionFlow.includes('dom-editability-summary.md'), 'execution flow must include DOM editability summary');
+assert(executionFlow.includes('plain-text reports must include local HTML file paths'), 'execution flow must require local HTML file paths in plain-text reports');
 assert(executionFlow.includes('Stable project-level examples'), 'execution flow must document stable project-level example artifacts');
 assert(executionFlow.includes('Run-level examples'), 'execution flow must document run-level example artifacts');
 assert(executionFlow.includes('generated `html/index*.html` or `html/<html-group>/index*.html`'), 'execution flow must document adaptive workspace-html paths');
@@ -343,8 +379,15 @@ assert(executionFlow.includes('runs/latest/reports/intake-report.json'), 'execut
 assert(executionFlow.includes('Do not promote a micro-adjustment into a full regeneration'), 'execution flow must block broad regeneration for micro-edits');
 assert(executionFlow.includes('sync-back decision'), 'execution flow must record deliverable-copy sync-back decisions');
 const stageGuides = read('references/stage-guides.md');
+assert(stageGuides.includes('Complex art source types'), 'stage guides must document complex art source types');
+assert(stageGuides.includes('reference_cutout'), 'stage guides must document reference cutout routing');
+assert(stageGuides.includes('regenerated_image'), 'stage guides must document regenerated image routing');
+assert(stageGuides.includes('prompt-only visual brief'), 'stage guides must keep visual briefs separate from assets');
+assert(stageGuides.includes('cutout_feasibility'), 'stage guides must document cutout feasibility');
+assert(stageGuides.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'stage guides must include the fixed complex asset routing prompt');
 assert(stageGuides.includes('reports/export-report.json'), 'stage-guides must mention export-report.json');
 assert(stageGuides.includes('Current `npm run batch-export` is report-only'), 'stage-guides must mention batch-export report-only mode');
+assert(stageGuides.includes('Local HTML file path'), 'stage-guides must require local HTML file paths in final reports');
 assert(stageGuides.includes('One HTML group -> direct `html/index.html`'), 'stage-guides must document single-group html output path');
 assert(stageGuides.includes('Multiple HTML groups -> `html/<html-group>/`.'), 'stage-guides must document multi-group html output path');
 assert(stageGuides.includes('One export group -> direct `exports/`'), 'stage-guides must document single export-group path');
@@ -362,6 +405,10 @@ if (fs.existsSync(rootReadmePath)) {
   assert(rootReadmeBody.includes('prompt_only 不是资产'), 'root README must explain prompt-only asset status');
   assert(rootReadmeBody.includes('当前预览微调'), 'root README must explain current preview edits');
   assert(rootReadmeBody.includes('outputs 路径检查'), 'root README must explain detached output path checks');
+  assert(rootReadmeBody.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'root README must explain fixed complex asset routing');
+  assert(rootReadmeBody.includes('平文本报告必须包含本地 HTML 文件路径'), 'root README must document local HTML paths in plain-text reports');
+  assert(rootReadmeBody.includes('/Users/<user>/Documents/text2html-image-project'), 'root README must explicitly document the system Documents output root');
+  assert(rootReadmeBody.includes('不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径'), 'root README must forbid cloud/localized document output roots');
 }
 
 const startOutput = require('child_process').execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'start.js')], {
@@ -387,15 +434,20 @@ const projectPaths = createProjectWorkspace(projectId);
 for (const dir of ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports']) {
   assert(fs.existsSync(projectPaths[dir]), `project workspace missing ${dir}`);
 }
+assert(projectPaths.workspace_root === path.join(getUserDocumentsDir(), 'text2html-image-project'), 'project workspace root must be under the system Documents text2html-image-project folder');
+assert(projectPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `project root must be under system Documents text2html-image-project: ${projectPaths.root}`);
+assert(!/CloudStorage|OneDrive|文档/.test(projectPaths.root), `project root must not use cloud/localized document folders: ${projectPaths.root}`);
 assert(projectPaths.root.endsWith(path.join('text2html-image-project', projectId)), 'project root should be directly under text2html-image-project');
 
 const subprojectPaths = createProjectWorkspace('Travel eSIM Banner For HKMO Long Name', { subprojectId: 'Page Master A' });
 assert(subprojectPaths.project_id === 'travel-esim-banner', 'long project name should sanitize to 20 chars');
 assert(subprojectPaths.subproject_id === 'page-master-a', 'subproject name should sanitize');
+assert(subprojectPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `subproject root must be under system Documents text2html-image-project: ${subprojectPaths.root}`);
 assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'travel-esim-banner', 'page-master-a')), 'subproject root should use shallow nesting under project');
 
 const defaultPaths = getProjectPaths();
 assert(defaultPaths.project_id === 'default', 'missing project should use default project id');
+assert(defaultPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `default project root must be under system Documents text2html-image-project: ${defaultPaths.root}`);
 
 const outputs = renderRows(undefined, { projectId });
 assert(outputs.some((item) => item.status === 'built'), 'build did not generate any HTML previews');
@@ -411,11 +463,15 @@ const buildOutput = require('child_process').execFileSync(process.execPath, [
   cwd: ROOT,
   encoding: 'utf8',
 });
-assert(buildOutput.includes('Local HTML path:'), 'build output should print the local HTML path every round');
+assert(buildOutput.includes('Local HTML file path:'), 'build output should print the local HTML file path every round');
 assert(buildOutput.includes('Open or refresh in Codex Browser: file://'), 'build output should print the file_url every round');
+assert(buildOutput.includes('Markdown preview link: ['), 'build output should print a markdown preview link every round');
+assert(buildOutput.includes('Preview links report:'), 'build output should print the preview links report path');
 for (const output of outputs.filter((item) => item.status === 'built')) {
   assert(output.html.startsWith(projectPaths.html), `HTML preview should be written to project html dir: ${output.html}`);
   assert(output.file_url === toFileUrl(output.html), `HTML preview should include file_url: ${output.html}`);
+  assert(output.markdown_link === `[${path.basename(output.html)}](${output.file_url})`, `HTML preview should include markdown_link: ${output.html}`);
+  assert(output.codex_browser_hint === 'open_or_refresh_file_url', `HTML preview should include Codex Browser hint: ${output.html}`);
   assert(path.basename(output.html) === `index.${output.lang.toLowerCase()}.html`, `localized HTML should use index.<lang>.html: ${output.html}`);
   assert(fs.existsSync(path.join(path.dirname(output.html), 'index.html')), `canonical index.html should exist beside localized HTML: ${output.html}`);
   assert(fs.existsSync(output.html), `missing generated HTML ${output.html}`);
@@ -434,8 +490,22 @@ for (const output of outputs.filter((item) => item.status === 'built')) {
 const buildReportPath = path.join(projectPaths.reports, 'build-report.json');
 assert(fs.existsSync(buildReportPath), 'build report should be written to project reports dir');
 const buildReport = JSON.parse(fs.readFileSync(buildReportPath, 'utf8'));
+assert(buildReport.preview_links_report === path.join(projectPaths.reports, 'preview-links.md'), 'build report should point to preview-links.md');
+assert(buildReport.codex_annotation_capability?.status === 'probe-required', 'build report should mark Codex annotation as probe-required');
 for (const output of buildReport.outputs.filter((item) => item.status === 'built')) {
   assert(output.file_url === toFileUrl(output.html), `build report output should include file_url: ${output.html}`);
+  assert(output.markdown_link === `[${path.basename(output.html)}](${output.file_url})`, `build report output should include markdown_link: ${output.html}`);
+}
+const previewLinksPath = path.join(projectPaths.reports, 'preview-links.md');
+assert(fs.existsSync(previewLinksPath), 'build should write reports/preview-links.md');
+const previewLinks = fs.readFileSync(previewLinksPath, 'utf8');
+assert(previewLinks.includes('# HTML Preview Links'), 'preview-links.md should have a clear heading');
+assert(previewLinks.includes('Codex Browser annotation capability is optional'), 'preview-links.md should explain optional annotation support');
+assert(previewLinks.includes('Do not claim annotation usage unless a session probe succeeds.'), 'preview-links.md should forbid unverified annotation claims');
+for (const output of outputs.filter((item) => item.status === 'built')) {
+  assert(previewLinks.includes(output.markdown_link), `preview-links.md should include markdown link for ${output.html}`);
+  assert(previewLinks.includes('- Local HTML file path:'), `preview-links.md should label local HTML file path for ${output.html}`);
+  assert(previewLinks.includes(output.html), `preview-links.md should include local path for ${output.html}`);
 }
 
 const firstHtmlOutput = outputs.find((item) => item.status === 'built');
@@ -466,6 +536,11 @@ assert(domAuditReport.project_id === projectPaths.project_id, 'DOM audit report 
 assert(domAuditReport.summary.entry_count >= 3, 'DOM audit should include generated HTML entries');
 assert(domAuditReport.summary.script_count === 0, 'DOM audit should count zero scripts for generated previews');
 assert(domAuditReport.entries.every((entry) => entry.html.startsWith(projectPaths.html)), 'DOM audit entries should stay inside project html dir');
+const domAuditSummary = fs.readFileSync(domAuditSummaryPath, 'utf8');
+assert(domAuditSummary.includes('- Local HTML file path:'), 'DOM audit summary should label local HTML file paths');
+for (const entry of domAuditReport.entries) {
+  assert(domAuditSummary.includes(entry.html), `DOM audit summary should include local HTML file path for ${entry.html}`);
+}
 
 const batchOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'batch-export.js'),
@@ -542,7 +617,7 @@ for (const srcMatch of bannerHtml.matchAll(/<img src="([^"]+)"/g)) {
   if (src.startsWith('data:')) continue;
   assert(src.startsWith('../../source/'), `generated image src should use project source assets: ${src}`);
   assert(fs.existsSync(path.resolve(path.dirname(bannerOutput.html), src)), `image path should resolve via Documents symlink: ${src}`);
-  assert(fs.existsSync(path.resolve(bannerRealDir, src)), `image path should resolve via real OneDrive path: ${src}`);
+  assert(fs.existsSync(path.resolve(bannerRealDir, src)), `image path should resolve via real filesystem path: ${src}`);
 }
 for (const panelClass of ['panel-castle', 'panel-wall']) {
   const srcMatch = bannerHtml.match(new RegExp(`<figure class="panel ${panelClass}">[\\s\\S]*?<img src="([^"]+)"`));
@@ -605,6 +680,152 @@ const savedScoreReport = JSON.parse(fs.readFileSync(subprojectScoreReportPath, '
 assert(savedScoreReport.overall_score === 91, 'review-score should preserve overall score');
 assert(savedScoreReport.subproject_id === 'page-master-a', 'review-score should preserve subproject id');
 assert(savedScoreReport.issues[0].fix_hint === 'move hero up', 'review-score should parse issue fix hint');
+
+const routeSourcePath = path.join(projectPaths.source, 'asset-routing-reference.png');
+const routeSourcePng = new PNG({ width: 900, height: 1200 });
+for (let y = 0; y < routeSourcePng.height; y += 1) {
+  for (let x = 0; x < routeSourcePng.width; x += 1) {
+    setPixel(routeSourcePng, x, y, [245, 238, 226, 255]);
+  }
+}
+fs.writeFileSync(routeSourcePath, PNG.sync.write(routeSourcePng));
+const routeElements = {
+  elements: [
+    {
+      id: 'app-icon',
+      kind: 'app_icon',
+      description: 'clear square app icon with hard boundary',
+      bbox: { x: 160, y: 220, w: 96, h: 96 },
+      overlaps_text: false,
+      needs_independent_adjustment: true,
+    },
+    {
+      id: 'soft-app-icon',
+      kind: 'application_icon',
+      description: 'soft gradient app icon with 3D illustrated symbol and style consistency needed',
+      bbox: { x: 320, y: 220, w: 48, h: 48 },
+      soft_edges: true,
+      needs_style_consistency: true,
+      needs_independent_adjustment: true,
+    },
+    {
+      id: 'mono-tool-icon',
+      kind: 'simple_icon',
+      description: 'single color airplane glyph that can be recreated as inline SVG',
+      bbox: { x: 500, y: 220, w: 40, h: 40 },
+    },
+    {
+      id: 'route-map',
+      kind: 'map',
+      description: 'decorative map background that is hard to recreate with geometry',
+      bbox: { x: 100, y: 500, w: 300, h: 220 },
+      needs_independent_adjustment: true,
+    },
+    {
+      id: 'cloud-layer',
+      kind: 'cloud',
+      description: 'soft cloud layer with translucent edge',
+      bbox: { x: 50, y: 40, w: 240, h: 96 },
+      soft_edges: true,
+      needs_independent_adjustment: true,
+    },
+    {
+      id: 'skyline-layer',
+      kind: 'skyline',
+      description: 'detailed skyline silhouette with many buildings',
+      bbox: { x: 0, y: 1040, w: 900, h: 160 },
+      needs_independent_adjustment: true,
+    },
+    {
+      id: 'traveler',
+      kind: 'person',
+      description: 'partly occluded soft 3D traveler illustration',
+      bbox: { x: 650, y: 890, w: 170, h: 260 },
+      overlaps_text: true,
+      needs_independent_adjustment: true,
+    },
+    {
+      id: 'headline',
+      kind: 'text',
+      description: 'main headline text',
+      bbox: { x: 260, y: 80, w: 340, h: 64 },
+    },
+    {
+      id: 'card-grid',
+      kind: 'card',
+      description: 'regular rounded app icon card grid',
+      bbox: { x: 140, y: 190, w: 540, h: 660 },
+    },
+    {
+      id: 'unknown-art',
+      kind: 'illustration',
+      description: '',
+    },
+  ],
+};
+const routeReport = routeAssets({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  elementsInput: routeElements,
+});
+const appIconRoute = routeReport.routing.elements.find((item) => item.id === 'app-icon');
+const softAppIconRoute = routeReport.routing.elements.find((item) => item.id === 'soft-app-icon');
+const monoToolIconRoute = routeReport.routing.elements.find((item) => item.id === 'mono-tool-icon');
+const mapRoute = routeReport.routing.elements.find((item) => item.id === 'route-map');
+const cloudRoute = routeReport.routing.elements.find((item) => item.id === 'cloud-layer');
+const skylineRoute = routeReport.routing.elements.find((item) => item.id === 'skyline-layer');
+const travelerRoute = routeReport.routing.elements.find((item) => item.id === 'traveler');
+const headlineRoute = routeReport.routing.elements.find((item) => item.id === 'headline');
+const cardRoute = routeReport.routing.elements.find((item) => item.id === 'card-grid');
+const unknownRoute = routeReport.routing.elements.find((item) => item.id === 'unknown-art');
+assert(appIconRoute.route === 'reference_cutout', 'clear hard-boundary icon should route to reference_cutout');
+assert(appIconRoute.cutout_feasibility === 'high', 'clear icon should have high cutout feasibility');
+assert(softAppIconRoute.route === 'regenerated_image', 'soft complex app icon should route to regenerated_image');
+assert(softAppIconRoute.requires_imagegen_prompt === true, 'soft complex app icon should require ImageGen prompt');
+assert(monoToolIconRoute.route === 'editable_vector', 'simple_icon should remain editable_vector');
+for (const complexRoute of [appIconRoute, softAppIconRoute, mapRoute, cloudRoute, skylineRoute, travelerRoute]) {
+  assert(complexRoute.route !== 'editable_vector', `${complexRoute.id} must not route to editable_vector`);
+  assert(complexRoute.route !== 'editable_text', `${complexRoute.id} must not route to editable_text`);
+}
+assert(travelerRoute.route === 'regenerated_image', 'occluded person should route to regenerated_image');
+assert(travelerRoute.cutout_feasibility === 'low', 'occluded person should have low cutout feasibility');
+assert(travelerRoute.regeneration_fit === 'high', 'occluded person should have high regeneration fit');
+assert(travelerRoute.requires_imagegen_prompt === true, 'regenerated image route should require ImageGen prompt');
+assert(headlineRoute.route === 'editable_text', 'text element should route to editable_text');
+assert(cardRoute.route === 'editable_vector', 'card element should route to editable_vector');
+assert(unknownRoute.status === 'review', 'missing bbox or description should require review');
+assert(routeReport.prompts.prompts.length >= 2, 'regenerated_image elements should get prompt packages');
+assert(routeReport.prompts.prompts[0].status === 'prompt_only', 'generated prompt package should be prompt_only');
+assert(routeReport.prompts.prompts.every((item) => item.prompt.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分')), 'prompt package should include the fixed complex asset instruction');
+assert(routeReport.provenance.assets.every((asset) => asset.status !== 'final_asset'), 'route planning must not create final assets');
+
+const routeElementsPath = path.join(projectPaths.working, 'asset-routing-elements.json');
+fs.writeFileSync(routeElementsPath, JSON.stringify(routeElements, null, 2));
+const routeCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'route-assets.js'),
+  '--project', projectId,
+  '--source-image', routeSourcePath,
+  '--elements', routeElementsPath,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(routeCliOutput.includes('Asset routing table written'), 'route-assets should print routing table path');
+for (const reportName of [
+  'reverse-prompt-brief.md',
+  'asset-routing-table.json',
+  'asset-generation-prompts.json',
+  'asset-provenance.json',
+]) {
+  assert(fs.existsSync(path.join(projectPaths.reports, reportName)), `route-assets should write reports/${reportName}`);
+}
+const routeTable = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'asset-routing-table.json'), 'utf8'));
+assert(routeTable.elements.every((item) => item.cutout_feasibility && item.regeneration_fit), 'routing table should include difficulty fields');
+assert(routeTable.elements.filter((item) => ['app_icon', 'application_icon', 'complex_icon', 'person', 'map', 'cloud', 'skyline'].includes(item.kind)).every((item) => !['editable_vector', 'editable_text'].includes(item.route)), 'hard-to-vector assets must not route to editable vector/text');
+const promptPackage = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'asset-generation-prompts.json'), 'utf8'));
+assert(promptPackage.prompts.every((item) => item.route === 'regenerated_image'), 'prompt package should only include regenerated_image elements');
+assert(promptPackage.prompts.every((item) => item.status === 'prompt_only'), 'prompt package entries should remain prompt_only');
+assert(promptPackage.prompts.every((item) => item.prompt.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分')), 'prompt package should include fixed complex asset routing instruction');
 
 const floodInputPath = path.join(projectPaths.working, 'flood-cutout-input.png');
 const floodOutputPath = path.join(projectPaths.working, 'flood-cutout-output.png');

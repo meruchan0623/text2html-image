@@ -57,6 +57,26 @@ Escalate to the full workflow when the request includes:
 - Final delivery where actual PNG files, dimensions, or variants matter.
 - Any mismatch between visual acceptance and DOM editability.
 
+## Reference Image Asset Routing
+
+For reference-image recreation or image-editing work, create routing evidence before writing the first HTML/CSS pass unless the request is only changing existing editable text.
+
+Fixed routing rule: 人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行.
+
+Required evidence:
+
+- `reports/reverse-prompt-brief.md`: visual structure, text hierarchy, simple vector shapes, complex art subjects, decorative layers, and likely editable/localizable content.
+- `reports/asset-routing-table.json`: one route per meaningful visible element plus `cutout_feasibility`, `regeneration_fit`, difficulty signals, and decision reason.
+- `reports/asset-generation-prompts.json`: `prompt_only` ImageGen prompt packages for `regenerated_image` elements; these are not final assets.
+- `reports/split-art-assets.json`: each independent PNG asset, output path, placement, dimensions, z-index, alpha extrema, mask/debug path, and limitations.
+- `reports/asset-provenance.json`: source type for each complex art asset so CSS/SVG/PIL geometric placeholders cannot be mistaken for final art.
+
+The visual brief is an intake and routing aid, not final business truth. OCR text, table content, prices, country/operator rows, QR/barcode assets, and legal copy still need DOM/source verification.
+
+When a subject may need later movement, scaling, replacement, localization, or independent tuning, keep it as a separate DOM node with explicit CSS placement. Do not fuse multiple independently adjustable art subjects into one PNG unless the user approves a locked composition.
+
+Hard-to-vector kinds such as `person`, `map`, `cloud`, `skyline`, `landmark`, `globe`, `application_icon`, `app_icon`, and `complex_icon` are not valid `editable_vector` or `editable_text` routes. `simple_icon` remains the route for single-color or simple glyphs that are cleanly rebuildable with SVG/CSS.
+
 ## 3. DOM Patch Discipline
 
 Prefer stable keys over text search:
@@ -103,13 +123,16 @@ It must fail-fast instead of silently degrading output when HTML/CSS requires un
 Use the cheapest proof that can catch the current failure mode, then escalate only when needed:
 
 1. Static DOM contract: no scripts, expected image count, editable text count, i18n/business key count, local asset existence, and `reports/dom-editability-report.json` status.
-2. HTML group consistency: canonical and localized variants share the expected structure and asset references.
-3. Render profile: direct renderer pass/fail and unsupported CSS reasons.
-4. Layout check: page overflow and cell/text overflow, especially for tables and long locale strings.
-5. Visual preview: browser screenshot against reference or accepted design.
-6. Export audit: PNG file count, language variants, scale variants, and pixel dimensions.
+2. Asset routing contract: reverse prompt brief, asset routing table with `cutout_feasibility` and `regeneration_fit`, prompt package, split art asset report, provenance report, resolved paths, and `old_geometric_css=false` for replaced art.
+3. HTML group consistency: canonical and localized variants share the expected structure and asset references.
+4. Render profile: direct renderer pass/fail and unsupported CSS reasons.
+5. Layout check: page overflow and cell/text overflow, especially for tables and long locale strings.
+6. Visual preview: browser screenshot against reference or accepted design.
+7. Export audit: PNG file count, language variants, scale variants, and pixel dimensions.
 
 If the in-app browser refuses `file://`, do not retry indefinitely or call the page broken. Use static DOM checks plus direct renderer profile or system browser fallback as appropriate.
+
+Every build should also leave a reopening path: `reports/preview-links.md`, `reports/build-report.json.outputs[].markdown_link`, and the plain absolute `html` path. Any plain-text reports must include local HTML file paths for every referenced preview. Treat browser-native element annotation as a current-session capability, not a guaranteed output. Probe it before use; if unsupported, keep ordinary screenshots and write coordinate or visual-annotation notes as task evidence.
 
 ## 7. Rework Prevention Reports
 
@@ -119,6 +142,7 @@ Stable project-level examples:
 
 - `project-summary.json`
 - `delivery-audit.json`
+- `reports/preview-links.md`
 - `reports/qc-summary.json`
 - `reports/export-audit.json`
 - `reports/user-acceptance.json`
@@ -131,6 +155,11 @@ Run-level examples:
 - `runs/latest/reports/dom-contract-report.json`
 - `runs/latest/reports/dom-editability-report.json`
 - `runs/latest/reports/dom-editability-summary.md`
+- `runs/latest/reports/reverse-prompt-brief.md`
+- `runs/latest/reports/asset-routing-table.json`
+- `runs/latest/reports/asset-generation-prompts.json`
+- `runs/latest/reports/split-art-assets.json`
+- `runs/latest/reports/asset-provenance.json`
 - `runs/latest/reports/locale-risk-report.json`
 - `runs/latest/reports/render-profile-report.json`
 
@@ -145,8 +174,13 @@ Before final delivery, confirm:
 - Active surface was correct and not overwritten by an unintended rebuild.
 - All intended `html_group` variants were patched or the one-locale exception is documented.
 - Required text remains editable DOM text with i18n/business keys.
+- Reference-image recreation has routing evidence and complex art provenance when applicable.
+- Independent art subjects are separate DOM image nodes unless a locked composition was approved.
+- Replaced complex art does not leave stale CSS/SVG/PIL geometric placeholders.
 - Dense labels have coordinate/debug reports and omitted reasons.
 - QC or equivalent DOM checks passed for the affected HTML files.
+- `reports/preview-links.md` exists and final response includes the active HTML Markdown link plus absolute path.
+- Codex Browser annotation use is either probe-confirmed or explicitly replaced by screenshot/DOM/coordinate evidence.
 - Real PNG export was performed when requested, not only an export plan.
 - `reports/png-export-report.json` exists when direct PNG export was requested.
 - PNG files exist under `exports/`.

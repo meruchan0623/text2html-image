@@ -71,7 +71,7 @@ function sanitizeProjectId(projectId, fallback = 'default') {
 }
 
 function getWorkspaceRoot(config = loadConfig()) {
-  return path.resolve(expandHome(config.workspace_root || '$DOCUMENTS/text2html-image'));
+  return path.resolve(expandHome(config.workspace_root || '$DOCUMENTS/text2html-image-project'));
 }
 
 function getProjectPaths(projectId, config = loadConfig(), options = {}) {
@@ -196,6 +196,51 @@ function toFileUrl(filePath) {
   return pathToFileURL(filePath).href;
 }
 
+function toMarkdownLink(filePath) {
+  return `[${path.basename(filePath)}](${toFileUrl(filePath)})`;
+}
+
+function getCodexAnnotationCapability() {
+  return {
+    status: 'probe-required',
+    use_when: 'Only after the current Codex Browser session exposes an annotation screenshot command such as elementScreenshot.',
+    fallback: 'Use ordinary browser screenshots plus visual-annotations evidence when the probe fails or is unavailable.',
+  };
+}
+
+function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnnotationCapability) {
+  const lines = [
+    '# HTML Preview Links',
+    '',
+    `Generated: ${generatedAt}`,
+    `Project: ${projectPaths.project_id}${projectPaths.subproject_id ? ` / ${projectPaths.subproject_id}` : ''}`,
+    '',
+    'Codex Browser annotation capability is optional and must be probed in the current session before use.',
+    'Do not claim annotation usage unless a session probe succeeds.',
+    `Annotation fallback: ${codexAnnotationCapability.fallback}`,
+    '',
+    '## Links',
+    '',
+  ];
+
+  for (const output of outputs.filter((item) => item.status === 'built')) {
+    lines.push(`### ${output.html_group} / ${output.lang}`);
+    lines.push('');
+    lines.push(`- Markdown preview link: ${output.markdown_link}`);
+    lines.push(`- Local HTML file path: \`${output.html}\``);
+    lines.push(`- File URL: \`${output.file_url}\``);
+    lines.push('- Codex Browser hint: open or refresh the file URL, then screenshot or inspect the DOM before visual review.');
+    lines.push('');
+  }
+
+  if (!outputs.some((item) => item.status === 'built')) {
+    lines.push('No HTML previews were built. Check build-report.json for skipped rows.');
+    lines.push('');
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
 function renderTemplate(template, row, outputDir, projectPaths) {
   const benefits = buildBenefits(row);
   const patchAssets = buildPatchAssets(row);
@@ -245,6 +290,9 @@ function renderRows(rows = loadCopyRows(), options = {}) {
   const outputs = [];
   const projectPaths = createProjectWorkspace(options.projectId, { subprojectId: options.subprojectId });
   const canonicalGroups = new Set();
+  const generatedAt = new Date().toISOString();
+  const previewLinksReport = path.join(projectPaths.reports, 'preview-links.md');
+  const codexAnnotationCapability = getCodexAnnotationCapability();
 
   for (const row of rows) {
     const templatePath = path.join(ROOT, 'templates', row.template_id, 'master.html');
@@ -256,10 +304,11 @@ function renderRows(rows = loadCopyRows(), options = {}) {
     const groupName = outputGroupName(row);
     const outputDir = path.join(projectPaths.html, groupName);
     const languageHtml = `index.${safeLang(row.lang)}.html`;
+    const htmlPath = path.join(outputDir, languageHtml);
     fs.mkdirSync(outputDir, { recursive: true });
     const html = renderTemplate(fs.readFileSync(templatePath, 'utf8'), row, outputDir, projectPaths);
     copyTemplateAssets(row.template_id, outputDir);
-    fs.writeFileSync(path.join(outputDir, languageHtml), html);
+    fs.writeFileSync(htmlPath, html);
     if (!canonicalGroups.has(groupName)) {
       fs.writeFileSync(path.join(outputDir, 'index.html'), html);
       canonicalGroups.add(groupName);
@@ -272,17 +321,27 @@ function renderRows(rows = loadCopyRows(), options = {}) {
       template_id: row.template_id,
       lang: row.lang,
       html_group: groupName,
-      html: path.join(outputDir, languageHtml),
-      file_url: toFileUrl(path.join(outputDir, languageHtml)),
+      html: htmlPath,
+      file_url: toFileUrl(htmlPath),
+      markdown_link: toMarkdownLink(htmlPath),
+      codex_browser_hint: 'open_or_refresh_file_url',
+      preview_links_report: previewLinksReport,
       export_name: row.export_name,
       canvas: `${row.canvas_w}x${row.canvas_h}`,
     });
   }
 
+  fs.writeFileSync(
+    previewLinksReport,
+    buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnnotationCapability)
+  );
+
   writeJson(path.join(projectPaths.reports, 'build-report.json'), {
-    generated_at: new Date().toISOString(),
+    generated_at: generatedAt,
     project_id: projectPaths.project_id,
     subproject_id: projectPaths.subproject_id,
+    preview_links_report: previewLinksReport,
+    codex_annotation_capability: codexAnnotationCapability,
     total: outputs.length,
     built: outputs.filter((item) => item.status === 'built').length,
     outputs,
@@ -325,6 +384,12 @@ function validateWorkflow(options = {}) {
   }
   if (!config.workspace_root) errors.push('workflow.config.json missing workspace_root');
   if (!String(config.workspace_root).includes('text2html-image')) errors.push('workflow.config.json workspace_root must point to text2html-image');
+  if (config.workspace_root !== '$DOCUMENTS/text2html-image-project') {
+    errors.push('workflow.config.json workspace_root must be $DOCUMENTS/text2html-image-project');
+  }
+  if (/CloudStorage|OneDrive|文档/.test(String(config.workspace_root))) {
+    errors.push('workflow.config.json workspace_root must not point to cloud or localized document folders');
+  }
   if (!Array.isArray(config.project_directory_schema?.directories)) {
     errors.push('workflow.config.json missing project_directory_schema.directories');
   }
@@ -390,4 +455,5 @@ module.exports = {
   buildPatchAssets,
   assetExists,
   toFileUrl,
+  toMarkdownLink,
 };
