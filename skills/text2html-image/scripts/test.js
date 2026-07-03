@@ -8,6 +8,7 @@ const {
   getUserDocumentsDir,
   getWorkspaceRoot,
   renderRows,
+  sanitizeProjectFolderName,
   sanitizeProjectId,
   toFileUrl,
   validateScoreReport,
@@ -314,6 +315,9 @@ assert(skillBody.includes('route": "regenerated_image"'), 'skill must document r
 assert(skillBody.includes('cutout_feasibility'), 'skill must document cutout feasibility scoring');
 assert(skillBody.includes('regeneration_fit'), 'skill must document regeneration fit scoring');
 assert(skillBody.includes('asset-generation-prompts.json'), 'skill must document image generation prompt package');
+assert(skillBody.includes('PNG output with a real alpha channel'), 'skill must require ImageGen PNG assets with real alpha channel');
+assert(skillBody.includes('green screen, green background, chroma key background'), 'skill must forbid green/chroma-key ImageGen backgrounds');
+assert(skillBody.includes('transparent PNG with alpha channel'), 'skill must require transparent PNG with alpha channel in regenerated prompts');
 assert(skillBody.includes('## Flood Cutout Asset Cleanup'), 'skill must document flood cutout asset cleanup');
 assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cutout command');
 assert(skillBody.includes('*-mask-debug.png'), 'skill must require mask debug output');
@@ -355,6 +359,7 @@ assert(skillBody.includes('dom-editability-report.json'), 'skill must mention do
 assert(skillBody.includes('## Final Preview Links'), 'skill must document final preview links');
 assert(skillBody.includes('preview-links.md'), 'skill must require a preview links report');
 assert(skillBody.includes('Every plain-text report or final response that references an HTML preview must include the local HTML file path'), 'skill must require local HTML file paths in plain-text reports');
+assert(skillBody.includes('required handoff for every image-edit round'), 'skill must require HTML preview links every image-edit round');
 assert(skillBody.includes('Browser annotation capability is optional'), 'skill must document optional browser annotation capability');
 assert(skillBody.includes('Do not claim browser annotation was used unless the current session probe succeeds'), 'skill must forbid unverified annotation claims');
 const executionFlow = read('references/execution-flow.md');
@@ -363,6 +368,8 @@ assert(executionFlow.includes('asset-routing-table.json'), 'execution flow must 
 assert(executionFlow.includes('asset-provenance.json'), 'execution flow must include asset provenance evidence');
 assert(executionFlow.includes('split-art-assets.json'), 'execution flow must include split art assets evidence');
 assert(executionFlow.includes('asset-generation-prompts.json'), 'execution flow must include generated prompt package evidence');
+assert(executionFlow.includes('transparent PNG with alpha channel'), 'execution flow must require transparent PNG ImageGen prompts');
+assert(executionFlow.includes('green-background channel images'), 'execution flow must reject green-background channel images');
 assert(executionFlow.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'execution flow must include the fixed complex asset routing prompt');
 assert(executionFlow.includes('dom-editability-report.json'), 'execution flow must include DOM editability report');
 assert(executionFlow.includes('dom-editability-summary.md'), 'execution flow must include DOM editability summary');
@@ -394,6 +401,9 @@ assert(stageGuides.includes('One export group -> direct `exports/`'), 'stage-gui
 assert(stageGuides.includes('Multiple delivery/export packs -> `exports/<delivery-id-or-group>/`'), 'stage-guides must document multi-delivery export path');
 assert(stageGuides.includes('Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/`'), 'stage-guides must document run-level iterative diagnostics path');
 assert(stageGuides.includes('Prompt package is not an asset'), 'stage guides must separate prompt packages from usable assets');
+assert(stageGuides.includes('ImageGen / Codex image generation must request transparent PNG with alpha channel'), 'stage guides must require alpha PNG ImageGen assets');
+assert(stageGuides.includes('green screen, green background, chroma key background'), 'stage guides must forbid green/chroma-key ImageGen backgrounds');
+assert(stageGuides.includes('real PNG with alpha channel'), 'stage guides must keep regenerated_image prompt-only until real alpha PNG exists');
 assert(stageGuides.includes('Current preview edit checklist'), 'stage guides must document current preview edits');
 assert(stageGuides.includes('Detached outputs path checklist'), 'stage guides must document detached output path checks');
 assert(!stageGuides.includes('exports/export-manifest.json'), 'stage-guides should not require export manifest path');
@@ -407,6 +417,8 @@ if (fs.existsSync(rootReadmePath)) {
   assert(rootReadmeBody.includes('outputs 路径检查'), 'root README must explain detached output path checks');
   assert(rootReadmeBody.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'root README must explain fixed complex asset routing');
   assert(rootReadmeBody.includes('平文本报告必须包含本地 HTML 文件路径'), 'root README must document local HTML paths in plain-text reports');
+  assert(rootReadmeBody.includes('带 alpha 透明通道的 PNG'), 'root README must tell users to request alpha PNG assets');
+  assert(rootReadmeBody.includes('不要绿幕、绿色背景'), 'root README must forbid green-screen generated assets');
   assert(rootReadmeBody.includes('/Users/<user>/Documents/text2html-image-project'), 'root README must explicitly document the system Documents output root');
   assert(rootReadmeBody.includes('不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径'), 'root README must forbid cloud/localized document output roots');
 }
@@ -428,6 +440,9 @@ assert(verboseStartOutput.includes('input:'), 'verbose start output should inclu
 
 assert(sanitizeProjectId('Travel eSIM Banner For HKMO Long Name') === 'travel-esim-banner', 'project ids should be kebab-case and max 20 chars');
 assert(sanitizeProjectId('Page Master A') === 'page-master-a', 'subproject ids should be kebab-case');
+assert(sanitizeProjectFolderName('非洲多国覆盖表-国家覆盖表-清爽商务风') === '非洲多国覆盖表-国家覆盖表-清爽商务风', 'project folder names should preserve Chinese title and notes');
+assert(sanitizeProjectFolderName('Global Roaming Coverage / Country Coverage Table / Clean Business Style') === 'Global-Roaming-Coverage-Country-Coverage-Table-Clean-Business-Style', 'project folder names should keep readable English notes');
+assert(sanitizeProjectFolderName('  :::  ') === 'default', 'empty project folder names should fall back to default');
 
 const projectId = 'test-default-project';
 const projectPaths = createProjectWorkspace(projectId);
@@ -440,10 +455,14 @@ assert(!/CloudStorage|OneDrive|文档/.test(projectPaths.root), `project root mu
 assert(projectPaths.root.endsWith(path.join('text2html-image-project', projectId)), 'project root should be directly under text2html-image-project');
 
 const subprojectPaths = createProjectWorkspace('Travel eSIM Banner For HKMO Long Name', { subprojectId: 'Page Master A' });
-assert(subprojectPaths.project_id === 'travel-esim-banner', 'long project name should sanitize to 20 chars');
-assert(subprojectPaths.subproject_id === 'page-master-a', 'subproject name should sanitize');
+assert(subprojectPaths.project_id === 'Travel-eSIM-Banner-For-HKMO-Long-Name', 'project folder name should preserve readable title words');
+assert(subprojectPaths.subproject_id === 'Page-Master-A', 'subproject folder name should preserve readable title words');
 assert(subprojectPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `subproject root must be under system Documents text2html-image-project: ${subprojectPaths.root}`);
-assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'travel-esim-banner', 'page-master-a')), 'subproject root should use shallow nesting under project');
+assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'Travel-eSIM-Banner-For-HKMO-Long-Name', 'Page-Master-A')), 'subproject root should use shallow nesting under readable project folder');
+
+const chineseProjectPaths = createProjectWorkspace('欧洲多国流量包-国家覆盖表-简洁蓝白商务风');
+assert(chineseProjectPaths.project_id === '欧洲多国流量包-国家覆盖表-简洁蓝白商务风', 'Chinese project title and inferred image type/style notes should become the folder name');
+assert(chineseProjectPaths.root.endsWith(path.join('text2html-image-project', '欧洲多国流量包-国家覆盖表-简洁蓝白商务风')), 'Chinese project root should stay readable under text2html-image-project');
 
 const defaultPaths = getProjectPaths();
 assert(defaultPaths.project_id === 'default', 'missing project should use default project id');
@@ -467,6 +486,8 @@ assert(buildOutput.includes('Local HTML file path:'), 'build output should print
 assert(buildOutput.includes('Open or refresh in your browser: file://'), 'build output should print the file_url every round');
 assert(buildOutput.includes('Markdown preview link: ['), 'build output should print a markdown preview link every round');
 assert(buildOutput.includes('Preview links report:'), 'build output should print the preview links report path');
+assert(buildOutput.includes('Required HTML preview handoff for this image-edit round:'), 'build output should label HTML preview handoff as required every round');
+assert(buildOutput.includes('Final response must include the Markdown preview link, the plain local HTML file path, and this preview links report path.'), 'build output should instruct final responses to include all preview handoff fields');
 for (const output of outputs.filter((item) => item.status === 'built')) {
   assert(output.html.startsWith(projectPaths.html), `HTML preview should be written to project html dir: ${output.html}`);
   assert(output.file_url === toFileUrl(output.html), `HTML preview should include file_url: ${output.html}`);
@@ -502,6 +523,7 @@ const previewLinks = fs.readFileSync(previewLinksPath, 'utf8');
 assert(previewLinks.includes('# HTML Preview Links'), 'preview-links.md should have a clear heading');
 assert(previewLinks.includes('Browser annotation capability is optional'), 'preview-links.md should explain optional annotation support');
 assert(previewLinks.includes('Do not claim annotation usage unless a session probe succeeds.'), 'preview-links.md should forbid unverified annotation claims');
+assert(previewLinks.includes('Required final-response handoff for every image-edit round'), 'preview-links.md should require preview handoff every image-edit round');
 for (const output of outputs.filter((item) => item.status === 'built')) {
   assert(previewLinks.includes(output.markdown_link), `preview-links.md should include markdown link for ${output.html}`);
   assert(previewLinks.includes('- Local HTML file path:'), `preview-links.md should label local HTML file path for ${output.html}`);
@@ -678,7 +700,7 @@ const subprojectScoreReportPath = path.join(getProjectPaths(projectId, config, {
 assert(fs.existsSync(subprojectScoreReportPath), 'review-score should create subproject round-01.json');
 const savedScoreReport = JSON.parse(fs.readFileSync(subprojectScoreReportPath, 'utf8'));
 assert(savedScoreReport.overall_score === 91, 'review-score should preserve overall score');
-assert(savedScoreReport.subproject_id === 'page-master-a', 'review-score should preserve subproject id');
+assert(savedScoreReport.subproject_id === 'Page-Master-A', 'review-score should preserve readable subproject folder id');
 assert(savedScoreReport.issues[0].fix_hint === 'move hero up', 'review-score should parse issue fix hint');
 
 const routeSourcePath = path.join(projectPaths.source, 'asset-routing-reference.png');
@@ -797,6 +819,12 @@ assert(unknownRoute.status === 'review', 'missing bbox or description should req
 assert(routeReport.prompts.prompts.length >= 2, 'regenerated_image elements should get prompt packages');
 assert(routeReport.prompts.prompts[0].status === 'prompt_only', 'generated prompt package should be prompt_only');
 assert(routeReport.prompts.prompts.every((item) => item.prompt.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分')), 'prompt package should include the fixed complex asset instruction');
+assert(routeReport.prompts.prompts.every((item) => item.prompt.includes('transparent PNG with alpha channel')), 'prompt package should require transparent PNG with alpha channel');
+assert(routeReport.prompts.prompts.every((item) => item.prompt.includes('No green screen, green background, chroma key background')), 'prompt package should forbid green/chroma-key backgrounds');
+assert(routeReport.prompts.prompts.every((item) => item.required_format === 'png'), 'prompt package should require png format structurally');
+assert(routeReport.prompts.prompts.every((item) => item.requires_alpha_channel === true), 'prompt package should require alpha channel structurally');
+assert(routeReport.prompts.prompts.every((item) => item.exterior_alpha === 0), 'prompt package should require exterior alpha 0 structurally');
+assert(routeReport.prompts.prompts.every((item) => Array.isArray(item.forbidden_backgrounds) && item.forbidden_backgrounds.includes('green screen') && item.forbidden_backgrounds.includes('chroma key background') && item.forbidden_backgrounds.includes('colored matte')), 'prompt package should structurally forbid green/chroma-key/matte backgrounds');
 assert(routeReport.provenance.assets.every((asset) => asset.status !== 'final_asset'), 'route planning must not create final assets');
 
 const routeElementsPath = path.join(projectPaths.working, 'asset-routing-elements.json');
@@ -826,6 +854,12 @@ const promptPackage = JSON.parse(fs.readFileSync(path.join(projectPaths.reports,
 assert(promptPackage.prompts.every((item) => item.route === 'regenerated_image'), 'prompt package should only include regenerated_image elements');
 assert(promptPackage.prompts.every((item) => item.status === 'prompt_only'), 'prompt package entries should remain prompt_only');
 assert(promptPackage.prompts.every((item) => item.prompt.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分')), 'prompt package should include fixed complex asset routing instruction');
+assert(promptPackage.prompts.every((item) => item.prompt.includes('transparent PNG with alpha channel')), 'written prompt package should require transparent PNG with alpha channel');
+assert(promptPackage.prompts.every((item) => item.prompt.includes('No green screen, green background, chroma key background')), 'written prompt package should forbid green/chroma-key backgrounds');
+assert(promptPackage.prompts.every((item) => item.required_format === 'png'), 'written prompt package should include required png format');
+assert(promptPackage.prompts.every((item) => item.requires_alpha_channel === true), 'written prompt package should include alpha-channel requirement');
+assert(promptPackage.prompts.every((item) => item.exterior_alpha === 0), 'written prompt package should include exterior alpha 0');
+assert(promptPackage.prompts.every((item) => item.forbidden_backgrounds.includes('green background') && item.forbidden_backgrounds.includes('white matte') && item.forbidden_backgrounds.includes('gradient background')), 'written prompt package should list forbidden solid/matte backgrounds');
 
 const floodInputPath = path.join(projectPaths.working, 'flood-cutout-input.png');
 const floodOutputPath = path.join(projectPaths.working, 'flood-cutout-output.png');

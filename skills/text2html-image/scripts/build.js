@@ -10,9 +10,13 @@ const previewLinksReport = outputs.find((item) => item.preview_links_report)?.pr
 
 console.log(`Built ${built} HTML preview(s) for project ${projectId}${subprojectId ? ` / subproject ${subprojectId}` : ''}.`);
 for (const output of outputs.filter((item) => item.status === 'built')) {
+  console.log('Required HTML preview handoff for this image-edit round:');
   console.log(`Local HTML file path: ${output.html}`);
   console.log(`Open or refresh in your browser: ${output.file_url}`);
   console.log(`Markdown preview link: ${output.markdown_link}`);
 }
-if (previewLinksReport) console.log(`Preview links report: ${previewLinksReport}`);
+if (previewLinksReport) {
+  console.log(`Preview links report: ${previewLinksReport}`);
+  console.log('Final response must include the Markdown preview link, the plain local HTML file path, and this preview links report path.');
+}
 if (skipped) console.log('Skipped row(s); see the project reports/build-report.json.');

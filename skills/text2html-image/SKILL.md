@@ -193,7 +193,7 @@ Image project folders must stay shallow and self-contained. Do not place repo co
 
 Do not generate `project-manifest.json` inside image project folders. If a command needs structured output, write task-specific JSON under `reports/`, `scores/`, or `exports/`.
 
-Default project id is `default`. Prefer an explicit English kebab-case project id. Project and subproject ids are sanitized to lowercase ASCII kebab-case and capped at 20 characters.
+Default project id is `default`. Prefer an explicit readable project folder name derived from the image's main title, followed by short hyphen-separated notes for the inferred image type and visual style, for example `欧洲多国流量包-国家覆盖表-简洁蓝白商务风`. If the title contains Chinese, keep the Chinese title. If there is no Chinese title, translate the main title to Chinese when the prompt or source copy makes that safe; otherwise keep a readable English title. The notes should be easy to identify from the prompt or reference image, such as `国家覆盖表`, `价格促销海报`, `步骤说明图`, `清爽商务风`, or `卡通插画风`. Project and subproject folder names preserve readable Unicode text, replace unsafe path separators with hyphens, and are capped at 80 characters. Internal language/html group slugs still use lowercase ASCII kebab-case.
 
 Use `--subproject <subproject-id>` when one user job contains multiple page-level image masters that need isolated rounds, screenshots, and exports. This remains the existing script behavior; adaptive flattening is a documentation contract and does not alter `--subproject` semantics until scripts are updated.
 
@@ -260,8 +260,10 @@ Use these rules for complex illustrated posters where a flat sticker-sheet asset
 
 - Do not generate a loose asset sticker sheet for complex posters. Prefer same-canvas transparent PNG layers plus editable HTML/CSS/SVG overlay.
 - Every PNG layer must use the final canvas dimensions and origin. Preserve alpha, keep transparent regions transparent, and verify dimensions before reporting success.
+- ImageGen / Codex image generation for poster assets must request PNG output with a real alpha channel. Exterior pixels outside the subject must be alpha 0; do not accept green screen, green background, chroma key background, white matte, gray matte, beige matte, colored matte, or gradient background as a substitute for transparency.
 - For irregular or AI-generated bitmap layers, run flood cutout first and use the resulting `*-transparent.png`; do not place glow-cutout, gray-matte, or softly faded background assets as final layers.
 - Transparent PNG acceptance requires fully transparent exterior pixels, no visible gradient glow around the silhouette, and a saved `*-mask-debug.png` plus `*-cutout-report.json`.
+- Generated ImageGen assets may enter HTML `<img>` layers only after PNG format, real alpha transparency, dimensions, and provenance are checked.
 - PNG layers must not contain poster-level title, step copy, CTA, legal text, labels, or other text that needs localization. Those belong in DOM text with `data-i18n-key`.
 - Keep CSS-rebuildable geometry out of PNG layers: large rectangles, circles, rounded cards, pills, button bases, notice bars, simple borders, and simple icons.
 - Use clear layer names and z-index roles such as `background-art.png`, `device-art.png`, optional `foreground-art.png`, and an HTML text/vector layer.
@@ -289,6 +291,7 @@ Use this when a poster contains complex non-text art such as people, maps, globe
 - Write `reports/asset-provenance.json` when complex art assets are cut out, regenerated, externally licensed, or user-provided. Provenance must prove the final PNG is not a CSS/SVG/PIL geometric placeholder.
 - Every complex element must include routing difficulty fields: `cutout_feasibility`, `regeneration_fit`, `difficulty_signals`, `decision_reason`, and `requires_imagegen_prompt`.
 - For `regenerated_image`, write `reports/asset-generation-prompts.json` with `prompt_only` entries. A prompt package is never a final asset and must not be inserted into HTML.
+- Every `regenerated_image` prompt must require transparent PNG with alpha channel and must forbid green screen / chroma key / matte backgrounds. Do not ask ImageGen for green-background channel images and do not treat them as acceptable transparent assets.
 - The final HTML must pass: `script_count == 0`, no unapproved complex art SVG placeholders, `image_count == expected independent asset count`, all image paths resolve from the active or delivered HTML path, and `old_geometric_css=false` for replaced art.
 
 ## Phone Poster Layering Pitfalls
@@ -309,6 +312,7 @@ Use these rules for phone-UI travel/eSIM posters and other same-canvas illustrat
 Use these rules before starting or continuing a poster recreation, transparent-layer package, current preview edit, or detached `outputs/` delivery.
 
 - `prompt_only is not a finished transparent asset`. A prompt package for ChatGPT Images 2, Codex image generation, or any external image model only means the layer request is ready. Do not place that layer into final HTML until real PNG outputs exist, match the expected canvas/bbox contract, and have an audit report.
+- ImageGen returning a green-background or other chroma-key/matte PNG is still not a finished transparent asset. It must be regenerated as a transparent PNG with alpha channel or rejected before HTML composition.
 - `flood-cutout is not semantic segmentation`. It removes edge-connected background and near-edge glow from a supplied bitmap. It cannot decide which part of a full ghost poster is the phone, map, person, or background. If the source is a full poster, return to layer planning, model-assisted visual review, manual crop, or user-supplied layers before using `flood-cutout`.
 - For a current preview edit, start from the HTML path the user is actually viewing. Decide whether the active surface is `workspace-html` or `deliverable-copy` before editing. Do not rebuild or regenerate the full page just to fix a QR code, icon, copy position, phone safe-area, or asset path.
 - QR/barcode assets are bitmap truth assets. Crop them from the reference or original source image, keep them as PNG assets in the project asset pack, and verify they resolve from both the workspace HTML path and any detached delivery path.
@@ -490,6 +494,8 @@ Every build or final delivery should surface a clickable local preview target fo
 - `browser_hint`: `open_or_refresh_file_url`.
 
 In final responses, include the active HTML as a Markdown link and include the plain absolute local HTML file path next to it for clients that do not open `file://` links. Keep `reports/preview-links.md` with the project evidence so a later agent can reopen the same preview without re-running discovery.
+
+This is a required handoff for every image-edit round, not just final delivery: always output the active HTML Markdown preview link, the plain absolute local HTML path, and the `reports/preview-links.md` path before asking the user to inspect the result. If multiple HTML variants were built, name the active variant or list each variant that needs review.
 
 Browser annotation capability is optional. Probe the current agent/browser session before using browser-native element annotation, for example by checking whether an annotation screenshot command is exposed and succeeds. Do not claim browser annotation was used unless the current session probe succeeds. If the probe fails or the client does not expose annotation commands, use ordinary browser screenshots, DOM snapshots, coordinate notes, or a task-local visual annotation report instead.
 
