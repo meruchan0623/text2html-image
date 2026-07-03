@@ -200,24 +200,24 @@ function toMarkdownLink(filePath) {
   return `[${path.basename(filePath)}](${toFileUrl(filePath)})`;
 }
 
-function getCodexAnnotationCapability() {
+function getAnnotationCapability() {
   return {
     status: 'probe-required',
-    use_when: 'Only after the current Codex Browser session exposes an annotation screenshot command such as elementScreenshot.',
+    use_when: 'Only after the current browser session exposes an annotation screenshot command such as elementScreenshot.',
     fallback: 'Use ordinary browser screenshots plus visual-annotations evidence when the probe fails or is unavailable.',
   };
 }
 
-function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnnotationCapability) {
+function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, annotationCapability) {
   const lines = [
     '# HTML Preview Links',
     '',
     `Generated: ${generatedAt}`,
     `Project: ${projectPaths.project_id}${projectPaths.subproject_id ? ` / ${projectPaths.subproject_id}` : ''}`,
     '',
-    'Codex Browser annotation capability is optional and must be probed in the current session before use.',
+    'Browser annotation capability is optional and must be probed in the current session before use.',
     'Do not claim annotation usage unless a session probe succeeds.',
-    `Annotation fallback: ${codexAnnotationCapability.fallback}`,
+    `Annotation fallback: ${annotationCapability.fallback}`,
     '',
     '## Links',
     '',
@@ -229,7 +229,7 @@ function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnno
     lines.push(`- Markdown preview link: ${output.markdown_link}`);
     lines.push(`- Local HTML file path: \`${output.html}\``);
     lines.push(`- File URL: \`${output.file_url}\``);
-    lines.push('- Codex Browser hint: open or refresh the file URL, then screenshot or inspect the DOM before visual review.');
+    lines.push('- Browser hint: open or refresh the file URL, then screenshot or inspect the DOM before visual review.');
     lines.push('');
   }
 
@@ -292,7 +292,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
   const canonicalGroups = new Set();
   const generatedAt = new Date().toISOString();
   const previewLinksReport = path.join(projectPaths.reports, 'preview-links.md');
-  const codexAnnotationCapability = getCodexAnnotationCapability();
+  const annotationCapability = getAnnotationCapability();
 
   for (const row of rows) {
     const templatePath = path.join(ROOT, 'templates', row.template_id, 'master.html');
@@ -324,7 +324,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
       html: htmlPath,
       file_url: toFileUrl(htmlPath),
       markdown_link: toMarkdownLink(htmlPath),
-      codex_browser_hint: 'open_or_refresh_file_url',
+      browser_hint: 'open_or_refresh_file_url',
       preview_links_report: previewLinksReport,
       export_name: row.export_name,
       canvas: `${row.canvas_w}x${row.canvas_h}`,
@@ -333,7 +333,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
 
   fs.writeFileSync(
     previewLinksReport,
-    buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnnotationCapability)
+    buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, annotationCapability)
   );
 
   writeJson(path.join(projectPaths.reports, 'build-report.json'), {
@@ -341,7 +341,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
     project_id: projectPaths.project_id,
     subproject_id: projectPaths.subproject_id,
     preview_links_report: previewLinksReport,
-    codex_annotation_capability: codexAnnotationCapability,
+    annotation_capability: annotationCapability,
     total: outputs.length,
     built: outputs.filter((item) => item.status === 'built').length,
     outputs,

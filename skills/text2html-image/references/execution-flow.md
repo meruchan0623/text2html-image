@@ -180,7 +180,7 @@ Before final delivery, confirm:
 - Dense labels have coordinate/debug reports and omitted reasons.
 - QC or equivalent DOM checks passed for the affected HTML files.
 - `reports/preview-links.md` exists and final response includes the active HTML Markdown link plus absolute path.
-- Codex Browser annotation use is either probe-confirmed or explicitly replaced by screenshot/DOM/coordinate evidence.
+- Browser annotation use is either probe-confirmed or explicitly replaced by screenshot/DOM/coordinate evidence.
 - Real PNG export was performed when requested, not only an export plan.
 - `reports/png-export-report.json` exists when direct PNG export was requested.
 - PNG files exist under `exports/`.

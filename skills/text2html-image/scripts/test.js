@@ -277,9 +277,9 @@ for (const file of skillFiles) {
   assert(body.includes('Do not use CloudStorage, OneDrive, or localized `文档` paths'), `${file} must forbid cloud/localized document output roots`);
   assert(body.includes('## HTML Grouping'), `${file} must document html grouping`);
   assert(body.includes('## 抄图复刻流程'), `${file} must document the copy-image workflow`);
-  assert(body.includes('多模态读取'), `${file} must document multimodal screenshot review`);
+  assert(body.includes('Multimodal image reading'), `${file} must document multimodal screenshot review`);
   assert(body.includes('静态 `index.html`'), `${file} must require static HTML output`);
-  assert(body.includes('刷新当前 Codex Browser 页面'), `${file} must require refreshing the current Codex Browser page`);
+  assert(body.includes('refresh the browser preview'), `${file} must require refreshing the browser preview`);
   assert(body.includes('Do not close the debugging preview'), `${file} must keep the debugging preview open until accepted`);
   for (const term of noDebugBrowserTerms) {
     assert(!body.includes(term), `${file} must not mention ${term}`);
@@ -355,8 +355,8 @@ assert(skillBody.includes('dom-editability-report.json'), 'skill must mention do
 assert(skillBody.includes('## Final Preview Links'), 'skill must document final preview links');
 assert(skillBody.includes('preview-links.md'), 'skill must require a preview links report');
 assert(skillBody.includes('Every plain-text report or final response that references an HTML preview must include the local HTML file path'), 'skill must require local HTML file paths in plain-text reports');
-assert(skillBody.includes('Codex Browser annotation capability is optional'), 'skill must document optional Codex annotation capability');
-assert(skillBody.includes('Do not claim Codex Browser annotation was used unless the current session probe succeeds'), 'skill must forbid unverified annotation claims');
+assert(skillBody.includes('Browser annotation capability is optional'), 'skill must document optional browser annotation capability');
+assert(skillBody.includes('Do not claim browser annotation was used unless the current session probe succeeds'), 'skill must forbid unverified annotation claims');
 const executionFlow = read('references/execution-flow.md');
 assert(executionFlow.includes('Reference Image Asset Routing'), 'execution flow must document reference image asset routing');
 assert(executionFlow.includes('asset-routing-table.json'), 'execution flow must include asset routing table evidence');
@@ -464,14 +464,14 @@ const buildOutput = require('child_process').execFileSync(process.execPath, [
   encoding: 'utf8',
 });
 assert(buildOutput.includes('Local HTML file path:'), 'build output should print the local HTML file path every round');
-assert(buildOutput.includes('Open or refresh in Codex Browser: file://'), 'build output should print the file_url every round');
+assert(buildOutput.includes('Open or refresh in your browser: file://'), 'build output should print the file_url every round');
 assert(buildOutput.includes('Markdown preview link: ['), 'build output should print a markdown preview link every round');
 assert(buildOutput.includes('Preview links report:'), 'build output should print the preview links report path');
 for (const output of outputs.filter((item) => item.status === 'built')) {
   assert(output.html.startsWith(projectPaths.html), `HTML preview should be written to project html dir: ${output.html}`);
   assert(output.file_url === toFileUrl(output.html), `HTML preview should include file_url: ${output.html}`);
   assert(output.markdown_link === `[${path.basename(output.html)}](${output.file_url})`, `HTML preview should include markdown_link: ${output.html}`);
-  assert(output.codex_browser_hint === 'open_or_refresh_file_url', `HTML preview should include Codex Browser hint: ${output.html}`);
+  assert(output.browser_hint === 'open_or_refresh_file_url', `HTML preview should include browser hint: ${output.html}`);
   assert(path.basename(output.html) === `index.${output.lang.toLowerCase()}.html`, `localized HTML should use index.<lang>.html: ${output.html}`);
   assert(fs.existsSync(path.join(path.dirname(output.html), 'index.html')), `canonical index.html should exist beside localized HTML: ${output.html}`);
   assert(fs.existsSync(output.html), `missing generated HTML ${output.html}`);
@@ -491,7 +491,7 @@ const buildReportPath = path.join(projectPaths.reports, 'build-report.json');
 assert(fs.existsSync(buildReportPath), 'build report should be written to project reports dir');
 const buildReport = JSON.parse(fs.readFileSync(buildReportPath, 'utf8'));
 assert(buildReport.preview_links_report === path.join(projectPaths.reports, 'preview-links.md'), 'build report should point to preview-links.md');
-assert(buildReport.codex_annotation_capability?.status === 'probe-required', 'build report should mark Codex annotation as probe-required');
+assert(buildReport.annotation_capability?.status === 'probe-required', 'build report should mark annotation as probe-required');
 for (const output of buildReport.outputs.filter((item) => item.status === 'built')) {
   assert(output.file_url === toFileUrl(output.html), `build report output should include file_url: ${output.html}`);
   assert(output.markdown_link === `[${path.basename(output.html)}](${output.file_url})`, `build report output should include markdown_link: ${output.html}`);
@@ -500,7 +500,7 @@ const previewLinksPath = path.join(projectPaths.reports, 'preview-links.md');
 assert(fs.existsSync(previewLinksPath), 'build should write reports/preview-links.md');
 const previewLinks = fs.readFileSync(previewLinksPath, 'utf8');
 assert(previewLinks.includes('# HTML Preview Links'), 'preview-links.md should have a clear heading');
-assert(previewLinks.includes('Codex Browser annotation capability is optional'), 'preview-links.md should explain optional annotation support');
+assert(previewLinks.includes('Browser annotation capability is optional'), 'preview-links.md should explain optional annotation support');
 assert(previewLinks.includes('Do not claim annotation usage unless a session probe succeeds.'), 'preview-links.md should forbid unverified annotation claims');
 for (const output of outputs.filter((item) => item.status === 'built')) {
   assert(previewLinks.includes(output.markdown_link), `preview-links.md should include markdown link for ${output.html}`);
@@ -894,5 +894,77 @@ assert(floodReport.mode === 'edge-flood', 'flood report should name edge-flood m
 assert(floodReport.removed_pixels > 0, 'flood report should count removed pixels');
 assert(floodReport.edge_cleanup_pixels > 0, 'flood report should count edge cleanup pixels');
 assert(floodReport.warnings.length === 0, `flood report should not warn for fixture: ${floodReport.warnings.join('; ')}`);
+
+// --- install-skill.js: 双平台符号链接安装 ---
+const installSkill = require('./install-skill');
+const osModule = require('os');
+
+// 单元：resolveTargets 路径解析（纯函数，不碰真实 HOME）
+{
+  const targets = installSkill.resolveTargets({
+    target: 'all',
+    env: { CODEX_HOME: '/tmp/fake-codex' },
+    homedir: '/tmp/fake-home',
+  });
+  assert(targets.length === 2, 'resolveTargets all should return two targets');
+  const claude = targets.find((t) => t.platform === 'claude');
+  const codex = targets.find((t) => t.platform === 'codex');
+  assert(
+    claude.linkPath === path.join('/tmp/fake-home', '.claude', 'skills', 'text2html-image'),
+    'claude link path defaults under ~/.claude/skills'
+  );
+  assert(
+    codex.linkPath === path.join('/tmp/fake-codex', 'skills', 'text2html-image'),
+    'codex link path honors CODEX_HOME'
+  );
+  const onlyClaude = installSkill.resolveTargets({ target: 'claude', homedir: '/tmp/fake-home' });
+  assert(onlyClaude.length === 1 && onlyClaude[0].platform === 'claude', 'target=claude filters to one target');
+  const codexDefault = installSkill.resolveTargets({ target: 'codex', env: {}, homedir: '/tmp/fake-home' });
+  assert(
+    codexDefault[0].linkPath === path.join('/tmp/fake-home', '.codex', 'skills', 'text2html-image'),
+    'codex falls back to ~/.codex when CODEX_HOME unset'
+  );
+}
+
+// 端到端：创建 / 幂等 / 真实目录报错（用临时目录，不污染真实 HOME）
+{
+  const tmpBase = fs.mkdtempSync(path.join(osModule.tmpdir(), 't2h-install-'));
+  const claudeDir = path.join(tmpBase, '.claude', 'skills');
+  const codexDir = path.join(tmpBase, '.codex', 'skills');
+  const claudeLink = path.join(claudeDir, 'text2html-image');
+  const codexLink = path.join(codexDir, 'text2html-image');
+  const runInstall = (extraArgs) =>
+    require('child_process').execFileSync(
+      process.execPath,
+      [path.join(ROOT, 'scripts', 'install-skill.js'), '--claude-dir', claudeDir, '--codex-dir', codexDir, ...extraArgs],
+      { cwd: ROOT, encoding: 'utf8' }
+    );
+
+  runInstall(['--target', 'all']);
+  assert(fs.lstatSync(claudeLink).isSymbolicLink(), 'claude symlink created');
+  assert(fs.lstatSync(codexLink).isSymbolicLink(), 'codex symlink created');
+  assert(fs.realpathSync(claudeLink) === fs.realpathSync(ROOT), 'claude symlink points to skill dir');
+  assert(fs.existsSync(path.join(claudeLink, 'SKILL.md')), 'SKILL.md is readable through the symlink');
+
+  // 幂等：再次运行不报错，仍是符号链接
+  runInstall(['--target', 'all']);
+  assert(fs.lstatSync(claudeLink).isSymbolicLink(), 'idempotent re-run keeps the symlink');
+
+  // 安全：目标是真实目录时必须报错且不删除
+  fs.unlinkSync(claudeLink);
+  fs.mkdirSync(claudeLink, { recursive: true });
+  fs.writeFileSync(path.join(claudeLink, 'keep.txt'), 'real-data');
+  let threw = false;
+  try {
+    runInstall(['--target', 'claude']);
+  } catch (e) {
+    threw = true;
+    assert(/Refusing to overwrite real path/.test(String(e.stdout) + String(e.stderr)), 'error explains refusal');
+  }
+  assert(threw, 'install exits non-zero when target is a real directory');
+  assert(fs.existsSync(path.join(claudeLink, 'keep.txt')), 'real directory must NOT be deleted');
+
+  fs.rmSync(tmpBase, { recursive: true, force: true });
+}
 
 console.log(`Tests passed. Generated ${outputs.filter((item) => item.status === 'built').length} preview(s).`);

@@ -15,7 +15,7 @@ Use this reference only when stage rules are unclear, when extending templates, 
 
 ### Prompt package is not an asset
 
-- Treat ChatGPT Images 2 / Codex image generation prompts as `prompt_only` until real PNG outputs are supplied.
+- Treat external image-generation prompts (e.g. ChatGPT Images, Codex image generation) as `prompt_only` until real PNG outputs are supplied.
 - A usable transparent layer must include the PNG file, expected dimensions, alpha audit, and a report path.
 - Do not place `prompt_only` layers into HTML, exports, screenshots, or delivery reports.
 - If image generation is unavailable, record the prompt package path and stop the asset at review state.
@@ -138,8 +138,8 @@ Errors block export. Warnings identify missing optional assets or incomplete pro
 - Adjust typography and line-height in language-specific CSS; do not turn text into images.
 - Run `npm run batch-export -- --project <project-id> [--subproject <subproject-id>]` only after QC has no errors.
 - Current `npm run batch-export` is report-only and writes `reports/export-report.json`; it does not create PNG files. Real PNG files require `npm run export-fast` for supported render profiles or an explicit browser screenshot/export fallback.
-- `npm run build` writes `reports/preview-links.md` with Markdown `file://` links, `Local HTML file path` entries, and Codex Browser reopening hints. Keep this report with the final evidence and include both the active HTML Markdown link and the plain local HTML file path in the final response.
-- Browser-native annotation is optional and session-dependent. Probe the current Codex Browser before relying on element/circle annotation; otherwise use ordinary screenshots, DOM snapshots, and coordinate notes.
+- `npm run build` writes `reports/preview-links.md` with Markdown `file://` links, `Local HTML file path` entries, and browser reopening hints. Keep this report with the final evidence and include both the active HTML Markdown link and the plain local HTML file path in the final response.
+- Browser-native annotation is optional and session-dependent. Probe the current browser tool before relying on element/circle annotation; otherwise use ordinary screenshots, DOM snapshots, and coordinate notes.
 - Adaptive grouping rule:
   - One HTML group -> direct `html/index.html`, `html/index.<lang>.html`.
   - Multiple HTML groups -> `html/<html-group>/`.

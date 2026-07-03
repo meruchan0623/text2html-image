@@ -1,6 +1,7 @@
 ---
 name: text2html-image
 description: Use when generating, validating, localizing, or exporting editable ecommerce poster/ad images with repo-root HTML/CSS templates, project workspaces, browser screenshots, and multilingual variants.
+when_to_use: When the user wants to create, recreate, edit, localize, layer, QC, or export an editable poster/banner/ad image from text, a reference image, or an existing HTML/CSS template — keeping text, price, CTA, labels, and legal copy as real editable DOM rather than baked-in pixels.
 ---
 
 # text2html-image
@@ -59,6 +60,14 @@ npm test
 npm run project:init -- --project <project-id>
 npm run build -- --project <project-id>
 ```
+
+Locate this skill directory before running commands (the runtime working directory is usually the caller's project, not this package):
+
+- Claude Code: the skill directory is `${CLAUDE_SKILL_DIR}` — run `cd "$CLAUDE_SKILL_DIR"` first.
+- Codex: the skill directory is `$CODEX_HOME/skills/text2html-image` (or the repo path `skills/text2html-image`) — `cd` there first.
+- Any other agent: `cd` into the directory that contains this `SKILL.md`.
+
+Install as a discoverable skill for both agents with `npm run install:all` (or `npm run install:claude` / `npm run install:codex`).
 
 Do not write generated work into the skill directory or repository root. Keep runtime image projects under the system user-home Documents folder: `/Users/<user>/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths for generated project output.
 
@@ -349,8 +358,8 @@ Reference routing:
 6. Create a project workspace with `npm run project:init -- --project <project-id> [--subproject <subproject-id>]` when the workspace does not already exist.
 7. Generate HTML previews with `npm run build -- --project <project-id> [--subproject <subproject-id>]` only when the active surface allows rebuild.
 8. Run `npm run quality-check -- --project <project-id> [--subproject <subproject-id>]` after every layout or text-affecting source/template change, and run equivalent DOM checks after direct workspace HTML edits.
-9. Before visual iteration or scoring, resolve the active HTML path using the Project Workspace path decision rules: grouped evidence wins; otherwise use active shallow single-group files or current script-compatible layout. For visual iteration, open the generated `file://.../html/index*.html` (single-group) or `file://.../html/<html-group>/index*.html` (multi-group) in Codex Browser, save current iterative screenshots under `runs/latest/screenshots/` when runs-based evidence is active; otherwise keep screenshots in the existing/current script-supported location. Then use multimodal reading to identify fixes. If the preview is already open, 刷新当前 Codex Browser 页面 after rebuilding.
-10. Keep the Codex Browser preview open until the image is accepted or the user stops the work. Do not close the debugging preview between unfinished rounds.
+9. Before visual iteration or scoring, resolve the active HTML path using the Project Workspace path decision rules: grouped evidence wins; otherwise use active shallow single-group files or current script-compatible layout. For visual iteration, open the generated `file://.../html/index*.html` (single-group) or `file://.../html/<html-group>/index*.html` (multi-group) in your browser tool, save current iterative screenshots under `runs/latest/screenshots/` when runs-based evidence is active; otherwise keep screenshots in the existing/current script-supported location. Then use multimodal reading to identify fixes. If the preview is already open, refresh the browser preview after rebuilding.
+10. Keep the browser preview open until the image is accepted or the user stops the work. Do not close the debugging preview between unfinished rounds.
 11. Only prepare export outputs after QC or equivalent DOM/layout checks have no blocking errors.
 12. For multilingual work, preserve structure and hierarchy first; adjust language-specific typography only after the approved base layout is stable.
 
@@ -427,8 +436,8 @@ Loop:
 1. Build or revise editable HTML/CSS/SVG. Keep text, price, CTA, labels, and legal copy editable unless the user explicitly accepts bitmap text.
 2. Run `npm run build -- --project <project-id> [--subproject <subproject-id>]`.
 3. Report the local HTML path and `file_url` printed by `npm run build` for this round.
-4. Open the generated preview in Codex Browser via the `file_url` printed by `npm run build`.
-5. If the preview is already open from an earlier round, 刷新当前 Codex Browser 页面 after rebuilding instead of opening a new debugging surface.
+4. Open the generated preview in your browser tool via the `file_url` printed by `npm run build`.
+5. If the preview is already open from an earlier round, refresh the browser preview after rebuilding instead of opening a new debugging surface.
 6. Keep the preview open while the image is unfinished.
 7. Capture a browser screenshot into `runs/latest/screenshots/round-NN.png` when run evidence is active; otherwise keep using the current/existing screenshot location (for example `screenshots/round-NN.png`).
 8. Use multimodal reading to compare the screenshot with the reference image.
@@ -465,24 +474,24 @@ Score report schema:
 Browser/multimodal boundary:
 
 - Repo scripts create project folders, HTML previews, and JSON report structure.
-- Codex Browser performs visual opening, screenshots, and real layout inspection.
-- 多模态读取 happens in Codex against the saved browser screenshot; do not hard-code Codex Browser APIs inside repo scripts.
-- Reuse the generated `file_url` and 刷新当前 Codex Browser 页面 between rebuilds.
+- Your browser tool performs visual opening, screenshots, and real layout inspection.
+- Multimodal image reading happens against the saved browser screenshot; do not hard-code any browser-native APIs inside repo scripts.
+- Reuse the generated `file_url` and refresh the browser preview between rebuilds.
 - Every build round should surface the local HTML path and `file_url` before screenshot review.
-- If Codex Browser cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
+- If the browser tool cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
 
 ## Final Preview Links
 
 Every build or final delivery should surface a clickable local preview target for the active HTML. Every plain-text report or final response that references an HTML preview must include the local HTML file path. `npm run build` writes `reports/preview-links.md` and each built output in `reports/build-report.json` includes:
 
 - `html`: absolute local HTML path.
-- `file_url`: `file://` URL for Codex Browser or another local browser surface.
+- `file_url`: `file://` URL for your browser tool or another local browser surface.
 - `markdown_link`: Markdown link using the `file_url`.
-- `codex_browser_hint`: `open_or_refresh_file_url`.
+- `browser_hint`: `open_or_refresh_file_url`.
 
 In final responses, include the active HTML as a Markdown link and include the plain absolute local HTML file path next to it for clients that do not open `file://` links. Keep `reports/preview-links.md` with the project evidence so a later agent can reopen the same preview without re-running discovery.
 
-Codex Browser annotation capability is optional. Probe the current Codex session before using browser-native element annotation, for example by checking whether an annotation screenshot command is exposed and succeeds. Do not claim Codex Browser annotation was used unless the current session probe succeeds. If the probe fails or the client does not expose annotation commands, use ordinary browser screenshots, DOM snapshots, coordinate notes, or a task-local visual annotation report instead.
+Browser annotation capability is optional. Probe the current agent/browser session before using browser-native element annotation, for example by checking whether an annotation screenshot command is exposed and succeeds. Do not claim browser annotation was used unless the current session probe succeeds. If the probe fails or the client does not expose annotation commands, use ordinary browser screenshots, DOM snapshots, coordinate notes, or a task-local visual annotation report instead.
 
 ## Export Mode Guard
 
