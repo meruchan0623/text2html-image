@@ -30,6 +30,36 @@
       "template_type": "reusable",
       "status": "active",
       "description": "Reusable Africa eSIM map template for package smoke tests and dense map layouts."
+    },
+    {
+      "template_id": "copy_basic_poster",
+      "template_type": "fixture",
+      "status": "test-fixture",
+      "description": "Copy-image basic poster fixture created by scripts/test.js."
+    },
+    {
+      "template_id": "copy_layered_banner",
+      "template_type": "fixture",
+      "status": "test-fixture",
+      "description": "Copy-image layered banner fixture created by scripts/test.js."
+    },
+    {
+      "template_id": "copy_vector_poster",
+      "template_type": "fixture",
+      "status": "test-fixture",
+      "description": "Copy-image vector poster fixture created by scripts/test.js."
+    },
+    {
+      "template_id": "copy_phone_poster",
+      "template_type": "fixture",
+      "status": "test-fixture",
+      "description": "Copy-image phone poster fixture created by scripts/test.js."
+    },
+    {
+      "template_id": "copy_complex_poster",
+      "template_type": "fixture",
+      "status": "test-fixture",
+      "description": "Copy-image complex poster fixture created by scripts/test.js."
     }
   ]
 }

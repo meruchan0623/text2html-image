@@ -28,6 +28,7 @@ flowchart TD
 - `outputs 路径检查`：交付副本里的图片路径要从交付 HTML 自己的位置解析。
 - `复杂资产先路由`：人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行。
 - 二维码和条码必须是从原图或源素材裁切的位图资产；小飞机、小功能图标优先 SVG/CSS 重绘。
+- `安装命令可用`：skill 包提供 `install:all`、`install:codex`、`install:claude`，不要再用手工复制当作默认安装路径。
 
 ## 这个 skill 到底做什么
 
@@ -137,19 +138,13 @@ flowchart TD
 
 ### Step 2：确认项目和路径
 
-运行命令的位置是 skill 根目录：
-
-```bash
-/Users/tashima_meru/Develop/text2html-image/skills/text2html-image
-```
-
 生成项目默认放在：
 
 ```text
-/Users/<user>/Documents/text2html-image-project/<project-id>/
+~/Documents/text2html-image-project/<project-id>/
 ```
 
-所有项目输出都必须落在系统用户目录下的 `Documents/text2html-image-project`。不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径。
+所有项目输出都必须落在用户主目录下的 `~/Documents/text2html-image-project`。不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径。
 
 不要把项目输出写到 skill repo 根目录里。
 
@@ -167,14 +162,22 @@ flowchart TD
 
 `app_icon`、`application_icon`、`complex_icon`、人物、地图、云、天际线、地标和地球等难以矢量复刻的元素，必须先进入资产路由报告，再选择抠图或反向生成提示词再生图。只有 `simple_icon` 这类单色简单图标才默认允许 SVG/CSS 重绘。
 
+资产路由优先使用命令生成报告：
+
+```bash
+npm run route:assets -- --project <project-id>
+```
+
+报告里要区分 `simple_icon`、`complex_icon`、`app_icon`、`prompt_only`、`bitmap_truth` 等资产类型。`prompt_only` 只能作为外部生成请求说明，不能当作已经可渲染的图片资产。
+
 ### Step 4：准备内容和模板
 
-fast path 只读最少文件：
+fast path 只读最少文件。当前仓库不再内置业务样例行；如果任务使用临时或项目级 copy 数据，构建时显式传 `--copy-data <copy-data.json>`：
 
 ```text
-data/copy_master.json
+<copy-data.json> 或 data/copy_master.json
 templates/<template_id>/master.html
-templates/<template_id>/master.css
+templates/<template_id>/master.css 或当前 workspace HTML
 当前任务需要的图片或资产
 ```
 
@@ -186,14 +189,15 @@ templates/<template_id>/master.css
 
 ```bash
 npm run project:init -- --project <project-id>
-npm run build -- --project <project-id>
+npm run build -- --project <project-id> --copy-data <copy-data.json>
+npm run route:assets -- --project <project-id>
 ```
 
 如果一个任务里有多个独立页面或母版，用：
 
 ```bash
 npm run project:init -- --project <project-id> --subproject <subproject-id>
-npm run build -- --project <project-id> --subproject <subproject-id>
+npm run build -- --project <project-id> --subproject <subproject-id> --copy-data <copy-data.json>
 ```
 
 build 后要记录：
@@ -204,6 +208,16 @@ build 后要记录：
 - `reports/preview-links.md`，里面保留可重新打开的 HTML 链接清单。
 - 当前 `html_group`。
 
+如果需要把 skill 安装到本机 Agent 环境，使用：
+
+```bash
+npm run install:all
+npm run install:codex
+npm run install:claude
+```
+
+安装命令只负责注册 skill 包；项目生成、截图、导出仍然必须在 `~/Documents/text2html-image-project/<project-id>/` 下完成。
+
 平文本报告必须包含本地 HTML 文件路径。只给 `file://` 链接或 Markdown 链接不够。
 
 最终回复里也要显式给出：
@@ -211,6 +225,8 @@ build 后要记录：
 - 可点击的 HTML Markdown 链接。
 - 纯文本绝对路径，方便不能打开 `file://` 的客户端手动复制。
 - `reports/preview-links.md` 路径。
+
+这不是只在最终交付时才做。每一轮改图结束、准备让用户在 Coding Agent 浏览器里预览前，都必须输出这三项；如果生成了多个语言或多个 HTML 变体，要说明当前建议预览哪一个，或者把需要检查的变体逐个列出来。
 
 ### Step 6：浏览器预览和截图对比
 
@@ -310,7 +326,7 @@ flowchart LR
 
 ```json
 {
-  "project_id": "travel-esim-banner",
+  "project_id": "copy-image-poster",
   "round": 1,
   "overall_score": 90,
   "layout_score": 90,
@@ -336,7 +352,8 @@ flowchart LR
 1. 尽量使用同画布尺寸的透明 PNG 图层。
 2. 不要把海报主标题、价格、CTA 放进 PNG。
 3. PNG 外部不能有灰底、白边、渐变光晕。
-4. 有背景残留时运行：
+4. 使用 ImageGen / Codex image generation 生成素材时，直接要求带 alpha 透明通道的 PNG，不要绿幕、绿色背景、白底、灰底、彩色底或 matte 背景素材。
+5. 有背景残留时运行：
 
 ```bash
 npm run flood-cutout -- --input <source.png>

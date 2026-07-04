@@ -3,7 +3,7 @@ const path = require('path');
 const { createProjectWorkspace, parseArgs, writeJson } = require('./utils/workflow-core');
 const { listHtmlEntries } = require('./utils/html-entries');
 const { inspectRenderProfile } = require('./utils/render-profile');
-const { compileEuropeLikeIr } = require('./utils/poster-ir');
+const { compilePosterIr } = require('./utils/poster-ir');
 const { compileSvg } = require('./utils/svg-compiler');
 const { Resvg } = require('@resvg/resvg-js');
 
@@ -30,7 +30,7 @@ function main() {
   const profileEntries = entries.map((entry) => {
     const profile = inspectRenderProfile(entry.html);
     if (profile.status === 'pass') {
-      const ir = compileEuropeLikeIr(entry.html);
+      const ir = compilePosterIr(entry.html);
       const irDir = path.join(projectPaths.reports, 'render-ir');
       const irPath = path.join(irDir, `${entry.html_group}.${entry.variant}.json`);
       writeJson(irPath, ir);

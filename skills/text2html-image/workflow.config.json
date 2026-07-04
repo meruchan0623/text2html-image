@@ -42,8 +42,18 @@
       "id": "asset-preparation",
       "name": "资产准备",
       "owner_skill": "text2html-image",
-      "inputs": ["platform_spec", "sku_info", "source_assets", "brand_or_theme_color"],
-      "outputs": ["assets/metadata/asset_index.json", "asset_mapping.json", "color_palette", "svg_element_specs"],
+      "inputs": [
+        "platform_spec",
+        "sku_info",
+        "source_assets",
+        "brand_or_theme_color"
+      ],
+      "outputs": [
+        "assets/metadata/asset_index.json",
+        "asset_mapping.json",
+        "color_palette",
+        "svg_element_specs"
+      ],
       "gate": "assets have declared source, license, dimensions, transparency, and usage_scene"
     },
     {
@@ -51,8 +61,16 @@
       "id": "layout-specification",
       "name": "布局指定",
       "owner_skill": "text2html-image",
-      "inputs": ["asset_index", "canvas_specs", "template_types"],
-      "outputs": ["layout.json", "template_id", "safe_area_assignments"],
+      "inputs": [
+        "asset_index",
+        "canvas_specs",
+        "template_types"
+      ],
+      "outputs": [
+        "layout.json",
+        "template_id",
+        "safe_area_assignments"
+      ],
       "gate": "layout fits canvas, uses known components, and keeps copy/hero/price zones separate"
     },
     {
@@ -60,8 +78,16 @@
       "id": "detail-specification",
       "name": "细节指定",
       "owner_skill": "text2html-image",
-      "inputs": ["layout.json", "component_specs", "svg_element_specs"],
-      "outputs": ["template HTML/CSS", "component overrides", "detail_notes"],
+      "inputs": [
+        "layout.json",
+        "component_specs",
+        "svg_element_specs"
+      ],
+      "outputs": [
+        "template HTML/CSS",
+        "component overrides",
+        "detail_notes"
+      ],
       "gate": "all visible details are represented as editable HTML/CSS/SVG, not flattened text images"
     },
     {
@@ -69,8 +95,16 @@
       "id": "detail-modification",
       "name": "细节修改",
       "owner_skill": "text2html-image",
-      "inputs": ["current HTML/CSS", "visual feedback", "detail_notes"],
-      "outputs": ["revision record", "updated HTML/CSS", "before_after notes"],
+      "inputs": [
+        "current HTML/CSS",
+        "visual feedback",
+        "detail_notes"
+      ],
+      "outputs": [
+        "revision record",
+        "updated HTML/CSS",
+        "before_after notes"
+      ],
       "gate": "each change is scoped, reversible, and tied to a concrete visual issue"
     },
     {
@@ -78,8 +112,16 @@
       "id": "layout-stability-review",
       "name": "布局稳固性审核",
       "owner_skill": "text2html-image",
-      "inputs": ["updated HTML/CSS", "layout.json", "canvas_specs"],
-      "outputs": ["qc report", "stability score", "fix list"],
+      "inputs": [
+        "updated HTML/CSS",
+        "layout.json",
+        "canvas_specs"
+      ],
+      "outputs": [
+        "qc report",
+        "stability score",
+        "fix list"
+      ],
       "gate": "no scrollbars, no unreplaced tokens, no text overflow, and no critical missing assets"
     },
     {
@@ -87,8 +129,16 @@
       "id": "multilingual-localization",
       "name": "多语言化",
       "owner_skill": "text2html-image",
-      "inputs": ["approved layout", "copy_master", "language style rules"],
-      "outputs": ["localized HTML previews", "export manifest", "language consistency report"],
+      "inputs": [
+        "approved layout",
+        "copy_master",
+        "language style rules"
+      ],
+      "outputs": [
+        "localized HTML previews",
+        "export manifest",
+        "language consistency report"
+      ],
       "gate": "each target language keeps structure, hierarchy, and CTA/price visibility consistent"
     }
   ],
@@ -170,13 +220,14 @@
     "colors",
     "layout"
   ],
-  "template_types": [
-    "T01_price_type",
-    "banner_zh_hkmo"
-  ],
+  "template_types": [],
   "font_config": {
     "primary_font": "Noto Sans SC",
-    "fallback_fonts": ["Arial", "Helvetica", "sans-serif"],
+    "fallback_fonts": [
+      "Arial",
+      "Helvetica",
+      "sans-serif"
+    ],
     "language_fonts": {
       "ja-JP": "Noto Sans JP",
       "ko-KR": "Noto Sans KR",
@@ -184,16 +235,47 @@
       "zh-TW": "Noto Sans TC"
     },
     "size_rules": {
-      "title": {"min": 36, "max": 72, "default": 48},
-      "subtitle": {"min": 24, "max": 48, "default": 36},
-      "body": {"min": 18, "max": 36, "default": 24},
-      "caption": {"min": 14, "max": 24, "default": 18}
+      "title": {
+        "min": 36,
+        "max": 72,
+        "default": 48
+      },
+      "subtitle": {
+        "min": 24,
+        "max": 48,
+        "default": 36
+      },
+      "body": {
+        "min": 18,
+        "max": 36,
+        "default": 24
+      },
+      "caption": {
+        "min": 14,
+        "max": 24,
+        "default": 18
+      }
     }
   },
   "safe_areas": {
-    "title": {"top": 50, "left": 50, "right": 50, "bottom": 0},
-    "price": {"top": 0, "left": 50, "right": 50, "bottom": 50},
-    "cta": {"top": 0, "left": 100, "right": 100, "bottom": 100}
+    "title": {
+      "top": 50,
+      "left": 50,
+      "right": 50,
+      "bottom": 0
+    },
+    "price": {
+      "top": 0,
+      "left": 50,
+      "right": 50,
+      "bottom": 50
+    },
+    "cta": {
+      "top": 0,
+      "left": 100,
+      "right": 100,
+      "bottom": 100
+    }
   },
   "export_settings": {
     "format": "PNG",

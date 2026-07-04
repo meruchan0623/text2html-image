@@ -8,9 +8,11 @@ const { checkCopySchema } = require('./copy-schema-core');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PROJECT_DIRS = ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports'];
 const MAX_PROJECT_SLUG_LENGTH = 20;
+const MAX_PROJECT_FOLDER_NAME_LENGTH = 80;
 
 function readJson(relativePath) {
-  return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), 'utf8'));
+  const target = path.isAbsolute(relativePath) ? relativePath : path.join(ROOT, relativePath);
+  return JSON.parse(fs.readFileSync(target, 'utf8'));
 }
 
 function writeJson(targetPath, value) {
@@ -72,13 +74,30 @@ function sanitizeProjectId(projectId, fallback = 'default') {
   return sanitized || fallback;
 }
 
+function truncateFolderName(value, maxLength = MAX_PROJECT_FOLDER_NAME_LENGTH) {
+  if (value.length <= maxLength) return value;
+  const truncated = value.slice(0, maxLength).replace(/-+$/g, '');
+  return truncated || value.slice(0, maxLength);
+}
+
+function sanitizeProjectFolderName(projectId, fallback = 'default') {
+  const value = String(projectId || fallback).trim();
+  const normalized = value
+    .normalize('NFKC')
+    .replace(/[\\/:\0]/g, '-')
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .replace(/[-_]{2,}/g, '-');
+  return truncateFolderName(normalized || fallback);
+}
+
 function getWorkspaceRoot(config = loadConfig()) {
   return path.resolve(expandHome(config.workspace_root || '$DOCUMENTS/text2html-image-project'));
 }
 
 function getProjectPaths(projectId, config = loadConfig(), options = {}) {
-  const safeProjectId = sanitizeProjectId(projectId || config.default_project_id || 'default');
-  const safeSubprojectId = options.subprojectId ? sanitizeProjectId(options.subprojectId, '') : '';
+  const safeProjectId = sanitizeProjectFolderName(projectId || config.default_project_id || 'default');
+  const safeSubprojectId = options.subprojectId ? sanitizeProjectFolderName(options.subprojectId, '') : '';
   const workspaceRoot = getWorkspaceRoot(config);
   const projectRoot = path.join(workspaceRoot, safeProjectId);
   const activeRoot = safeSubprojectId ? path.join(projectRoot, safeSubprojectId) : projectRoot;
@@ -119,8 +138,8 @@ function createProjectWorkspace(projectId, options = {}) {
   return paths;
 }
 
-function loadCopyRows() {
-  const copyMaster = readJson('data/copy_master.json');
+function loadCopyRows(copyDataPath = 'data/copy_master.json') {
+  const copyMaster = readJson(copyDataPath);
   return Array.isArray(copyMaster.data) ? copyMaster.data : [];
 }
 
@@ -202,24 +221,26 @@ function toMarkdownLink(filePath) {
   return `[${path.basename(filePath)}](${toFileUrl(filePath)})`;
 }
 
-function getCodexAnnotationCapability() {
+function getAnnotationCapability() {
   return {
     status: 'probe-required',
-    use_when: 'Only after the current Codex Browser session exposes an annotation screenshot command such as elementScreenshot.',
+    use_when: 'Only after the current browser session exposes an annotation screenshot command such as elementScreenshot.',
     fallback: 'Use ordinary browser screenshots plus visual-annotations evidence when the probe fails or is unavailable.',
   };
 }
 
-function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnnotationCapability) {
+function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, annotationCapability) {
   const lines = [
     '# HTML Preview Links',
     '',
     `Generated: ${generatedAt}`,
     `Project: ${projectPaths.project_id}${projectPaths.subproject_id ? ` / ${projectPaths.subproject_id}` : ''}`,
     '',
-    'Codex Browser annotation capability is optional and must be probed in the current session before use.',
+    'Browser annotation capability is optional and must be probed in the current session before use.',
     'Do not claim annotation usage unless a session probe succeeds.',
-    `Annotation fallback: ${codexAnnotationCapability.fallback}`,
+    `Annotation fallback: ${annotationCapability.fallback}`,
+    '',
+    'Required final-response handoff for every image-edit round: include the active Markdown preview link, the plain absolute local HTML file path, and this report path so the browser preview can be reopened without discovery.',
     '',
     '## Links',
     '',
@@ -231,7 +252,7 @@ function buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnno
     lines.push(`- Markdown preview link: ${output.markdown_link}`);
     lines.push(`- Local HTML file path: \`${output.html}\``);
     lines.push(`- File URL: \`${output.file_url}\``);
-    lines.push('- Codex Browser hint: open or refresh the file URL, then screenshot or inspect the DOM before visual review.');
+    lines.push('- Browser hint: open or refresh the file URL, then screenshot or inspect the DOM before visual review.');
     lines.push('');
   }
 
@@ -288,15 +309,16 @@ function copyTemplateAssets(templateId, outputDir) {
   }
 }
 
-function renderRows(rows = loadCopyRows(), options = {}) {
+function renderRows(rows, options = {}) {
+  const activeRows = rows || loadCopyRows(options.copyDataPath);
   const outputs = [];
   const projectPaths = createProjectWorkspace(options.projectId, { subprojectId: options.subprojectId });
   const canonicalGroups = new Set();
   const generatedAt = new Date().toISOString();
   const previewLinksReport = path.join(projectPaths.reports, 'preview-links.md');
-  const codexAnnotationCapability = getCodexAnnotationCapability();
+  const annotationCapability = getAnnotationCapability();
 
-  for (const row of rows) {
+  for (const row of activeRows) {
     const templatePath = path.join(ROOT, 'templates', row.template_id, 'master.html');
     if (!fs.existsSync(templatePath)) {
       outputs.push({ row: row.source_row_id, status: 'skipped', error: `missing template ${row.template_id}` });
@@ -326,7 +348,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
       html: htmlPath,
       file_url: toFileUrl(htmlPath),
       markdown_link: toMarkdownLink(htmlPath),
-      codex_browser_hint: 'open_or_refresh_file_url',
+      browser_hint: 'open_or_refresh_file_url',
       preview_links_report: previewLinksReport,
       export_name: row.export_name,
       canvas: `${row.canvas_w}x${row.canvas_h}`,
@@ -335,7 +357,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
 
   fs.writeFileSync(
     previewLinksReport,
-    buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, codexAnnotationCapability)
+    buildPreviewLinksMarkdown(projectPaths, outputs, generatedAt, annotationCapability)
   );
 
   writeJson(path.join(projectPaths.reports, 'build-report.json'), {
@@ -343,7 +365,7 @@ function renderRows(rows = loadCopyRows(), options = {}) {
     project_id: projectPaths.project_id,
     subproject_id: projectPaths.subproject_id,
     preview_links_report: previewLinksReport,
-    codex_annotation_capability: codexAnnotationCapability,
+    annotation_capability: annotationCapability,
     total: outputs.length,
     built: outputs.filter((item) => item.status === 'built').length,
     outputs,
@@ -378,7 +400,7 @@ function validateWorkflow(options = {}) {
   const errors = [];
   const warnings = [];
   const config = loadConfig();
-  const rows = loadCopyRows();
+  const rows = options.rows || loadCopyRows(options.copyDataPath);
   const projectPaths = getProjectPaths(options.projectId, config, { subprojectId: options.subprojectId });
 
   if (!Array.isArray(config.workflow_phases) || config.workflow_phases.length !== 6) {
@@ -397,7 +419,9 @@ function validateWorkflow(options = {}) {
   }
   if (!config.copy_image_review?.score_schema) errors.push('workflow.config.json missing copy_image_review.score_schema');
 
-  if (!rows.length) errors.push('data/copy_master.json has no data rows');
+  if (!rows.length) {
+    warnings.push('data/copy_master.json has no active copy rows');
+  }
 
   const templateReport = checkTemplates({ rows });
   for (const templateId of templateReport.missing_templates) {
@@ -448,6 +472,7 @@ function validateWorkflow(options = {}) {
 module.exports = {
   ROOT,
   PROJECT_DIRS,
+  MAX_PROJECT_FOLDER_NAME_LENGTH,
   MAX_PROJECT_SLUG_LENGTH,
   createProjectWorkspace,
   expandHome,
@@ -461,6 +486,7 @@ module.exports = {
   loadConfig,
   loadCopyRows,
   renderRows,
+  sanitizeProjectFolderName,
   sanitizeProjectId,
   safeLang,
   validateScoreReport,

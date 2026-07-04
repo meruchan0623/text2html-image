@@ -7,7 +7,7 @@ function main() {
   const args = parseArgs();
   const projectPaths = createProjectWorkspace(args.project, { subprojectId: args.subproject });
   const report = checkCopySchema({
-    rows: loadCopyRows(),
+    rows: loadCopyRows(args['copy-data']),
     templateId: args.template,
   });
   const reportPath = path.join(projectPaths.reports, 'copy-schema-report.json');

@@ -1,11 +1,12 @@
 ---
 name: text2html-image
 description: Use when generating, validating, localizing, or exporting editable ecommerce poster/ad images with repo-root HTML/CSS templates, project workspaces, browser screenshots, and multilingual variants.
+when_to_use: When the user wants to create, recreate, edit, localize, layer, QC, or export an editable poster/banner/ad image from text, a reference image, or an existing HTML/CSS template — keeping text, price, CTA, labels, and legal copy as real editable DOM rather than baked-in pixels.
 ---
 
 # text2html-image
 
-Use this as the canonical skill package. It should run from this skill directory because `scripts/`, `config/`, `templates/`, `data/`, `assets/`, `package.json`, and `workflow.config.json` are bundled runtime resources. If the current working directory is elsewhere, locate or switch to this directory before using repo commands.
+Use this as the canonical skill package. It should run from this skill directory because `scripts/`, `config/`, `data/`, `package.json`, and `workflow.config.json` are bundled runtime resources. `templates/` and `assets/` may exist when reusable fixtures are intentionally installed; do not assume old business templates are bundled. If the current working directory is elsewhere, locate or switch to this directory before using repo commands.
 
 ## Core Rule
 
@@ -48,6 +49,8 @@ For ordinary requests like creating, recreating, or editing one poster/banner, a
 - `templates/<template_id>/master.html` and `master.css` for the target template.
 - Any user-provided image paths or local assets needed for the current output.
 
+The bundled `data/copy_master.json` may intentionally contain no active rows. For task-local rows, pass an explicit data file with `npm run build -- --project <project-id> --copy-data <copy-data.json>`.
+
 Then build the preview with `npm run build -- --project <project-id>`. Run QC only after a concrete HTML/CSS change or before export.
 
 ## Self-Contained Skill Package
@@ -60,7 +63,15 @@ npm run project:init -- --project <project-id>
 npm run build -- --project <project-id>
 ```
 
-Do not write generated work into the skill directory or repository root. Keep runtime image projects under the system user-home Documents folder: `/Users/<user>/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths for generated project output.
+Locate this skill directory before running commands (the runtime working directory is usually the caller's project, not this package):
+
+- Claude Code: the skill directory is `${CLAUDE_SKILL_DIR}` — run `cd "$CLAUDE_SKILL_DIR"` first.
+- Codex: the skill directory is `$CODEX_HOME/skills/text2html-image` (or the repo path `skills/text2html-image`) — `cd` there first.
+- Any other agent: `cd` into the directory that contains this `SKILL.md`.
+
+Install as a discoverable skill for both agents with `npm run install:all` (or `npm run install:claude` / `npm run install:codex`).
+
+Do not write generated work into the skill directory or repository root. Keep runtime image projects under the system user-home Documents folder: `~/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths for generated project output.
 
 ## Flood Cutout Asset Cleanup
 
@@ -104,7 +115,7 @@ For `workspace-html` edits, patch all variants in the active `html_group` unless
 
 ## Project Workspace
 
-Runtime files live outside the repo in the current user's system Documents folder. The only output root is `/Users/<user>/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths. The preferred future layout is adaptive: keep stable project entrypoints shallow, add subdirectories only when there is more than one group or when process evidence must be retained.
+Runtime files live outside the repo in the current user's system Documents folder. The only output root is `~/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths. The preferred future layout is adaptive: keep stable project entrypoints shallow, add subdirectories only when there is more than one group or when process evidence must be retained.
 
 This is a preferred future output contract for generated workspaces. Current scripts are unchanged, so existing/historical folders may still follow legacy grouped paths until runtime behavior is updated.
 
@@ -184,7 +195,7 @@ Image project folders must stay shallow and self-contained. Do not place repo co
 
 Do not generate `project-manifest.json` inside image project folders. If a command needs structured output, write task-specific JSON under `reports/`, `scores/`, or `exports/`.
 
-Default project id is `default`. Prefer an explicit English kebab-case project id. Project and subproject ids are sanitized to lowercase ASCII kebab-case and capped at 20 characters.
+Default project id is `default`. Prefer an explicit readable project folder name derived from the image's main title, followed by short hyphen-separated notes for the inferred image type and visual style, for example `商品主图复刻-价格促销海报-清爽商务风`. If the title contains Chinese, keep the Chinese title. If there is no Chinese title, translate the main title to Chinese when the prompt or source copy makes that safe; otherwise keep a readable English title. The notes should be easy to identify from the prompt or reference image, such as `价格促销海报`, `步骤说明图`, `功能说明图`, `清爽商务风`, or `卡通插画风`. Project and subproject folder names preserve readable Unicode text, replace unsafe path separators with hyphens, and are capped at 80 characters. Internal language/html group slugs still use lowercase ASCII kebab-case.
 
 Use `--subproject <subproject-id>` when one user job contains multiple page-level image masters that need isolated rounds, screenshots, and exports. This remains the existing script behavior; adaptive flattening is a documentation contract and does not alter `--subproject` semantics until scripts are updated.
 
@@ -199,7 +210,7 @@ Use `--subproject <subproject-id>` when one user job contains multiple page-leve
 
 ## Map + Table Poster Pitfalls
 
-Use these rules for coverage posters that combine a background map with editable HTML tables, especially multilingual eSIM region maps.
+Use these rules for coverage or comparison posters that combine a complex background map/diagram with editable HTML tables.
 
 - Decide the source of truth before editing. If the user asks to directly tune generated `html/index*.html` or `html/<html-group>/index*.html`, do not run `npm run build` again until the direct edits are either accepted and backported to templates or intentionally discarded. A rebuild can overwrite generated HTML/CSS changes.
 - Keep a clear split between template source and generated workspace. Template fixes belong in `templates/<template_id>/`; emergency visual fixes can be made in generated HTML files (`html/index*.html` for active single-group or `html/<html-group>/index*.html` for grouped/current-script output), but then either sync the same change to every localized `index.<lang>.html` or document that only the canonical preview was edited.
@@ -226,7 +237,7 @@ Use these rules when opening a full multilingual copy-recreation pipeline from r
 - Verify the reference canvas from the actual image dimensions before choosing a target size. Do not assume platform defaults such as 1600 x 1200 when the reference layout is 1404 x 1120.
 - If a template needs many custom copy fields, confirm the renderer supports arbitrary row fields before designing the template. If it only supports a fixed schema, make the smallest compatible renderer change so country names, carriers, and language-specific fields stay in `copy_master` instead of being hard-coded.
 - Treat `html_group` as the contract for batch multilingual output. For single-group projects, localized pages may land under `html/index*.html`; for multi-group projects they should land under `html/<html-group>/index*.html`, all with one shared CSS file and stable `index.<lang>.html` names.
-- Build scripts may render old sample rows in addition to the active project rows. When that happens, scope review, QC interpretation, export, and final delivery to the intended `html_group` rather than every preview printed by `npm run build`.
+- Build scripts may render every row from the selected copy data file. Scope review, QC interpretation, export, and final delivery to the intended `html_group` rather than every preview printed by `npm run build`.
 - Do not assume `npm run batch-export` writes PNG files. Check what it actually produces. If it only writes a manifest/report, use a local export helper or Chrome headless screenshots for real image output.
 - Playwright being installed does not mean its browser binary is available. If Playwright fails because the cached Chromium executable is missing, prefer an installed system browser such as Google Chrome or Microsoft Edge before changing HTML/CSS.
 - Keep one-off export helpers outside shared repo scripts unless the behavior is generally useful. A temporary helper can live in the task workspace `work/`, while durable export behavior should be promoted intentionally later. One-off helpers should export the generated HTML as-is; they should not recreate the poster with a different DOM, inject `<script>`, or bypass the editability contract.
@@ -251,8 +262,10 @@ Use these rules for complex illustrated posters where a flat sticker-sheet asset
 
 - Do not generate a loose asset sticker sheet for complex posters. Prefer same-canvas transparent PNG layers plus editable HTML/CSS/SVG overlay.
 - Every PNG layer must use the final canvas dimensions and origin. Preserve alpha, keep transparent regions transparent, and verify dimensions before reporting success.
+- ImageGen / Codex image generation for poster assets must request PNG output with a real alpha channel. Exterior pixels outside the subject must be alpha 0; do not accept green screen, green background, chroma key background, white matte, gray matte, beige matte, colored matte, or gradient background as a substitute for transparency.
 - For irregular or AI-generated bitmap layers, run flood cutout first and use the resulting `*-transparent.png`; do not place glow-cutout, gray-matte, or softly faded background assets as final layers.
 - Transparent PNG acceptance requires fully transparent exterior pixels, no visible gradient glow around the silhouette, and a saved `*-mask-debug.png` plus `*-cutout-report.json`.
+- Generated ImageGen assets may enter HTML `<img>` layers only after PNG format, real alpha transparency, dimensions, and provenance are checked.
 - PNG layers must not contain poster-level title, step copy, CTA, legal text, labels, or other text that needs localization. Those belong in DOM text with `data-i18n-key`.
 - Keep CSS-rebuildable geometry out of PNG layers: large rectangles, circles, rounded cards, pills, button bases, notice bars, simple borders, and simple icons.
 - Use clear layer names and z-index roles such as `background-art.png`, `device-art.png`, optional `foreground-art.png`, and an HTML text/vector layer.
@@ -280,15 +293,16 @@ Use this when a poster contains complex non-text art such as people, maps, globe
 - Write `reports/asset-provenance.json` when complex art assets are cut out, regenerated, externally licensed, or user-provided. Provenance must prove the final PNG is not a CSS/SVG/PIL geometric placeholder.
 - Every complex element must include routing difficulty fields: `cutout_feasibility`, `regeneration_fit`, `difficulty_signals`, `decision_reason`, and `requires_imagegen_prompt`.
 - For `regenerated_image`, write `reports/asset-generation-prompts.json` with `prompt_only` entries. A prompt package is never a final asset and must not be inserted into HTML.
+- Every `regenerated_image` prompt must require transparent PNG with alpha channel and must forbid green screen / chroma key / matte backgrounds. Do not ask ImageGen for green-background channel images and do not treat them as acceptable transparent assets.
 - The final HTML must pass: `script_count == 0`, no unapproved complex art SVG placeholders, `image_count == expected independent asset count`, all image paths resolve from the active or delivered HTML path, and `old_geometric_css=false` for replaced art.
 
 ## Phone Poster Layering Pitfalls
 
-Use these rules for phone-UI travel/eSIM posters and other same-canvas illustrated ads where device mockups, small icon assets, QR codes, and editable marketing copy overlap.
+Use these rules for phone-UI posters and other same-canvas illustrated ads where device mockups, small icon assets, QR codes, and editable marketing copy overlap.
 
 - If a same-canvas layer touches the canvas edge, such as bottom waves, skyline art, or a decorative sticker anchored at the edge, edge-flood cleanup can sample the subject as background or remove almost nothing. Inspect `*-mask-debug.png` whenever `removed_area_ratio_too_low` or `removed_area_ratio_too_high` appears; do not accept the transparent layer until the exterior region is truly transparent or the layer is cropped/padded for safe edge sampling.
 - Do not feed feathered or semi-transparent masks into flood cutout as final art. Partial alpha that is not removed can become a dark opaque seam after PNG compositing. Use a hard mask for the removable exterior or explicitly clean near-transparent edge pixels before placing the layer.
-- For icon-sized assets inside editable UI, such as the airplane in a `Travel eSIM` pill or the three feature-card icons, prefer inline SVG/CSS recreation. Use a cropped PNG only when texture, painterly shading, or source fidelity matters more than clean editability; verify that the crop has no background matte before shipping.
+- For icon-sized assets inside editable UI, such as a small plane icon in a product pill or the three feature-card icons, prefer inline SVG/CSS recreation. Use a cropped PNG only when texture, painterly shading, or source fidelity matters more than clean editability; verify that the crop has no background matte before shipping.
 - QR codes and scannable codes are bitmap truth assets. Crop them from the reference into the project `source/` folder, copy them with the deliverable asset pack, preserve contrast and square geometry, and never redraw, OCR, blur, or scale them through CSS filters.
 - Device mockups need a separate `phone safe-area` contract: keep the bezel/shadow, clipped screen background, and DOM screen UI in distinct z-index layers. Scale the phone shell and inner UI together, and verify no card, ring, or QR container is hidden by the shell or by an oversized screen background.
 - When enlarging a phone or feature cards to fill white space, preserve translation resilience first. Use `minmax(0, 1fr)`, `min-width: 0`, tight but readable `line-height`, and `overflow-wrap: anywhere` on labels that can expand; avoid one global text scale that makes S8N/localized copy overflow.
@@ -300,10 +314,11 @@ Use these rules for phone-UI travel/eSIM posters and other same-canvas illustrat
 Use these rules before starting or continuing a poster recreation, transparent-layer package, current preview edit, or detached `outputs/` delivery.
 
 - `prompt_only is not a finished transparent asset`. A prompt package for ChatGPT Images 2, Codex image generation, or any external image model only means the layer request is ready. Do not place that layer into final HTML until real PNG outputs exist, match the expected canvas/bbox contract, and have an audit report.
+- ImageGen returning a green-background or other chroma-key/matte PNG is still not a finished transparent asset. It must be regenerated as a transparent PNG with alpha channel or rejected before HTML composition.
 - `flood-cutout is not semantic segmentation`. It removes edge-connected background and near-edge glow from a supplied bitmap. It cannot decide which part of a full ghost poster is the phone, map, person, or background. If the source is a full poster, return to layer planning, model-assisted visual review, manual crop, or user-supplied layers before using `flood-cutout`.
 - For a current preview edit, start from the HTML path the user is actually viewing. Decide whether the active surface is `workspace-html` or `deliverable-copy` before editing. Do not rebuild or regenerate the full page just to fix a QR code, icon, copy position, phone safe-area, or asset path.
 - QR/barcode assets are bitmap truth assets. Crop them from the reference or original source image, keep them as PNG assets in the project asset pack, and verify they resolve from both the workspace HTML path and any detached delivery path.
-- Small single-color icons, such as a plane next to `Travel eSIM`, should be recreated as inline SVG/CSS unless source fidelity requires a PNG crop. Record SVG recreation as an editable substitute, not a pixel-perfect crop.
+- Small single-color icons, such as a plane next to a product label, should be recreated as inline SVG/CSS unless source fidelity requires a PNG crop. Record SVG recreation as an editable substitute, not a pixel-perfect crop.
 - When syncing to `outputs/`, asset paths must be resolved from the delivered HTML path. A workspace path like `../../source/qr-code.png` may need to become `../source/qr-code.png` in `outputs/html/index.html`.
 - When making a design more visually full, scale phone shells and internal UI as a group. Preserve translation resilience with `min-width: 0`, `minmax(0, 1fr)`, tight readable `line-height`, and `overflow-wrap: anywhere` for long S8N/localized text.
 - If the user asks for a beginner-readable workflow explanation, update README or another explicit local guide instead of leaving the flow only in chat.
@@ -349,8 +364,8 @@ Reference routing:
 6. Create a project workspace with `npm run project:init -- --project <project-id> [--subproject <subproject-id>]` when the workspace does not already exist.
 7. Generate HTML previews with `npm run build -- --project <project-id> [--subproject <subproject-id>]` only when the active surface allows rebuild.
 8. Run `npm run quality-check -- --project <project-id> [--subproject <subproject-id>]` after every layout or text-affecting source/template change, and run equivalent DOM checks after direct workspace HTML edits.
-9. Before visual iteration or scoring, resolve the active HTML path using the Project Workspace path decision rules: grouped evidence wins; otherwise use active shallow single-group files or current script-compatible layout. For visual iteration, open the generated `file://.../html/index*.html` (single-group) or `file://.../html/<html-group>/index*.html` (multi-group) in Codex Browser, save current iterative screenshots under `runs/latest/screenshots/` when runs-based evidence is active; otherwise keep screenshots in the existing/current script-supported location. Then use multimodal reading to identify fixes. If the preview is already open, 刷新当前 Codex Browser 页面 after rebuilding.
-10. Keep the Codex Browser preview open until the image is accepted or the user stops the work. Do not close the debugging preview between unfinished rounds.
+9. Before visual iteration or scoring, resolve the active HTML path using the Project Workspace path decision rules: grouped evidence wins; otherwise use active shallow single-group files or current script-compatible layout. For visual iteration, open the generated `file://.../html/index*.html` (single-group) or `file://.../html/<html-group>/index*.html` (multi-group) in your browser tool, save current iterative screenshots under `runs/latest/screenshots/` when runs-based evidence is active; otherwise keep screenshots in the existing/current script-supported location. Then use multimodal reading to identify fixes. If the preview is already open, refresh the browser preview after rebuilding.
+10. Keep the browser preview open until the image is accepted or the user stops the work. Do not close the debugging preview between unfinished rounds.
 11. Only prepare export outputs after QC or equivalent DOM/layout checks have no blocking errors.
 12. For multilingual work, preserve structure and hierarchy first; adjust language-specific typography only after the approved base layout is stable.
 
@@ -394,7 +409,7 @@ Example routing entry:
 ```json
 {
   "id": "globe_map",
-  "description": "Pale 3D globe with Europe map and orange location pin",
+  "description": "Pale 3D globe/map with an orange location pin",
   "route": "regenerated_image",
   "cutout_feasibility": "low",
   "regeneration_fit": "high",
@@ -427,8 +442,8 @@ Loop:
 1. Build or revise editable HTML/CSS/SVG. Keep text, price, CTA, labels, and legal copy editable unless the user explicitly accepts bitmap text.
 2. Run `npm run build -- --project <project-id> [--subproject <subproject-id>]`.
 3. Report the local HTML path and `file_url` printed by `npm run build` for this round.
-4. Open the generated preview in Codex Browser via the `file_url` printed by `npm run build`.
-5. If the preview is already open from an earlier round, 刷新当前 Codex Browser 页面 after rebuilding instead of opening a new debugging surface.
+4. Open the generated preview in your browser tool via the `file_url` printed by `npm run build`.
+5. If the preview is already open from an earlier round, refresh the browser preview after rebuilding instead of opening a new debugging surface.
 6. Keep the preview open while the image is unfinished.
 7. Capture a browser screenshot into `runs/latest/screenshots/round-NN.png` when run evidence is active; otherwise keep using the current/existing screenshot location (for example `screenshots/round-NN.png`).
 8. Use multimodal reading to compare the screenshot with the reference image.
@@ -439,12 +454,12 @@ Score report schema:
 
 ```json
 {
-  "project_id": "travel-esim-banner",
+  "project_id": "copy-image-poster",
   "subproject_id": "page-master-a",
   "round": 1,
   "generated_at": "2026-06-16T00:00:00.000Z",
-  "source_image": "<Documents>/text2html-image-project/travel-esim-banner/page-master-a/source/reference.png",
-  "screenshot": "<Documents>/text2html-image-project/travel-esim-banner/page-master-a/screenshots/round-01.png",
+  "source_image": "<Documents>/text2html-image-project/copy-image-poster/page-master-a/source/reference.png",
+  "screenshot": "<Documents>/text2html-image-project/copy-image-poster/page-master-a/screenshots/round-01.png",
   "overall_score": 90,
   "layout_score": 90,
   "typography_score": 90,
@@ -465,24 +480,26 @@ Score report schema:
 Browser/multimodal boundary:
 
 - Repo scripts create project folders, HTML previews, and JSON report structure.
-- Codex Browser performs visual opening, screenshots, and real layout inspection.
-- 多模态读取 happens in Codex against the saved browser screenshot; do not hard-code Codex Browser APIs inside repo scripts.
-- Reuse the generated `file_url` and 刷新当前 Codex Browser 页面 between rebuilds.
+- Your browser tool performs visual opening, screenshots, and real layout inspection.
+- Multimodal image reading happens against the saved browser screenshot; do not hard-code any browser-native APIs inside repo scripts.
+- Reuse the generated `file_url` and refresh the browser preview between rebuilds.
 - Every build round should surface the local HTML path and `file_url` before screenshot review.
-- If Codex Browser cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
+- If the browser tool cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
 
 ## Final Preview Links
 
 Every build or final delivery should surface a clickable local preview target for the active HTML. Every plain-text report or final response that references an HTML preview must include the local HTML file path. `npm run build` writes `reports/preview-links.md` and each built output in `reports/build-report.json` includes:
 
 - `html`: absolute local HTML path.
-- `file_url`: `file://` URL for Codex Browser or another local browser surface.
+- `file_url`: `file://` URL for your browser tool or another local browser surface.
 - `markdown_link`: Markdown link using the `file_url`.
-- `codex_browser_hint`: `open_or_refresh_file_url`.
+- `browser_hint`: `open_or_refresh_file_url`.
 
 In final responses, include the active HTML as a Markdown link and include the plain absolute local HTML file path next to it for clients that do not open `file://` links. Keep `reports/preview-links.md` with the project evidence so a later agent can reopen the same preview without re-running discovery.
 
-Codex Browser annotation capability is optional. Probe the current Codex session before using browser-native element annotation, for example by checking whether an annotation screenshot command is exposed and succeeds. Do not claim Codex Browser annotation was used unless the current session probe succeeds. If the probe fails or the client does not expose annotation commands, use ordinary browser screenshots, DOM snapshots, coordinate notes, or a task-local visual annotation report instead.
+This is a required handoff for every image-edit round, not just final delivery: always output the active HTML Markdown preview link, the plain absolute local HTML path, and the `reports/preview-links.md` path before asking the user to inspect the result. If multiple HTML variants were built, name the active variant or list each variant that needs review.
+
+Browser annotation capability is optional. Probe the current agent/browser session before using browser-native element annotation, for example by checking whether an annotation screenshot command is exposed and succeeds. Do not claim browser annotation was used unless the current session probe succeeds. If the probe fails or the client does not expose annotation commands, use ordinary browser screenshots, DOM snapshots, coordinate notes, or a task-local visual annotation report instead.
 
 ## Export Mode Guard
 
@@ -583,8 +600,8 @@ For map or dense label work, also report:
 ```bash
 npm run start
 npm run project:init -- --project <project-id> [--subproject <subproject-id>]
-npm run build -- --project <project-id> [--subproject <subproject-id>]
-npm run quality-check -- --project <project-id> [--subproject <subproject-id>]
+npm run build -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]
+npm run quality-check -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]
 npm run audit:dom -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
 npm run template:check -- --project <project-id> [--subproject <subproject-id>]
 npm run copy-schema -- --project <project-id> [--subproject <subproject-id>]

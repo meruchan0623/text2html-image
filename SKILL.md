@@ -15,9 +15,26 @@ npm test
 npm run build -- --project <project-id>
 ```
 
-For global Codex discovery, install it as:
+## Install as a discoverable skill (Claude Code + Codex)
+
+Install for both coding agents at once (creates symlinks into each agent's skills directory):
 
 ```bash
+cd skills/text2html-image
+npm run install:all      # Claude Code + Codex
+# or one platform only:
+npm run install:claude   # ~/.claude/skills/text2html-image        -> /text2html-image
+npm run install:codex    # ${CODEX_HOME:-$HOME/.codex}/skills/text2html-image
+```
+
+Manual fallback (equivalent symlinks):
+
+```bash
+# Claude Code
+mkdir -p ~/.claude/skills
+ln -sfn "$(pwd)/skills/text2html-image" ~/.claude/skills/text2html-image
+
+# Codex
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
 ln -sfn "$(pwd)/skills/text2html-image" "${CODEX_HOME:-$HOME/.codex}/skills/text2html-image"
 ```

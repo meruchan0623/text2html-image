@@ -8,6 +8,7 @@ const {
   getUserDocumentsDir,
   getWorkspaceRoot,
   renderRows,
+  sanitizeProjectFolderName,
   sanitizeProjectId,
   toFileUrl,
   validateScoreReport,
@@ -57,11 +58,11 @@ function cleanupTestFixtures() {
     }
   }
   for (const dir of [
-    'templates/T01_price_type',
-    'templates/banner_zh_hkmo',
-    'templates/europe_esim_map',
-    'templates/travel_esim_usage_query',
-    'templates/africa_esim_map',
+    'templates/copy_basic_poster',
+    'templates/copy_layered_banner',
+    'templates/copy_vector_poster',
+    'templates/copy_phone_poster',
+    'templates/copy_complex_poster',
     'assets/source',
     'templates',
     'assets',
@@ -78,11 +79,11 @@ function prepareTestFixtures() {
   cleanupTestFixtures();
   process.on('exit', cleanupTestFixtures);
 
-  writeTestFixture('assets/source/hong-kong-skyline.jpg', 'fixture skyline');
-  writeTestFixture('assets/source/hk-disneyland-castle.jpg', 'fixture castle');
-  writeTestFixture('assets/source/xian-city-wall.jpg', 'fixture wall');
+  writeTestFixture('assets/source/sample-background.jpg', 'fixture background');
+  writeTestFixture('assets/source/sample-panel-left.jpg', 'fixture left panel');
+  writeTestFixture('assets/source/sample-panel-right.jpg', 'fixture right panel');
 
-  writeTestFixture('templates/T01_price_type/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_basic_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -100,7 +101,7 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/T01_price_type/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_basic_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #f7fbff; overflow: visible; }
 .title { position: absolute; left: 64px; top: 80px; font-size: 64px; margin: 0; }
 .subtitle { position: absolute; left: 64px; top: 170px; font-size: 32px; margin: 0; }
@@ -109,7 +110,7 @@ function prepareTestFixtures() {
 .disclaimer { position: absolute; left: 64px; bottom: 70px; font-size: 18px; }
 `);
 
-  writeTestFixture('templates/banner_zh_hkmo/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_layered_banner/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -118,31 +119,31 @@ function prepareTestFixtures() {
 </head>
 <body class="{{lang_class}}">
   <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
-    <img class="skyline" src="{{bg_asset}}" data-asset-text-policy="preserve-raster" alt="">
+    <img class="background-art" src="{{bg_asset}}" data-asset-text-policy="preserve-raster" alt="">
     <section class="center-card">
       <h1 class="title" data-i18n-key="title">{{title}}</h1>
       <p class="subtitle" data-i18n-key="subtitle">{{subtitle}}</p>
       <span class="cta" data-i18n-key="cta">{{cta}}</span>
     </section>
-    <figure class="panel panel-castle"><img src="{{patch_asset_1}}" data-asset-text-policy="preserve-raster" alt=""></figure>
-    <figure class="panel panel-wall"><img src="{{patch_asset_2}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+    <figure class="panel panel-left"><img src="{{patch_asset_1}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+    <figure class="panel panel-right"><img src="{{patch_asset_2}}" data-asset-text-policy="preserve-raster" alt=""></figure>
   </main>
 </body>
 </html>
 `);
-  writeTestFixture('templates/banner_zh_hkmo/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_layered_banner/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #dfeffc; overflow: visible; }
-.skyline { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.background-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .center-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 420px; height: 260px; background: rgba(255,255,255,.9); }
 .title { margin: 44px 0 0; text-align: center; font-size: 60px; }
 .subtitle, .cta { display: block; text-align: center; font-size: 28px; }
 .panel { position: absolute; margin: 0; }
 .panel img { width: 180px; height: 120px; object-fit: cover; }
-.panel-castle { left: 90px; bottom: 40px; }
-.panel-wall { right: 90px; bottom: 40px; }
+.panel-left { left: 90px; bottom: 40px; }
+.panel-right { right: 90px; bottom: 40px; }
 `);
 
-  writeTestFixture('templates/europe_esim_map/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_vector_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -161,7 +162,7 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/europe_esim_map/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_vector_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #ffffff; overflow: visible; }
 .map-base { position: absolute; left: 0; top: 0; }
 .map-label { position: absolute; color: #fff; font-weight: 700; transform: translate(-50%, -50%); }
@@ -169,7 +170,7 @@ function prepareTestFixtures() {
 .title-pill { position: absolute; left: 560px; top: 1130px; width: 370px; height: 72px; display: flex; align-items: center; justify-content: center; color: white; background: #415BA8; border-radius: 36px; }
 `);
 
-  writeTestFixture('templates/travel_esim_usage_query/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_phone_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -188,14 +189,14 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/travel_esim_usage_query/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_phone_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #f5f8ff; overflow: visible; }
 .title { position: absolute; left: 80px; top: 90px; font-size: 72px; }
 .subtitle { position: absolute; left: 80px; top: 190px; font-size: 30px; }
 .phone { position: absolute; left: 340px; top: 360px; width: 420px; height: 620px; border: 8px solid #222; border-radius: 42px; }
 `);
 
-  writeTestFixture('templates/africa_esim_map/master.html', `<!doctype html>
+  writeTestFixture('templates/copy_complex_poster/master.html', `<!doctype html>
 <html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
@@ -215,7 +216,7 @@ function prepareTestFixtures() {
 </body>
 </html>
 `);
-  writeTestFixture('templates/africa_esim_map/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
+  writeTestFixture('templates/copy_complex_poster/master.css', `body { margin: 0; font-family: Arial, sans-serif; }
 .poster { position: relative; background: #ffffff; overflow: visible; }
 .title { position: absolute; left: 80px; top: 70px; font-size: 52px; }
 .map { position: absolute; left: 420px; top: 240px; width: 560px; height: 560px; mix-blend-mode: multiply; }
@@ -264,17 +265,33 @@ assert(packageJson.dependencies?.pngjs || packageJson.devDependencies?.pngjs, 'p
 
 const config = JSON.parse(read('workflow.config.json'));
 const copyRows = JSON.parse(read('data/copy_master.json')).data;
-const templatePreflight = checkTemplates({ rows: copyRows });
+const preflightRows = copyRows.length ? copyRows : [{
+  source_row_id: 'PREFLIGHT_ROW',
+  template_id: 'T01_price_type',
+  platform: 'test',
+  canvas_w: 1024,
+  canvas_h: 1280,
+  lang: 'en-US',
+  sku: 'PREFLIGHT',
+  title: 'Preflight poster',
+  subtitle: 'Contract row',
+  cta: 'Open',
+  disclaimer: 'Fixture row',
+  price: '1',
+  currency: '$',
+  unit: '',
+}];
+const templatePreflight = checkTemplates({ rows: preflightRows });
 assert(templatePreflight.status === 'pass', `template preflight should pass after test fixtures are prepared: ${templatePreflight.missing_templates.join(', ')}`);
-assert(templatePreflight.templates.some((item) => item.template_id === 'T01_price_type'), 'template preflight should include T01_price_type');
+assert(templatePreflight.templates.some((item) => item.template_id === preflightRows[0].template_id), 'template preflight should include the active preflight template');
 const missingTemplatePreflight = checkTemplates({
   rows: [{ source_row_id: 'missing-row', template_id: 'missing-template-id' }],
 });
 assert(missingTemplatePreflight.status === 'fail', 'template preflight should fail for a missing template');
 assert(missingTemplatePreflight.missing_templates.includes('missing-template-id'), 'template preflight should report the missing template id');
-const copySchemaPass = checkCopySchema({ rows: copyRows });
+const copySchemaPass = checkCopySchema({ rows: preflightRows });
 assert(copySchemaPass.status === 'pass', `copy schema should pass for test fixtures: ${copySchemaPass.errors.join('; ')}`);
-const brokenCopyRows = copyRows.map((row, index) => {
+const brokenCopyRows = preflightRows.map((row, index) => {
   if (index !== 0) return row;
   const next = { ...row };
   delete next.title;
@@ -319,13 +336,13 @@ for (const file of skillFiles) {
   assert(body.includes('## Escalation Triggers'), `${file} must document escalation triggers`);
   assert(body.includes('## Project Workspace'), `${file} must document the project workspace`);
   assert(body.includes('text2html-image-project'), `${file} must document the image project workspace`);
-  assert(body.includes('/Users/<user>/Documents/text2html-image-project'), `${file} must explicitly document the system Documents output root`);
+  assert(body.includes('~/Documents/text2html-image-project'), `${file} must explicitly document the system Documents output root`);
   assert(body.includes('Do not use CloudStorage, OneDrive, or localized `文档` paths'), `${file} must forbid cloud/localized document output roots`);
   assert(body.includes('## HTML Grouping'), `${file} must document html grouping`);
   assert(body.includes('## 抄图复刻流程'), `${file} must document the copy-image workflow`);
-  assert(body.includes('多模态读取'), `${file} must document multimodal screenshot review`);
+  assert(body.includes('Multimodal image reading'), `${file} must document multimodal screenshot review`);
   assert(body.includes('静态 `index.html`'), `${file} must require static HTML output`);
-  assert(body.includes('刷新当前 Codex Browser 页面'), `${file} must require refreshing the current Codex Browser page`);
+  assert(body.includes('refresh the browser preview'), `${file} must require refreshing the browser preview`);
   assert(body.includes('Do not close the debugging preview'), `${file} must keep the debugging preview open until accepted`);
   for (const term of noDebugBrowserTerms) {
     assert(!body.includes(term), `${file} must not mention ${term}`);
@@ -368,6 +385,9 @@ assert(skillBody.includes('npm run visual:review'), 'skill must document visual:
 assert(skillBody.includes('element-decomposition-plan.json'), 'skill must document element decomposition plan output');
 assert(skillBody.includes('mask-quality-report.json'), 'skill must document mask quality report output');
 assert(skillBody.includes('cutout-layer-package.json'), 'skill must document cutout layer package output');
+assert(skillBody.includes('PNG output with a real alpha channel'), 'skill must require ImageGen PNG assets with real alpha channel');
+assert(skillBody.includes('green screen, green background, chroma key background'), 'skill must forbid green/chroma-key ImageGen backgrounds');
+assert(skillBody.includes('transparent PNG with alpha channel'), 'skill must require transparent PNG with alpha channel in regenerated prompts');
 assert(skillBody.includes('## Flood Cutout Asset Cleanup'), 'skill must document flood cutout asset cleanup');
 assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cutout command');
 assert(skillBody.includes('*-mask-debug.png'), 'skill must require mask debug output');
@@ -377,7 +397,7 @@ assert(skillBody.includes('data-i18n-key'), 'skill must require i18n metadata fo
 assert(skillBody.includes('## Phone Poster Layering Pitfalls'), 'skill must document phone poster layering pitfalls');
 assert(skillBody.includes('same-canvas layer touches the canvas edge'), 'skill must document same-canvas edge flood-cutout risk');
 assert(skillBody.includes('Partial alpha that is not removed can become a dark opaque seam'), 'skill must document partial-alpha seam risk');
-assert(skillBody.includes('the airplane in a `Travel eSIM` pill'), 'skill must prefer SVG/CSS for small UI art assets');
+assert(skillBody.includes('a small plane icon in a product pill'), 'skill must prefer SVG/CSS for small UI art assets');
 assert(skillBody.includes('QR codes and scannable codes are bitmap truth assets'), 'skill must require QR/scannable codes as cropped bitmap assets');
 assert(skillBody.includes('phone safe-area'), 'skill must document phone safe-area layering checks');
 assert(skillBody.includes('overflow-wrap: anywhere'), 'skill must document translation-resilient enlarged layouts');
@@ -409,14 +429,17 @@ assert(skillBody.includes('dom-editability-report.json'), 'skill must mention do
 assert(skillBody.includes('## Final Preview Links'), 'skill must document final preview links');
 assert(skillBody.includes('preview-links.md'), 'skill must require a preview links report');
 assert(skillBody.includes('Every plain-text report or final response that references an HTML preview must include the local HTML file path'), 'skill must require local HTML file paths in plain-text reports');
-assert(skillBody.includes('Codex Browser annotation capability is optional'), 'skill must document optional Codex annotation capability');
-assert(skillBody.includes('Do not claim Codex Browser annotation was used unless the current session probe succeeds'), 'skill must forbid unverified annotation claims');
+assert(skillBody.includes('required handoff for every image-edit round'), 'skill must require HTML preview links every image-edit round');
+assert(skillBody.includes('Browser annotation capability is optional'), 'skill must document optional browser annotation capability');
+assert(skillBody.includes('Do not claim browser annotation was used unless the current session probe succeeds'), 'skill must forbid unverified annotation claims');
 const executionFlow = read('references/execution-flow.md');
 assert(executionFlow.includes('Reference Image Asset Routing'), 'execution flow must document reference image asset routing');
 assert(executionFlow.includes('asset-routing-table.json'), 'execution flow must include asset routing table evidence');
 assert(executionFlow.includes('asset-provenance.json'), 'execution flow must include asset provenance evidence');
 assert(executionFlow.includes('split-art-assets.json'), 'execution flow must include split art assets evidence');
 assert(executionFlow.includes('asset-generation-prompts.json'), 'execution flow must include generated prompt package evidence');
+assert(executionFlow.includes('transparent PNG with alpha channel'), 'execution flow must require transparent PNG ImageGen prompts');
+assert(executionFlow.includes('green-background channel images'), 'execution flow must reject green-background channel images');
 assert(executionFlow.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'execution flow must include the fixed complex asset routing prompt');
 assert(executionFlow.includes('visual-intake-manifest.json'), 'execution flow must document visual intake manifest');
 assert(executionFlow.includes('element-decomposition-plan.json'), 'execution flow must document element decomposition plan');
@@ -456,6 +479,9 @@ assert(stageGuides.includes('Prompt package is not an asset'), 'stage guides mus
 assert(stageGuides.includes('Visual intake is a hypothesis package'), 'stage guides must document visual intake hypothesis status');
 assert(stageGuides.includes('Cutout decomposition is not a provider client'), 'stage guides must document provider-neutral cutout decomposition');
 assert(stageGuides.includes('Mask quality requires alpha evidence'), 'stage guides must document alpha evidence for masks');
+assert(stageGuides.includes('ImageGen / Codex image generation must request transparent PNG with alpha channel'), 'stage guides must require alpha PNG ImageGen assets');
+assert(stageGuides.includes('green screen, green background, chroma key background'), 'stage guides must forbid green/chroma-key ImageGen backgrounds');
+assert(stageGuides.includes('real PNG with alpha channel'), 'stage guides must keep regenerated_image prompt-only until real alpha PNG exists');
 assert(stageGuides.includes('Current preview edit checklist'), 'stage guides must document current preview edits');
 assert(stageGuides.includes('Detached outputs path checklist'), 'stage guides must document detached output path checks');
 assert(!stageGuides.includes('exports/export-manifest.json'), 'stage-guides should not require export manifest path');
@@ -469,7 +495,9 @@ if (fs.existsSync(rootReadmePath)) {
   assert(rootReadmeBody.includes('outputs 路径检查'), 'root README must explain detached output path checks');
   assert(rootReadmeBody.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'root README must explain fixed complex asset routing');
   assert(rootReadmeBody.includes('平文本报告必须包含本地 HTML 文件路径'), 'root README must document local HTML paths in plain-text reports');
-  assert(rootReadmeBody.includes('/Users/<user>/Documents/text2html-image-project'), 'root README must explicitly document the system Documents output root');
+  assert(rootReadmeBody.includes('带 alpha 透明通道的 PNG'), 'root README must tell users to request alpha PNG assets');
+  assert(rootReadmeBody.includes('不要绿幕、绿色背景'), 'root README must forbid green-screen generated assets');
+  assert(rootReadmeBody.includes('~/Documents/text2html-image-project'), 'root README must explicitly document the system Documents output root');
   assert(rootReadmeBody.includes('不要使用 CloudStorage、OneDrive 或本地化 `文档` 路径'), 'root README must forbid cloud/localized document output roots');
 }
 
@@ -488,8 +516,11 @@ const verboseStartOutput = require('child_process').execFileSync(process.execPat
 assert(verboseStartOutput.includes('text2html-image workflow phases:'), 'verbose start output should print phase details');
 assert(verboseStartOutput.includes('input:'), 'verbose start output should include phase inputs');
 
-assert(sanitizeProjectId('Travel eSIM Banner For HKMO Long Name') === 'travel-esim-banner', 'project ids should be kebab-case and max 20 chars');
+assert(sanitizeProjectId('Copy Image Poster With Long Name') === 'copy-image-poster', 'project ids should be kebab-case and max 20 chars');
 assert(sanitizeProjectId('Page Master A') === 'page-master-a', 'subproject ids should be kebab-case');
+assert(sanitizeProjectFolderName('商品主图复刻-价格促销海报-清爽商务风') === '商品主图复刻-价格促销海报-清爽商务风', 'project folder names should preserve Chinese title and notes');
+assert(sanitizeProjectFolderName('Product Poster Recreation / Price Promo / Clean Business Style') === 'Product-Poster-Recreation-Price-Promo-Clean-Business-Style', 'project folder names should keep readable English notes');
+assert(sanitizeProjectFolderName('  :::  ') === 'default', 'empty project folder names should fall back to default');
 
 const projectId = `test-p${process.pid}`;
 const projectPaths = createProjectWorkspace(projectId);
@@ -501,17 +532,105 @@ assert(projectPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2ht
 assert(!/CloudStorage|OneDrive|文档/.test(projectPaths.root), `project root must not use cloud/localized document folders: ${projectPaths.root}`);
 assert(projectPaths.root.endsWith(path.join('text2html-image-project', projectId)), 'project root should be directly under text2html-image-project');
 
-const subprojectPaths = createProjectWorkspace('Travel eSIM Banner For HKMO Long Name', { subprojectId: 'Page Master A' });
-assert(subprojectPaths.project_id === 'travel-esim-banner', 'long project name should sanitize to 20 chars');
-assert(subprojectPaths.subproject_id === 'page-master-a', 'subproject name should sanitize');
+const subprojectPaths = createProjectWorkspace('Copy Image Poster With Long Name', { subprojectId: 'Page Master A' });
+assert(subprojectPaths.project_id === 'Copy-Image-Poster-With-Long-Name', 'project folder name should preserve readable title words');
+assert(subprojectPaths.subproject_id === 'Page-Master-A', 'subproject folder name should preserve readable title words');
 assert(subprojectPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `subproject root must be under system Documents text2html-image-project: ${subprojectPaths.root}`);
-assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'travel-esim-banner', 'page-master-a')), 'subproject root should use shallow nesting under project');
+assert(subprojectPaths.root.endsWith(path.join('text2html-image-project', 'Copy-Image-Poster-With-Long-Name', 'Page-Master-A')), 'subproject root should use shallow nesting under readable project folder');
+
+const chineseProjectPaths = createProjectWorkspace('商品主图复刻-价格促销海报-清爽商务风');
+assert(chineseProjectPaths.project_id === '商品主图复刻-价格促销海报-清爽商务风', 'Chinese project title and inferred image type/style notes should become the folder name');
+assert(chineseProjectPaths.root.endsWith(path.join('text2html-image-project', '商品主图复刻-价格促销海报-清爽商务风')), 'Chinese project root should stay readable under text2html-image-project');
 
 const defaultPaths = getProjectPaths();
 assert(defaultPaths.project_id === 'default', 'missing project should use default project id');
 assert(defaultPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `default project root must be under system Documents text2html-image-project: ${defaultPaths.root}`);
 
-const outputs = renderRows(undefined, { projectId });
+const fixtureCopyRows = [
+  {
+    source_row_id: 'COPY_BASIC_ZH_CN',
+    template_id: 'copy_basic_poster',
+    platform: 'custom_poster',
+    canvas_w: 1024,
+    canvas_h: 1280,
+    lang: 'zh-cn',
+    sku: 'COPY-BASIC',
+    title: '基础抄图海报',
+    subtitle: '可编辑文案层',
+    cta: '立即查看',
+    disclaimer: '示例文案仅用于测试',
+    price: '29.99',
+    currency: '$',
+    unit: '',
+    html_group: 'copy-basic-poster',
+    export_name: 'copy-basic-poster-zh-cn-1024x1280',
+  },
+  {
+    source_row_id: 'COPY_LAYERED_ZH_CN',
+    template_id: 'copy_layered_banner',
+    platform: 'custom_banner',
+    canvas_w: 1536,
+    canvas_h: 500,
+    lang: 'zh-cn',
+    sku: 'COPY-LAYERED',
+    title: '分层抄图横幅',
+    subtitle: '图片资产进入 source',
+    cta: '24H 支持',
+    bg_asset: 'assets/source/sample-background.jpg',
+    patch_assets: 'assets/source/sample-panel-left.jpg;assets/source/sample-panel-right.jpg',
+    html_group: 'copy-layered-banner',
+    export_name: 'copy-layered-banner-zh-cn-1536x500',
+  },
+  {
+    source_row_id: 'COPY_VECTOR_ZH_TW',
+    template_id: 'copy_vector_poster',
+    platform: 'custom_poster',
+    canvas_w: 1000,
+    canvas_h: 1263,
+    lang: 'zh-tw',
+    sku: 'COPY-VECTOR',
+    title: '向量抄圖海報',
+    cta: 'coverage',
+    html_group: 'copy-vector-poster',
+    export_name: 'copy-vector-poster-zh-tw-1000x1263',
+  },
+  {
+    source_row_id: 'COPY_PHONE_EN_US',
+    template_id: 'copy_phone_poster',
+    platform: 'custom_poster',
+    canvas_w: 1086,
+    canvas_h: 1448,
+    lang: 'en-us',
+    sku: 'COPY-PHONE',
+    title: 'Phone Poster',
+    subtitle: 'Editable phone UI',
+    remaining_label: 'Remaining data',
+    remaining_value: '1.25',
+    remaining_unit: 'GB',
+    html_group: 'copy-phone-poster',
+    export_name: 'copy-phone-poster-en-us-1086x1448',
+  },
+  {
+    source_row_id: 'COPY_COMPLEX_ZH_CN',
+    template_id: 'copy_complex_poster',
+    platform: 'custom_poster',
+    canvas_w: 1404,
+    canvas_h: 1120,
+    lang: 'zh-cn',
+    sku: 'COPY-COMPLEX',
+    title: '复杂资产抄图海报',
+    hero_asset: 'source/complex-layer.png',
+    country_dz: '区域 A',
+    country_cd: '区域 B',
+    country_eg: '区域 C',
+    html_group: 'copy-complex-poster',
+    export_name: 'copy-complex-poster-zh-cn-1404x1120',
+  },
+];
+const fixtureCopyDataPath = path.join(projectPaths.working, 'copy-master-fixture.json');
+fs.writeFileSync(fixtureCopyDataPath, `${JSON.stringify({ data: fixtureCopyRows }, null, 2)}\n`);
+
+const outputs = renderRows(fixtureCopyRows, { projectId });
 assert(outputs.some((item) => item.status === 'built'), 'build did not generate any HTML previews');
 const htmlEntries = listHtmlEntries(projectPaths);
 assert(htmlEntries.length >= 3, 'html entries should enumerate generated canonical and localized previews');
@@ -521,19 +640,22 @@ assert(htmlEntries.every((entry) => entry.file_url === toFileUrl(entry.html)), '
 const buildOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'build.js'),
   '--project', projectId,
+  '--copy-data', fixtureCopyDataPath,
 ], {
   cwd: ROOT,
   encoding: 'utf8',
 });
 assert(buildOutput.includes('Local HTML file path:'), 'build output should print the local HTML file path every round');
-assert(buildOutput.includes('Open or refresh in Codex Browser: file://'), 'build output should print the file_url every round');
+assert(buildOutput.includes('Open or refresh in your browser: file://'), 'build output should print the file_url every round');
 assert(buildOutput.includes('Markdown preview link: ['), 'build output should print a markdown preview link every round');
 assert(buildOutput.includes('Preview links report:'), 'build output should print the preview links report path');
+assert(buildOutput.includes('Required HTML preview handoff for this image-edit round:'), 'build output should label HTML preview handoff as required every round');
+assert(buildOutput.includes('Final response must include the Markdown preview link, the plain local HTML file path, and this preview links report path.'), 'build output should instruct final responses to include all preview handoff fields');
 for (const output of outputs.filter((item) => item.status === 'built')) {
   assert(output.html.startsWith(projectPaths.html), `HTML preview should be written to project html dir: ${output.html}`);
   assert(output.file_url === toFileUrl(output.html), `HTML preview should include file_url: ${output.html}`);
   assert(output.markdown_link === `[${path.basename(output.html)}](${output.file_url})`, `HTML preview should include markdown_link: ${output.html}`);
-  assert(output.codex_browser_hint === 'open_or_refresh_file_url', `HTML preview should include Codex Browser hint: ${output.html}`);
+  assert(output.browser_hint === 'open_or_refresh_file_url', `HTML preview should include browser hint: ${output.html}`);
   assert(path.basename(output.html) === `index.${output.lang.toLowerCase()}.html`, `localized HTML should use index.<lang>.html: ${output.html}`);
   assert(fs.existsSync(path.join(path.dirname(output.html), 'index.html')), `canonical index.html should exist beside localized HTML: ${output.html}`);
   assert(fs.existsSync(output.html), `missing generated HTML ${output.html}`);
@@ -553,7 +675,7 @@ const buildReportPath = path.join(projectPaths.reports, 'build-report.json');
 assert(fs.existsSync(buildReportPath), 'build report should be written to project reports dir');
 const buildReport = JSON.parse(fs.readFileSync(buildReportPath, 'utf8'));
 assert(buildReport.preview_links_report === path.join(projectPaths.reports, 'preview-links.md'), 'build report should point to preview-links.md');
-assert(buildReport.codex_annotation_capability?.status === 'probe-required', 'build report should mark Codex annotation as probe-required');
+assert(buildReport.annotation_capability?.status === 'probe-required', 'build report should mark annotation as probe-required');
 for (const output of buildReport.outputs.filter((item) => item.status === 'built')) {
   assert(output.file_url === toFileUrl(output.html), `build report output should include file_url: ${output.html}`);
   assert(output.markdown_link === `[${path.basename(output.html)}](${output.file_url})`, `build report output should include markdown_link: ${output.html}`);
@@ -562,8 +684,9 @@ const previewLinksPath = path.join(projectPaths.reports, 'preview-links.md');
 assert(fs.existsSync(previewLinksPath), 'build should write reports/preview-links.md');
 const previewLinks = fs.readFileSync(previewLinksPath, 'utf8');
 assert(previewLinks.includes('# HTML Preview Links'), 'preview-links.md should have a clear heading');
-assert(previewLinks.includes('Codex Browser annotation capability is optional'), 'preview-links.md should explain optional annotation support');
+assert(previewLinks.includes('Browser annotation capability is optional'), 'preview-links.md should explain optional annotation support');
 assert(previewLinks.includes('Do not claim annotation usage unless a session probe succeeds.'), 'preview-links.md should forbid unverified annotation claims');
+assert(previewLinks.includes('Required final-response handoff for every image-edit round'), 'preview-links.md should require preview handoff every image-edit round');
 for (const output of outputs.filter((item) => item.status === 'built')) {
   assert(previewLinks.includes(output.markdown_link), `preview-links.md should include markdown link for ${output.html}`);
   assert(previewLinks.includes('- Local HTML file path:'), `preview-links.md should label local HTML file path for ${output.html}`);
@@ -578,12 +701,13 @@ assert(firstHtmlAudit.metrics.editable_text_node_count > 0, 'generated HTML shou
 assert(firstHtmlAudit.metrics.image_count >= 0, 'DOM audit should report image count');
 assert(Array.isArray(firstHtmlAudit.risks), 'DOM audit should report risk array');
 
-const qc = validateWorkflow({ projectId });
+const qc = validateWorkflow({ projectId, rows: fixtureCopyRows });
 assert(qc.errors.length === 0, `quality errors: ${qc.errors.join('; ')}`);
 
 const templateCheckOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'template-check.js'),
   '--project', projectId,
+  '--copy-data', fixtureCopyDataPath,
 ], {
   cwd: ROOT,
   encoding: 'utf8',
@@ -598,6 +722,7 @@ assert(templateCheckReport.templates.every((item) => item.template_id && typeof 
 const copySchemaOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'copy-schema.js'),
   '--project', projectId,
+  '--copy-data', fixtureCopyDataPath,
 ], {
   cwd: ROOT,
   encoding: 'utf8',
@@ -607,7 +732,7 @@ const copySchemaReportPath = path.join(projectPaths.reports, 'copy-schema-report
 assert(fs.existsSync(copySchemaReportPath), 'copy-schema should write reports/copy-schema-report.json');
 const copySchemaReport = JSON.parse(fs.readFileSync(copySchemaReportPath, 'utf8'));
 assert(copySchemaReport.status === 'pass', 'copy-schema report should pass for test fixtures');
-assert(Object.keys(copySchemaReport.template_fields).includes('T01_price_type'), 'copy-schema report should include template fields');
+assert(Object.keys(copySchemaReport.template_fields).includes('copy_basic_poster'), 'copy-schema report should include fixture template fields');
 
 const domAuditOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'audit-dom.js'),
@@ -663,27 +788,27 @@ const profileReportPath = path.join(projectPaths.reports, 'render-profile-report
 assert(fs.existsSync(profileReportPath), 'render-fast should write reports/render-profile-report.json');
 const profileReport = JSON.parse(fs.readFileSync(profileReportPath, 'utf8'));
 assert(profileReport.entries.length >= 3, 'render profile report should include html entries');
-assert(profileReport.entries.some((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass'), 'europe map should pass the first render profile');
-assert(profileReport.entries.some((entry) => entry.html_group === 'africa-esim-map' && entry.status === 'fail'), 'africa map should fail profile because of grid/filter/blend');
+assert(profileReport.entries.some((entry) => entry.html_group === 'copy-vector-poster' && entry.status === 'pass'), 'vector poster should pass the first render profile');
+assert(profileReport.entries.some((entry) => entry.html_group === 'copy-complex-poster' && entry.status === 'fail'), 'complex poster should fail profile because of grid/filter/blend');
 assert(profileReport.entries.some((entry) => entry.unsupported_css.some((item) => item.property === 'mix-blend-mode')), 'profile should report unsupported mix-blend-mode');
-const europeEntry = profileReport.entries.find((entry) => entry.html_group === 'europe-esim-map' && entry.status === 'pass');
-assert(europeEntry?.ir_path, 'passing render profile entry should include ir_path');
-assert(fs.existsSync(europeEntry.ir_path), 'render profile should write render IR for passing entry');
-const europeIr = JSON.parse(fs.readFileSync(europeEntry.ir_path, 'utf8'));
-assert(europeIr.canvas.width === 1000 && europeIr.canvas.height === 1263, 'europe IR should preserve canvas size');
-assert(europeIr.layers.some((layer) => layer.type === 'svg'), 'europe IR should include inline svg layers');
-assert(europeIr.layers.some((layer) => layer.type === 'text' && layer.text.includes('歐洲')), 'europe IR should include title text layer');
-assert(europeEntry.svg_path, 'passing render profile entry should include svg_path');
-assert(fs.existsSync(europeEntry.svg_path), 'render-fast should write SVG for passing entry');
-const europeSvg = fs.readFileSync(europeEntry.svg_path, 'utf8');
-assert(europeSvg.includes('<svg'), 'compiled SVG should contain svg root');
-assert(europeSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
-assert(europeSvg.includes('歐洲'), 'compiled SVG should contain editable text content as SVG text');
+const vectorEntry = profileReport.entries.find((entry) => entry.html_group === 'copy-vector-poster' && entry.status === 'pass');
+assert(vectorEntry?.ir_path, 'passing render profile entry should include ir_path');
+assert(fs.existsSync(vectorEntry.ir_path), 'render profile should write render IR for passing entry');
+const vectorIr = JSON.parse(fs.readFileSync(vectorEntry.ir_path, 'utf8'));
+assert(vectorIr.canvas.width === 1000 && vectorIr.canvas.height === 1263, 'vector poster IR should preserve canvas size');
+assert(vectorIr.layers.some((layer) => layer.type === 'svg'), 'vector poster IR should include inline svg layers');
+assert(vectorIr.layers.some((layer) => layer.type === 'text' && layer.text.includes('向量')), 'vector poster IR should include title text layer');
+assert(vectorEntry.svg_path, 'passing render profile entry should include svg_path');
+assert(fs.existsSync(vectorEntry.svg_path), 'render-fast should write SVG for passing entry');
+const vectorSvg = fs.readFileSync(vectorEntry.svg_path, 'utf8');
+assert(vectorSvg.includes('<svg'), 'compiled SVG should contain svg root');
+assert(vectorSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
+assert(vectorSvg.includes('向量'), 'compiled SVG should contain editable text content as SVG text');
 
 const fastExportOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'render-fast.js'),
   '--project', projectId,
-  '--group', 'europe-esim-map',
+  '--group', 'copy-vector-poster',
   '--scale', '2',
 ], {
   cwd: ROOT,
@@ -693,12 +818,12 @@ assert(fastExportOutput.includes('Direct PNG export completed'), 'export-fast sh
 const pngReportPath = path.join(projectPaths.reports, 'png-export-report.json');
 assert(fs.existsSync(pngReportPath), 'export-fast should write reports/png-export-report.json');
 const pngReport = JSON.parse(fs.readFileSync(pngReportPath, 'utf8'));
-assert(pngReport.status === 'pass', 'png export report should pass for europe group');
+assert(pngReport.status === 'pass', 'png export report should pass for vector poster group');
 assert(pngReport.exports.every((entry) => entry.scale === 2), 'png export report should preserve scale');
 assert(pngReport.exports.every((entry) => fs.existsSync(entry.png)), 'png export report should point to existing PNG files');
-assert(pngReport.exports.some((entry) => /europe-esim-map-canonical\.png$/.test(entry.png)), 'png export should include canonical output');
+assert(pngReport.exports.some((entry) => /copy-vector-poster-canonical\.png$/.test(entry.png)), 'png export should include canonical output');
 
-const bannerOutput = outputs.find((item) => item.export_name === 'banner_zh-CN_ESIM-HKMO-CN_1536x500');
+const bannerOutput = outputs.find((item) => item.export_name === 'copy-layered-banner-zh-cn-1536x500');
 assert(bannerOutput, 'banner output should be generated');
 const bannerHtml = fs.readFileSync(bannerOutput.html, 'utf8');
 const bannerRealDir = path.dirname(fs.realpathSync(bannerOutput.html));
@@ -709,7 +834,7 @@ for (const srcMatch of bannerHtml.matchAll(/<img src="([^"]+)"/g)) {
   assert(fs.existsSync(path.resolve(path.dirname(bannerOutput.html), src)), `image path should resolve via Documents symlink: ${src}`);
   assert(fs.existsSync(path.resolve(bannerRealDir, src)), `image path should resolve via real filesystem path: ${src}`);
 }
-for (const panelClass of ['panel-castle', 'panel-wall']) {
+for (const panelClass of ['panel-left', 'panel-right']) {
   const srcMatch = bannerHtml.match(new RegExp(`<figure class="panel ${panelClass}">[\\s\\S]*?<img src="([^"]+)"`));
   assert(srcMatch, `${panelClass} should render an image src`);
   assert(!srcMatch[1].startsWith('../../../../assets/'), `${panelClass} should not use hard-coded repo-relative asset paths`);
@@ -798,7 +923,7 @@ const subprojectScoreReportPath = path.join(getProjectPaths(projectId, config, {
 assert(fs.existsSync(subprojectScoreReportPath), 'review-score should create subproject round-01.json');
 const savedScoreReport = JSON.parse(fs.readFileSync(subprojectScoreReportPath, 'utf8'));
 assert(savedScoreReport.overall_score === 91, 'review-score should preserve overall score');
-assert(savedScoreReport.subproject_id === 'page-master-a', 'review-score should preserve subproject id');
+assert(savedScoreReport.subproject_id === 'Page-Master-A', 'review-score should preserve readable subproject folder id');
 assert(savedScoreReport.issues[0].fix_hint === 'move hero up', 'review-score should parse issue fix hint');
 
 const visualReviewInputPath = path.join(projectPaths.working, 'visual-review-input.json');
@@ -1084,6 +1209,12 @@ assert(unknownRoute.status === 'review', 'missing bbox or description should req
 assert(routeReport.prompts.prompts.length >= 2, 'regenerated_image elements should get prompt packages');
 assert(routeReport.prompts.prompts[0].status === 'prompt_only', 'generated prompt package should be prompt_only');
 assert(routeReport.prompts.prompts.every((item) => item.prompt.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分')), 'prompt package should include the fixed complex asset instruction');
+assert(routeReport.prompts.prompts.every((item) => item.prompt.includes('transparent PNG with alpha channel')), 'prompt package should require transparent PNG with alpha channel');
+assert(routeReport.prompts.prompts.every((item) => item.prompt.includes('No green screen, green background, chroma key background')), 'prompt package should forbid green/chroma-key backgrounds');
+assert(routeReport.prompts.prompts.every((item) => item.required_format === 'png'), 'prompt package should require png format structurally');
+assert(routeReport.prompts.prompts.every((item) => item.requires_alpha_channel === true), 'prompt package should require alpha channel structurally');
+assert(routeReport.prompts.prompts.every((item) => item.exterior_alpha === 0), 'prompt package should require exterior alpha 0 structurally');
+assert(routeReport.prompts.prompts.every((item) => Array.isArray(item.forbidden_backgrounds) && item.forbidden_backgrounds.includes('green screen') && item.forbidden_backgrounds.includes('chroma key background') && item.forbidden_backgrounds.includes('colored matte')), 'prompt package should structurally forbid green/chroma-key/matte backgrounds');
 assert(routeReport.provenance.assets.every((asset) => asset.status !== 'final_asset'), 'route planning must not create final assets');
 
 const routeElementsPath = path.join(projectPaths.working, 'asset-routing-elements.json');
@@ -1113,6 +1244,12 @@ const promptPackage = JSON.parse(fs.readFileSync(path.join(projectPaths.reports,
 assert(promptPackage.prompts.every((item) => item.route === 'regenerated_image'), 'prompt package should only include regenerated_image elements');
 assert(promptPackage.prompts.every((item) => item.status === 'prompt_only'), 'prompt package entries should remain prompt_only');
 assert(promptPackage.prompts.every((item) => item.prompt.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分')), 'prompt package should include fixed complex asset routing instruction');
+assert(promptPackage.prompts.every((item) => item.prompt.includes('transparent PNG with alpha channel')), 'written prompt package should require transparent PNG with alpha channel');
+assert(promptPackage.prompts.every((item) => item.prompt.includes('No green screen, green background, chroma key background')), 'written prompt package should forbid green/chroma-key backgrounds');
+assert(promptPackage.prompts.every((item) => item.required_format === 'png'), 'written prompt package should include required png format');
+assert(promptPackage.prompts.every((item) => item.requires_alpha_channel === true), 'written prompt package should include alpha-channel requirement');
+assert(promptPackage.prompts.every((item) => item.exterior_alpha === 0), 'written prompt package should include exterior alpha 0');
+assert(promptPackage.prompts.every((item) => item.forbidden_backgrounds.includes('green background') && item.forbidden_backgrounds.includes('white matte') && item.forbidden_backgrounds.includes('gradient background')), 'written prompt package should list forbidden solid/matte backgrounds');
 
 const floodInputPath = path.join(projectPaths.working, 'flood-cutout-input.png');
 const floodOutputPath = path.join(projectPaths.working, 'flood-cutout-output.png');
@@ -1181,5 +1318,77 @@ assert(floodReport.mode === 'edge-flood', 'flood report should name edge-flood m
 assert(floodReport.removed_pixels > 0, 'flood report should count removed pixels');
 assert(floodReport.edge_cleanup_pixels > 0, 'flood report should count edge cleanup pixels');
 assert(floodReport.warnings.length === 0, `flood report should not warn for fixture: ${floodReport.warnings.join('; ')}`);
+
+// --- install-skill.js: 双平台符号链接安装 ---
+const installSkill = require('./install-skill');
+const osModule = require('os');
+
+// 单元：resolveTargets 路径解析（纯函数，不碰真实 HOME）
+{
+  const targets = installSkill.resolveTargets({
+    target: 'all',
+    env: { CODEX_HOME: '/tmp/fake-codex' },
+    homedir: '/tmp/fake-home',
+  });
+  assert(targets.length === 2, 'resolveTargets all should return two targets');
+  const claude = targets.find((t) => t.platform === 'claude');
+  const codex = targets.find((t) => t.platform === 'codex');
+  assert(
+    claude.linkPath === path.join('/tmp/fake-home', '.claude', 'skills', 'text2html-image'),
+    'claude link path defaults under ~/.claude/skills'
+  );
+  assert(
+    codex.linkPath === path.join('/tmp/fake-codex', 'skills', 'text2html-image'),
+    'codex link path honors CODEX_HOME'
+  );
+  const onlyClaude = installSkill.resolveTargets({ target: 'claude', homedir: '/tmp/fake-home' });
+  assert(onlyClaude.length === 1 && onlyClaude[0].platform === 'claude', 'target=claude filters to one target');
+  const codexDefault = installSkill.resolveTargets({ target: 'codex', env: {}, homedir: '/tmp/fake-home' });
+  assert(
+    codexDefault[0].linkPath === path.join('/tmp/fake-home', '.codex', 'skills', 'text2html-image'),
+    'codex falls back to ~/.codex when CODEX_HOME unset'
+  );
+}
+
+// 端到端：创建 / 幂等 / 真实目录报错（用临时目录，不污染真实 HOME）
+{
+  const tmpBase = fs.mkdtempSync(path.join(osModule.tmpdir(), 't2h-install-'));
+  const claudeDir = path.join(tmpBase, '.claude', 'skills');
+  const codexDir = path.join(tmpBase, '.codex', 'skills');
+  const claudeLink = path.join(claudeDir, 'text2html-image');
+  const codexLink = path.join(codexDir, 'text2html-image');
+  const runInstall = (extraArgs) =>
+    require('child_process').execFileSync(
+      process.execPath,
+      [path.join(ROOT, 'scripts', 'install-skill.js'), '--claude-dir', claudeDir, '--codex-dir', codexDir, ...extraArgs],
+      { cwd: ROOT, encoding: 'utf8' }
+    );
+
+  runInstall(['--target', 'all']);
+  assert(fs.lstatSync(claudeLink).isSymbolicLink(), 'claude symlink created');
+  assert(fs.lstatSync(codexLink).isSymbolicLink(), 'codex symlink created');
+  assert(fs.realpathSync(claudeLink) === fs.realpathSync(ROOT), 'claude symlink points to skill dir');
+  assert(fs.existsSync(path.join(claudeLink, 'SKILL.md')), 'SKILL.md is readable through the symlink');
+
+  // 幂等：再次运行不报错，仍是符号链接
+  runInstall(['--target', 'all']);
+  assert(fs.lstatSync(claudeLink).isSymbolicLink(), 'idempotent re-run keeps the symlink');
+
+  // 安全：目标是真实目录时必须报错且不删除
+  fs.unlinkSync(claudeLink);
+  fs.mkdirSync(claudeLink, { recursive: true });
+  fs.writeFileSync(path.join(claudeLink, 'keep.txt'), 'real-data');
+  let threw = false;
+  try {
+    runInstall(['--target', 'claude']);
+  } catch (e) {
+    threw = true;
+    assert(/Refusing to overwrite real path/.test(String(e.stdout) + String(e.stderr)), 'error explains refusal');
+  }
+  assert(threw, 'install exits non-zero when target is a real directory');
+  assert(fs.existsSync(path.join(claudeLink, 'keep.txt')), 'real directory must NOT be deleted');
+
+  fs.rmSync(tmpBase, { recursive: true, force: true });
+}
 
 console.log(`Tests passed. Generated ${outputs.filter((item) => item.status === 'built').length} preview(s).`);

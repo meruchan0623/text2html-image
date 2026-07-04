@@ -34,7 +34,7 @@ When no patching script exists for the needed edit, write or update a small repo
 {
   "source_surface": "workspace-html",
   "rebuild_allowed": false,
-  "html_group": "africa-esim-map",
+  "html_group": "copy-complex-poster",
   "affected_variants": ["index.html", "index.zh-tw.html"],
   "required_export_refresh": true
 }
@@ -67,11 +67,13 @@ Required evidence:
 
 - `reports/reverse-prompt-brief.md`: visual structure, text hierarchy, simple vector shapes, complex art subjects, decorative layers, and likely editable/localizable content.
 - `reports/asset-routing-table.json`: one route per meaningful visible element plus `cutout_feasibility`, `regeneration_fit`, difficulty signals, and decision reason.
-- `reports/asset-generation-prompts.json`: `prompt_only` ImageGen prompt packages for `regenerated_image` elements; these are not final assets.
+- `reports/asset-generation-prompts.json`: `prompt_only` ImageGen prompt packages for `regenerated_image` elements; these must request transparent PNG with alpha channel, forbid green screen / chroma key / matte backgrounds, and are not final assets.
 - `reports/split-art-assets.json`: each independent PNG asset, output path, placement, dimensions, z-index, alpha extrema, mask/debug path, and limitations.
 - `reports/asset-provenance.json`: source type for each complex art asset so CSS/SVG/PIL geometric placeholders cannot be mistaken for final art.
 
 The visual brief is an intake and routing aid, not final business truth. OCR text, table content, prices, country/operator rows, QR/barcode assets, and legal copy still need DOM/source verification.
+
+Even if ImageGen returns a PNG, do not accept green-background channel images, chroma-key backgrounds, or colored matte backgrounds as transparent assets. Regenerate as real alpha PNG or reject before HTML composition.
 
 When a subject may need later movement, scaling, replacement, localization, or independent tuning, keep it as a separate DOM node with explicit CSS placement. Do not fuse multiple independently adjustable art subjects into one PNG unless the user approves a locked composition.
 
@@ -204,7 +206,7 @@ Before final delivery, confirm:
 - Dense labels have coordinate/debug reports and omitted reasons.
 - QC or equivalent DOM checks passed for the affected HTML files.
 - `reports/preview-links.md` exists and final response includes the active HTML Markdown link plus absolute path.
-- Codex Browser annotation use is either probe-confirmed or explicitly replaced by screenshot/DOM/coordinate evidence.
+- Browser annotation use is either probe-confirmed or explicitly replaced by screenshot/DOM/coordinate evidence.
 - Real PNG export was performed when requested, not only an export plan.
 - `reports/png-export-report.json` exists when direct PNG export was requested.
 - PNG files exist under `exports/`.

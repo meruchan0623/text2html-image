@@ -19,7 +19,10 @@
     "visual:intake": "node scripts/visual-intake.js",
     "cutout:decompose": "node scripts/cutout-decompose.js",
     "visual:review": "node scripts/visual-review.js",
-    "test": "node scripts/test.js"
+    "test": "node scripts/test.js",
+    "install:all": "node scripts/install-skill.js",
+    "install:claude": "node scripts/install-skill.js --target claude",
+    "install:codex": "node scripts/install-skill.js --target codex"
   },
   "keywords": [
     "ecommerce",

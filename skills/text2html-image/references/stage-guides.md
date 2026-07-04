@@ -6,6 +6,7 @@ Use this reference only when stage rules are unclear, when extending templates, 
 
 - Backgrounds and patches must not contain flattened text, logos, prices, CTAs, or legal copy.
 - Hero, product, and character assets should be transparent PNG when compositing is required.
+- ImageGen / Codex image generation must request transparent PNG with alpha channel for composited assets. Do not request or accept green screen, green background, chroma key background, white matte, gray matte, beige matte, colored matte, or gradient background as a transparency substitute.
 - For irregular bitmap cutouts, run `npm run flood-cutout -- --input <source.png>` and use the generated `*-transparent.png` as the compositing asset. Keep `*-mask-debug.png` and `*-cutout-report.json` in `working/` or `reports/` for review.
 - 固定复杂资产规则：人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行。
 - Reject transparent assets that still depend on gradient glow, gray matte, or semi-transparent exterior haze to blend into the poster.
@@ -15,8 +16,9 @@ Use this reference only when stage rules are unclear, when extending templates, 
 
 ### Prompt package is not an asset
 
-- Treat ChatGPT Images 2 / Codex image generation prompts as `prompt_only` until real PNG outputs are supplied.
+- Treat external image-generation prompts (e.g. ChatGPT Images, Codex image generation) as `prompt_only` until real PNG outputs are supplied.
 - A usable transparent layer must include the PNG file, expected dimensions, alpha audit, and a report path.
+- Even if ImageGen returns a PNG, reject it as unfinished when the exterior is green-screen, chroma-key, matte, or another solid/gradient background instead of real alpha transparency.
 - Do not place `prompt_only` layers into HTML, exports, screenshots, or delivery reports.
 - If image generation is unavailable, record the prompt package path and stop the asset at review state.
 - A prompt-only visual brief may guide routing, but it is not a bitmap layer, crop, source image, or proof that final art exists.
@@ -34,19 +36,19 @@ Hard-to-vector kinds such as `person`, `map`, `cloud`, `skyline`, `landmark`, `g
 
 Do not accept `css_geometry`, `svg_placeholder`, or `pil_geometry_placeholder` as final source types when the user asked for cutout or regenerated imagery. They can be temporary scaffolding only if clearly labeled and removed before delivery.
 
-Before choosing `reference_cutout` or `regenerated_image`, record `cutout_feasibility`, `regeneration_fit`, difficulty signals, and a decision reason. Low cutout feasibility or high regeneration fit should route to `regenerated_image`, which only produces a `prompt_only` entry in `reports/asset-generation-prompts.json` until a real PNG, alpha audit, and mask/debug report exist.
+Before choosing `reference_cutout` or `regenerated_image`, record `cutout_feasibility`, `regeneration_fit`, difficulty signals, and a decision reason. Low cutout feasibility or high regeneration fit should route to `regenerated_image`, which only produces a `prompt_only` entry in `reports/asset-generation-prompts.json` until a real PNG with alpha channel, alpha audit, and mask/debug report exist.
 
 Asset index records should follow this shape:
 
 ```json
 {
-  "asset_id": "hero_sim_girl_front",
+  "asset_id": "hero_product_character_front",
   "asset_type": "hero",
-  "path": "assets/heroes/hero_sim_girl_front.png",
+  "path": "assets/heroes/hero_product_character_front.png",
   "format": "png",
   "transparent": true,
   "angle": "front",
-  "usage_scene": "travel-esim-poster",
+  "usage_scene": "copy-image-poster",
   "license": "provided-by-user"
 }
 ```
@@ -55,12 +57,12 @@ Asset index records should follow this shape:
 
 - Define platform/channel, image type, canvas width/height, export format, safe areas, and font fallback rules before rendering.
 - Use `workflow.config.json`, `config/canvas_specs.json`, and `config/platform_rules.json` as the current sources of truth.
-- Choose a template type from `workflow.config.json` and keep mandatory zones separate: title, hero, benefits, price, CTA, disclaimer.
+- Choose or create an explicit `template_id` for the current task and keep mandatory zones separate: title, hero, benefits, price, CTA, disclaimer. `workflow.config.json` may have no bundled template list.
 - Prefer a `layout.json` record with explicit pixel boxes:
 
 ```json
 {
-  "template_id": "T01_price_type",
+  "template_id": "copy_basic_poster",
   "canvas": {"width": 1024, "height": 1280},
   "zones": {
     "title": {"x": 50, "y": 50, "w": 924, "h": 180},
@@ -81,7 +83,7 @@ Asset index records should follow this shape:
 - Use `npm run route:assets` to generate the initial routing table and ImageGen prompt-only package from an agent/human-supplied element list.
 - Keep independently adjustable complex art as separate `<img>` nodes with explicit CSS `left`, `top`, `width`, `height`, and `z-index`; record them in `reports/split-art-assets.json`.
 - Remove stale CSS/SVG/PIL geometric placeholders after PNG art replaces them, and report the clean state as `old_geometric_css=false`.
-- Run `npm run build -- --project <project-id> [--subproject <subproject-id>]` to render `data/copy_master.json` through `templates/<template_id>/master.html`.
+- Run `npm run build -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]` to render selected copy rows through `templates/<template_id>/master.html`.
 
 Supported scalar tokens:
 
@@ -138,8 +140,8 @@ Errors block export. Warnings identify missing optional assets or incomplete pro
 - Adjust typography and line-height in language-specific CSS; do not turn text into images.
 - Run `npm run batch-export -- --project <project-id> [--subproject <subproject-id>]` only after QC has no errors.
 - Current `npm run batch-export` is report-only and writes `reports/export-report.json`; it does not create PNG files. Real PNG files require `npm run export-fast` for supported render profiles or an explicit browser screenshot/export fallback.
-- `npm run build` writes `reports/preview-links.md` with Markdown `file://` links, `Local HTML file path` entries, and Codex Browser reopening hints. Keep this report with the final evidence and include both the active HTML Markdown link and the plain local HTML file path in the final response.
-- Browser-native annotation is optional and session-dependent. Probe the current Codex Browser before relying on element/circle annotation; otherwise use ordinary screenshots, DOM snapshots, and coordinate notes.
+- `npm run build` writes `reports/preview-links.md` with Markdown `file://` links, `Local HTML file path` entries, and browser reopening hints. Keep this report with the final evidence and include both the active HTML Markdown link and the plain local HTML file path in the final response.
+- Browser-native annotation is optional and session-dependent. Probe the current browser tool before relying on element/circle annotation; otherwise use ordinary screenshots, DOM snapshots, and coordinate notes.
 - Adaptive grouping rule:
   - One HTML group -> direct `html/index.html`, `html/index.<lang>.html`.
   - Multiple HTML groups -> `html/<html-group>/`.

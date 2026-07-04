@@ -16,6 +16,8 @@ Generated poster projects must stay outside this repo, under `~/Documents/text2h
 
 ## Build, Test, and Development Commands
 
+Install the skill so each agent can discover it: `npm run install:all` (Claude Code + Codex), or `npm run install:claude` / `npm run install:codex`. In Claude Code the skill directory is `${CLAUDE_SKILL_DIR}`; in Codex it is `$CODEX_HOME/skills/text2html-image`. `cd` into that directory before running the commands below.
+
 Run commands from `skills/text2html-image/`:
 
 ```bash

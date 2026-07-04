@@ -34,7 +34,7 @@ function readCanvas(documentNode) {
   return { width: parsePx(style.width), height: parsePx(style.height) };
 }
 
-function compileEuropeLikeIr(htmlPath) {
+function compilePosterIr(htmlPath) {
   const html = fs.readFileSync(htmlPath, 'utf8');
   const documentNode = parse5.parse(html);
   const canvas = readCanvas(documentNode);
@@ -104,5 +104,5 @@ function compileEuropeLikeIr(htmlPath) {
 }
 
 module.exports = {
-  compileEuropeLikeIr,
+  compilePosterIr,
 };

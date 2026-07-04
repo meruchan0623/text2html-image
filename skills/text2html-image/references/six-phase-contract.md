@@ -19,14 +19,14 @@ This reference defines the full handoff contract for the single `text2html-image
 
 ```json
 {
-  "asset_id": "hero_travel_esim_girl_front",
+  "asset_id": "hero_product_character_front",
   "asset_type": "hero",
-  "path": "assets/heroes/hero_travel_esim_girl_front.png",
+  "path": "assets/heroes/hero_product_character_front.png",
   "format": "png",
   "transparent": true,
   "angle": "front",
   "style": "clean ecommerce illustration",
-  "usage_scene": "travel-esim-poster",
+  "usage_scene": "copy-image-poster",
   "license": "provided-by-user",
   "notes": ""
 }
@@ -36,7 +36,7 @@ This reference defines the full handoff contract for the single `text2html-image
 
 ```json
 {
-  "template_id": "T01_price_type",
+  "template_id": "copy_basic_poster",
   "canvas": {"width": 1024, "height": 1280},
   "zones": {
     "title": {"x": 50, "y": 50, "w": 924, "h": 180},
@@ -54,15 +54,15 @@ This reference defines the full handoff contract for the single `text2html-image
 ```json
 {
   "source_row_id": "ROW001",
-  "template_id": "T01_price_type",
-  "platform": "shopee",
+  "template_id": "copy_basic_poster",
+  "platform": "custom_poster",
   "canvas_w": 1024,
   "canvas_h": 1280,
   "lang": "en-US",
-  "sku": "SIM001",
-  "title": "Summer Sale - 50% Off",
-  "cta": "Shop Now",
-  "export_name": "T01_en-US_SIM001_1024x1280"
+  "sku": "COPY001",
+  "title": "Editable Copy Poster",
+  "cta": "View Now",
+  "export_name": "copy-basic-poster-en-us-1024x1280"
 }
 ```
 
