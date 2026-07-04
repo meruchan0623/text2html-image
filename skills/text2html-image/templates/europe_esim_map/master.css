@@ -1,0 +1,6 @@
+body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #ffffff; overflow: visible; }
+.map-base { position: absolute; left: 0; top: 0; }
+.map-label { position: absolute; color: #fff; font-weight: 700; transform: translate(-50%, -50%); }
+.label-lg { font-size: 28px; }
+.title-pill { position: absolute; left: 560px; top: 1130px; width: 370px; height: 72px; display: flex; align-items: center; justify-content: center; color: white; background: #415BA8; border-radius: 36px; }

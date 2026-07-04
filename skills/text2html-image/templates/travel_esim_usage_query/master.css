@@ -1,0 +1,5 @@
+body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #f5f8ff; overflow: visible; }
+.title { position: absolute; left: 80px; top: 90px; font-size: 72px; }
+.subtitle { position: absolute; left: 80px; top: 190px; font-size: 30px; }
+.phone { position: absolute; left: 340px; top: 360px; width: 420px; height: 620px; border: 8px solid #222; border-radius: 42px; }

@@ -2,6 +2,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { checkTemplates } = require('./template-registry-core');
+const { checkCopySchema } = require('./copy-schema-core');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PROJECT_DIRS = ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports'];
@@ -396,6 +398,17 @@ function validateWorkflow(options = {}) {
   if (!config.copy_image_review?.score_schema) errors.push('workflow.config.json missing copy_image_review.score_schema');
 
   if (!rows.length) errors.push('data/copy_master.json has no data rows');
+
+  const templateReport = checkTemplates({ rows });
+  for (const templateId of templateReport.missing_templates) {
+    errors.push(`copy_master references missing template ${templateId}`);
+  }
+  for (const templateId of templateReport.unregistered_templates) {
+    warnings.push(`template ${templateId} exists but is not registered in templates/registry.json`);
+  }
+
+  const copySchemaReport = checkCopySchema({ rows });
+  for (const error of copySchemaReport.errors) errors.push(error);
 
   for (const row of rows) {
     for (const field of ['source_row_id', 'template_id', 'platform', 'canvas_w', 'canvas_h', 'lang', 'sku', 'title', 'export_name']) {

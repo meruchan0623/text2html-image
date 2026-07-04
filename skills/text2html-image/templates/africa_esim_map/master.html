@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <h1 class="title" data-i18n-key="title">{{title}}</h1>
+    <img class="map" src="{{hero_asset}}" data-asset-text-policy="preserve-raster" alt="">
+    <section class="country-grid" data-sku="{{sku}}">
+      <span data-country-code="DZ" data-i18n-key="country.dz">{{country_dz}}</span>
+      <span data-country-code="CD" data-i18n-key="country.cd">{{country_cd}}</span>
+      <span data-country-code="EG" data-i18n-key="country.eg">{{country_eg}}</span>
+    </section>
+  </main>
+</body>
+</html>

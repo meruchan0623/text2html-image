@@ -586,7 +586,12 @@ npm run project:init -- --project <project-id> [--subproject <subproject-id>]
 npm run build -- --project <project-id> [--subproject <subproject-id>]
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>]
 npm run audit:dom -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
+npm run template:check -- --project <project-id> [--subproject <subproject-id>]
+npm run copy-schema -- --project <project-id> [--subproject <subproject-id>]
+npm run visual:intake -- --project <project-id> --source-image <path> [--response <json>]
+npm run cutout:decompose -- --project <project-id> --source-image <path> --mode hybrid [--response <json>]
 npm run route:assets -- --project <project-id> --source-image <path> --elements <json-or-path> [--subproject <subproject-id>]
+npm run visual:review -- --project <project-id> --round <n> --report <json>
 npm run review:score -- --project <project-id> [--subproject <subproject-id>] --round 1 --source-image <path> --screenshot <path> --overall-score 90 --layout-score 90 --typography-score 90 --color-score 90 --asset-score 90 --issue "medium|layout|observed|expected|fix hint"
 npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  # report/export plan; verify PNGs separately
 npm run render:profile -- --project <project-id> [--group <html-group>]
@@ -594,6 +599,22 @@ npm run export-fast -- --project <project-id> [--group <html-group>] [--scale 2]
 npm run flood-cutout -- --input <source.png> [--output <clean.png>] [--mask <mask-debug.png>] [--report <report.json>]
 npm test
 ```
+
+## P0 Visual Intelligence Commands
+
+Use these commands when a reference image needs structured visual understanding, element decomposition, or repeatable visual review.
+
+`npm run template:check` writes `reports/template-check-report.json` and fails when `copy_master` references missing templates.
+
+`npm run copy-schema` writes `reports/copy-schema-report.json` and fails when template tokens cannot be supplied by copy rows or known derived fields.
+
+`npm run visual:intake` writes `reports/visual-intake-request.json` and `reports/visual-intake-manifest.json`. Visual intake is a hypothesis package. Without a supplied response JSON, the manifest status remains `review`.
+
+`npm run cutout:decompose` writes `reports/agent-cutout-request.json`, `reports/element-decomposition-plan.json`, `reports/mask-quality-report.json`, `reports/cutout-layer-package.json`, and `reports/agent-cutout-review.json`. Cutout decomposition is not a provider client. It can consume Agent/model JSON, external masks, and external transparent PNG layers.
+
+`npm run visual:review` writes `reports/visual-review-round-NN.json` and must include issue evidence. A visual pass cannot override a failing DOM audit.
+
+Stop when an element is identified but has no bbox, no mask, no layer, missing provenance, or a hard-to-vector kind is routed to `editable_vector`.
 
 ## Stop Conditions
 

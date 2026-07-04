@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <svg class="map-base" width="1000" height="1263" viewBox="0 0 1000 1263" aria-hidden="true">
+      <rect x="120" y="180" width="760" height="760" rx="80" fill="#e8f1ff" stroke="#315ba8" stroke-width="12"/>
+      <path d="M240 420 C360 300 510 310 620 440 S720 700 560 780 S260 750 240 580 Z" fill="#5f83d5"/>
+    </svg>
+    <span class="map-label label-lg" data-country-code="FR" data-i18n-key="country.fr" style="left: 480px; top: 560px;">法國</span>
+    <div class="title-pill" data-i18n-key="title">{{title}}</div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "templates": [
+    {
+      "template_id": "T01_price_type",
+      "template_type": "reusable",
+      "status": "active",
+      "description": "Reusable price-card template for package smoke tests and simple price posters."
+    },
+    {
+      "template_id": "banner_zh_hkmo",
+      "template_type": "reusable",
+      "status": "active",
+      "description": "Reusable HK/MO banner template for package smoke tests and skyline banners."
+    },
+    {
+      "template_id": "europe_esim_map",
+      "template_type": "reusable",
+      "status": "active",
+      "description": "Reusable Europe eSIM map template for package smoke tests and map layouts."
+    },
+    {
+      "template_id": "travel_esim_usage_query",
+      "template_type": "reusable",
+      "status": "active",
+      "description": "Reusable usage-query phone template for package smoke tests."
+    },
+    {
+      "template_id": "africa_esim_map",
+      "template_type": "reusable",
+      "status": "active",
+      "description": "Reusable Africa eSIM map template for package smoke tests and dense map layouts."
+    }
+  ]
+}

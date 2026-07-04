@@ -1,0 +1,7 @@
+body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #f7fbff; overflow: visible; }
+.title { position: absolute; left: 64px; top: 80px; font-size: 64px; margin: 0; }
+.subtitle { position: absolute; left: 64px; top: 170px; font-size: 32px; margin: 0; }
+.price { position: absolute; left: 64px; top: 360px; font-size: 56px; }
+.cta { position: absolute; left: 64px; bottom: 140px; font-size: 34px; }
+.disclaimer { position: absolute; left: 64px; bottom: 70px; font-size: 18px; }

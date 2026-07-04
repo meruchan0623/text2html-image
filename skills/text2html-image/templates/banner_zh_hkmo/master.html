@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="master.css">
+</head>
+<body class="{{lang_class}}">
+  <main class="poster" style="width: {{canvas_width}}px; height: {{canvas_height}}px">
+    <img class="skyline" src="{{bg_asset}}" data-asset-text-policy="preserve-raster" alt="">
+    <section class="center-card">
+      <h1 class="title" data-i18n-key="title">{{title}}</h1>
+      <p class="subtitle" data-i18n-key="subtitle">{{subtitle}}</p>
+      <span class="cta" data-i18n-key="cta">{{cta}}</span>
+    </section>
+    <figure class="panel panel-castle"><img src="{{patch_asset_1}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+    <figure class="panel panel-wall"><img src="{{patch_asset_2}}" data-asset-text-policy="preserve-raster" alt=""></figure>
+  </main>
+</body>
+</html>

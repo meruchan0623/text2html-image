@@ -167,6 +167,30 @@ Promote `runs/latest/` to a named run only when the evidence needs to survive: a
 
 If a stage has no report or equivalent evidence/proof, say exactly which evidence is missing instead of claiming the image is complete.
 
+## P0 Visual Intelligence Evidence Chain
+
+For reference-image recreation, create this report chain before final export:
+
+```text
+visual-intake-manifest.json
+-> element-decomposition-plan.json
+-> mask-quality-report.json
+-> cutout-layer-package.json
+-> asset-routing-table.json
+-> dom-editability-report.json
+-> visual-review-round-NN.json
+```
+
+`visual-intake-manifest.json` records Agent/VLM hypotheses. It is not pixel truth.
+
+`element-decomposition-plan.json` records element labels, prompts, bbox source, route, placement, and review status.
+
+`mask-quality-report.json` records alpha evidence and overlay paths for masks.
+
+`cutout-layer-package.json` records transparent PNG layer paths, mask paths, placement, z-index, and provenance.
+
+`visual-review-round-NN.json` records screenshot comparison scores, evidence coordinates or DOM paths, and the next action.
+
 ## 8. Completion Checklist
 
 Before final delivery, confirm:

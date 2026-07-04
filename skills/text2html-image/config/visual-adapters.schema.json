@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "grounding": ["external_json", "grounding_dino", "florence2", "dino_x", "none"],
+  "segmentation": ["external_mask", "sam2", "sam", "none"],
+  "matting": ["none", "rmbg", "birefnet", "flood_cutout"],
+  "generation": ["none", "external_image_edit"],
+  "default": {
+    "grounding": "external_json",
+    "segmentation": "external_mask",
+    "matting": "none",
+    "generation": "none"
+  }
+}

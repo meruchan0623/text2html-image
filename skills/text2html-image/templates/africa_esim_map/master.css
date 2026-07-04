@@ -1,0 +1,5 @@
+body { margin: 0; font-family: Arial, sans-serif; }
+.poster { position: relative; background: #ffffff; overflow: visible; }
+.title { position: absolute; left: 80px; top: 70px; font-size: 52px; }
+.map { position: absolute; left: 420px; top: 240px; width: 560px; height: 560px; mix-blend-mode: multiply; }
+.country-grid { position: absolute; left: 80px; top: 220px; width: 420px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

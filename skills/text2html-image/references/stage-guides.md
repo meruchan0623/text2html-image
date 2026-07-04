@@ -154,3 +154,13 @@ Errors block export. Warnings identify missing optional assets or incomplete pro
 - Rewrite paths when needed, for example from `../../source/qr-code.png` to `../source/qr-code.png`.
 - Keep QR/barcode assets as bitmap files and verify they render in the detached delivery path.
 - Do not report delivery complete if any image path in the delivered HTML is unresolved.
+
+## P0 Visual Intelligence Stage Notes
+
+Visual intake is a hypothesis package. It can name likely objects and business text, but bbox and route fields must stay reviewable.
+
+Cutout decomposition is not a provider client. It prepares request JSON, consumes external Agent/model output, validates bbox/mask/layer files, and writes local reports.
+
+Mask quality requires alpha evidence. A final layer needs a mask file, transparent PNG layer, overlay image, bbox fit status, and provenance before it can be treated as a real asset.
+
+Generated or inpainted replacements are not `reference_cutout`. Mark them as `regenerated_image` with prompt and provenance.

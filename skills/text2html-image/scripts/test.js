@@ -16,6 +16,11 @@ const {
 const { listHtmlEntries } = require('./utils/html-entries');
 const { inspectHtmlEditability } = require('./utils/dom-editability-core');
 const { routeAssets } = require('./utils/asset-routing-core');
+const { checkTemplates } = require('./utils/template-registry-core');
+const { checkCopySchema } = require('./utils/copy-schema-core');
+const { runVisualIntake } = require('./utils/visual-intake-core');
+const { runCutoutDecompose } = require('./utils/cutout-decompose-core');
+const { validateVisualReviewReport } = require('./utils/visual-review-core');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -30,16 +35,26 @@ function maybeReadAbsolute(file) {
 }
 
 const testFixturePaths = [];
+const testFixtureOriginals = new Map();
 function writeTestFixture(relativePath, content) {
   const target = path.join(ROOT, relativePath);
+  if (!testFixtureOriginals.has(target)) {
+    testFixtureOriginals.set(target, fs.existsSync(target) ? fs.readFileSync(target) : null);
+  }
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, content);
-  testFixturePaths.push(target);
+  if (!testFixturePaths.includes(target)) testFixturePaths.push(target);
 }
 
 function cleanupTestFixtures() {
   for (const file of testFixturePaths.reverse()) {
-    fs.rmSync(file, { force: true });
+    const original = testFixtureOriginals.get(file);
+    if (original === null) {
+      fs.rmSync(file, { force: true });
+    } else if (original !== undefined) {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, original);
+    }
   }
   for (const dir of [
     'templates/T01_price_type',
@@ -221,6 +236,11 @@ for (const script of [
   'flood-cutout.js',
   'audit-dom.js',
   'route-assets.js',
+  'template-check.js',
+  'copy-schema.js',
+  'visual-intake.js',
+  'cutout-decompose.js',
+  'visual-review.js',
   'test.js',
 ]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
@@ -232,12 +252,38 @@ assert(packageJson.scripts['export-fast'] === 'node scripts/render-fast.js', 'pa
 assert(packageJson.scripts['flood-cutout'] === 'node scripts/flood-cutout.js', 'package.json missing flood-cutout script');
 assert(packageJson.scripts['audit:dom'] === 'node scripts/audit-dom.js', 'package.json missing audit:dom script');
 assert(packageJson.scripts['route:assets'] === 'node scripts/route-assets.js', 'package.json missing route:assets script');
+assert(packageJson.scripts['template:check'] === 'node scripts/template-check.js', 'package.json missing template:check script');
+assert(packageJson.scripts['copy-schema'] === 'node scripts/copy-schema.js', 'package.json missing copy-schema script');
+assert(packageJson.scripts['visual:intake'] === 'node scripts/visual-intake.js', 'package.json missing visual:intake script');
+assert(packageJson.scripts['cutout:decompose'] === 'node scripts/cutout-decompose.js', 'package.json missing cutout:decompose script');
+assert(packageJson.scripts['visual:review'] === 'node scripts/visual-review.js', 'package.json missing visual:review script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
   assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
 assert(packageJson.dependencies?.pngjs || packageJson.devDependencies?.pngjs, 'package.json missing pngjs');
 
 const config = JSON.parse(read('workflow.config.json'));
+const copyRows = JSON.parse(read('data/copy_master.json')).data;
+const templatePreflight = checkTemplates({ rows: copyRows });
+assert(templatePreflight.status === 'pass', `template preflight should pass after test fixtures are prepared: ${templatePreflight.missing_templates.join(', ')}`);
+assert(templatePreflight.templates.some((item) => item.template_id === 'T01_price_type'), 'template preflight should include T01_price_type');
+const missingTemplatePreflight = checkTemplates({
+  rows: [{ source_row_id: 'missing-row', template_id: 'missing-template-id' }],
+});
+assert(missingTemplatePreflight.status === 'fail', 'template preflight should fail for a missing template');
+assert(missingTemplatePreflight.missing_templates.includes('missing-template-id'), 'template preflight should report the missing template id');
+const copySchemaPass = checkCopySchema({ rows: copyRows });
+assert(copySchemaPass.status === 'pass', `copy schema should pass for test fixtures: ${copySchemaPass.errors.join('; ')}`);
+const brokenCopyRows = copyRows.map((row, index) => {
+  if (index !== 0) return row;
+  const next = { ...row };
+  delete next.title;
+  return next;
+});
+const copySchemaFail = checkCopySchema({ rows: brokenCopyRows });
+assert(copySchemaFail.status === 'fail', 'copy schema should fail when a required token source field is missing');
+assert(copySchemaFail.errors.some((error) => error.includes('missing title')), 'copy schema should name the missing title field');
+
 assert(Array.isArray(config.workflow_phases), 'workflow.config.json missing workflow_phases');
 assert(config.workflow_phases.length === 6, 'workflow must have six phases');
 assert(config.workspace_root === '$DOCUMENTS/text2html-image-project', 'workflow.config.json must use the system Documents text2html-image-project workspace_root');
@@ -314,6 +360,14 @@ assert(skillBody.includes('route": "regenerated_image"'), 'skill must document r
 assert(skillBody.includes('cutout_feasibility'), 'skill must document cutout feasibility scoring');
 assert(skillBody.includes('regeneration_fit'), 'skill must document regeneration fit scoring');
 assert(skillBody.includes('asset-generation-prompts.json'), 'skill must document image generation prompt package');
+assert(skillBody.includes('npm run template:check'), 'skill must document template:check command');
+assert(skillBody.includes('npm run copy-schema'), 'skill must document copy-schema command');
+assert(skillBody.includes('npm run visual:intake'), 'skill must document visual:intake command');
+assert(skillBody.includes('npm run cutout:decompose'), 'skill must document cutout:decompose command');
+assert(skillBody.includes('npm run visual:review'), 'skill must document visual:review command');
+assert(skillBody.includes('element-decomposition-plan.json'), 'skill must document element decomposition plan output');
+assert(skillBody.includes('mask-quality-report.json'), 'skill must document mask quality report output');
+assert(skillBody.includes('cutout-layer-package.json'), 'skill must document cutout layer package output');
 assert(skillBody.includes('## Flood Cutout Asset Cleanup'), 'skill must document flood cutout asset cleanup');
 assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cutout command');
 assert(skillBody.includes('*-mask-debug.png'), 'skill must require mask debug output');
@@ -364,6 +418,11 @@ assert(executionFlow.includes('asset-provenance.json'), 'execution flow must inc
 assert(executionFlow.includes('split-art-assets.json'), 'execution flow must include split art assets evidence');
 assert(executionFlow.includes('asset-generation-prompts.json'), 'execution flow must include generated prompt package evidence');
 assert(executionFlow.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'execution flow must include the fixed complex asset routing prompt');
+assert(executionFlow.includes('visual-intake-manifest.json'), 'execution flow must document visual intake manifest');
+assert(executionFlow.includes('element-decomposition-plan.json'), 'execution flow must document element decomposition plan');
+assert(executionFlow.includes('mask-quality-report.json'), 'execution flow must document mask quality report');
+assert(executionFlow.includes('cutout-layer-package.json'), 'execution flow must document cutout layer package');
+assert(executionFlow.includes('visual-review-round-NN.json'), 'execution flow must document visual review rounds');
 assert(executionFlow.includes('dom-editability-report.json'), 'execution flow must include DOM editability report');
 assert(executionFlow.includes('dom-editability-summary.md'), 'execution flow must include DOM editability summary');
 assert(executionFlow.includes('plain-text reports must include local HTML file paths'), 'execution flow must require local HTML file paths in plain-text reports');
@@ -394,6 +453,9 @@ assert(stageGuides.includes('One export group -> direct `exports/`'), 'stage-gui
 assert(stageGuides.includes('Multiple delivery/export packs -> `exports/<delivery-id-or-group>/`'), 'stage-guides must document multi-delivery export path');
 assert(stageGuides.includes('Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/`'), 'stage-guides must document run-level iterative diagnostics path');
 assert(stageGuides.includes('Prompt package is not an asset'), 'stage guides must separate prompt packages from usable assets');
+assert(stageGuides.includes('Visual intake is a hypothesis package'), 'stage guides must document visual intake hypothesis status');
+assert(stageGuides.includes('Cutout decomposition is not a provider client'), 'stage guides must document provider-neutral cutout decomposition');
+assert(stageGuides.includes('Mask quality requires alpha evidence'), 'stage guides must document alpha evidence for masks');
 assert(stageGuides.includes('Current preview edit checklist'), 'stage guides must document current preview edits');
 assert(stageGuides.includes('Detached outputs path checklist'), 'stage guides must document detached output path checks');
 assert(!stageGuides.includes('exports/export-manifest.json'), 'stage-guides should not require export manifest path');
@@ -429,7 +491,7 @@ assert(verboseStartOutput.includes('input:'), 'verbose start output should inclu
 assert(sanitizeProjectId('Travel eSIM Banner For HKMO Long Name') === 'travel-esim-banner', 'project ids should be kebab-case and max 20 chars');
 assert(sanitizeProjectId('Page Master A') === 'page-master-a', 'subproject ids should be kebab-case');
 
-const projectId = 'test-default-project';
+const projectId = `test-p${process.pid}`;
 const projectPaths = createProjectWorkspace(projectId);
 for (const dir of ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports']) {
   assert(fs.existsSync(projectPaths[dir]), `project workspace missing ${dir}`);
@@ -518,6 +580,34 @@ assert(Array.isArray(firstHtmlAudit.risks), 'DOM audit should report risk array'
 
 const qc = validateWorkflow({ projectId });
 assert(qc.errors.length === 0, `quality errors: ${qc.errors.join('; ')}`);
+
+const templateCheckOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'template-check.js'),
+  '--project', projectId,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(templateCheckOutput.includes('Template check pass'), 'template-check should report pass for test fixtures');
+const templateCheckReportPath = path.join(projectPaths.reports, 'template-check-report.json');
+assert(fs.existsSync(templateCheckReportPath), 'template-check should write reports/template-check-report.json');
+const templateCheckReport = JSON.parse(fs.readFileSync(templateCheckReportPath, 'utf8'));
+assert(templateCheckReport.status === 'pass', 'template-check report should pass for test fixtures');
+assert(templateCheckReport.templates.every((item) => item.template_id && typeof item.exists === 'boolean'), 'template-check report should include template status rows');
+
+const copySchemaOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'copy-schema.js'),
+  '--project', projectId,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(copySchemaOutput.includes('Copy schema check pass'), 'copy-schema should report pass for test fixtures');
+const copySchemaReportPath = path.join(projectPaths.reports, 'copy-schema-report.json');
+assert(fs.existsSync(copySchemaReportPath), 'copy-schema should write reports/copy-schema-report.json');
+const copySchemaReport = JSON.parse(fs.readFileSync(copySchemaReportPath, 'utf8'));
+assert(copySchemaReport.status === 'pass', 'copy-schema report should pass for test fixtures');
+assert(Object.keys(copySchemaReport.template_fields).includes('T01_price_type'), 'copy-schema report should include template fields');
 
 const domAuditOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'audit-dom.js'),
@@ -655,6 +745,36 @@ const scoreValidation = validateScoreReport(validScoreReport);
 assert(scoreValidation.errors.length === 0, `valid score report should pass: ${scoreValidation.errors.join('; ')}`);
 const invalidScoreValidation = validateScoreReport({ overall_score: 101, issues: [{ severity: 'low' }] });
 assert(invalidScoreValidation.errors.length >= 6, 'invalid score report should report missing fields and invalid score');
+const validVisualReview = {
+  project_id: projectId,
+  subproject_id: null,
+  round: 1,
+  generated_at: new Date().toISOString(),
+  source_image: path.join(projectPaths.source, 'reference.png'),
+  screenshot: path.join(projectPaths.screenshots, 'round-01.png'),
+  overall_score: 91,
+  layout_score: 92,
+  typography_score: 90,
+  color_score: 91,
+  asset_score: 90,
+  text_legibility_score: 93,
+  issues: [
+    {
+      severity: 'medium',
+      area: 'asset',
+      observed: 'phone layer edge is too harsh',
+      expected: 'phone edge matches the reference softness',
+      evidence: 'x=520,y=300,w=260,h=520',
+      fix_hint: 'rerun matting for phone layer',
+    },
+  ],
+  next_action: 'Refine phone layer edge.',
+};
+const validVisualReviewResult = validateVisualReviewReport(validVisualReview);
+assert(validVisualReviewResult.errors.length === 0, `valid visual review should pass: ${validVisualReviewResult.errors.join('; ')}`);
+const invalidVisualReviewResult = validateVisualReviewReport({ overall_score: 91, issues: [{}] });
+assert(invalidVisualReviewResult.errors.some((error) => error.includes('text_legibility_score')), 'visual review validation should require text_legibility_score');
+assert(invalidVisualReviewResult.errors.some((error) => error.includes('issues[0].evidence')), 'visual review validation should require issue evidence');
 
 const scoreOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'review-score.js'),
@@ -681,6 +801,24 @@ assert(savedScoreReport.overall_score === 91, 'review-score should preserve over
 assert(savedScoreReport.subproject_id === 'page-master-a', 'review-score should preserve subproject id');
 assert(savedScoreReport.issues[0].fix_hint === 'move hero up', 'review-score should parse issue fix hint');
 
+const visualReviewInputPath = path.join(projectPaths.working, 'visual-review-input.json');
+fs.writeFileSync(visualReviewInputPath, JSON.stringify(validVisualReview, null, 2));
+const visualReviewOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'visual-review.js'),
+  '--project', projectId,
+  '--round', '1',
+  '--report', visualReviewInputPath,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(visualReviewOutput.includes('Visual review report written'), 'visual-review should print report path');
+const visualReviewReportPath = path.join(projectPaths.reports, 'visual-review-round-01.json');
+assert(fs.existsSync(visualReviewReportPath), 'visual-review should write reports/visual-review-round-01.json');
+const savedVisualReview = JSON.parse(fs.readFileSync(visualReviewReportPath, 'utf8'));
+assert(savedVisualReview.status === 'review', 'visual review with issues should remain review');
+assert(savedVisualReview.issues[0].evidence.includes('x=520'), 'visual review should preserve evidence');
+
 const routeSourcePath = path.join(projectPaths.source, 'asset-routing-reference.png');
 const routeSourcePng = new PNG({ width: 900, height: 1200 });
 for (let y = 0; y < routeSourcePng.height; y += 1) {
@@ -689,6 +827,155 @@ for (let y = 0; y < routeSourcePng.height; y += 1) {
   }
 }
 fs.writeFileSync(routeSourcePath, PNG.sync.write(routeSourcePng));
+const visualIntakeNoResponse = runVisualIntake({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  targetCanvas: { width: 900, height: 1200 },
+  taskType: 'recreate',
+});
+assert(visualIntakeNoResponse.manifest.status === 'review', 'visual intake without model response should remain review');
+assert(fs.existsSync(path.join(projectPaths.reports, 'visual-intake-request.json')), 'visual intake should write request package');
+assert(fs.existsSync(path.join(projectPaths.reports, 'visual-intake-manifest.json')), 'visual intake should write manifest');
+const visualIntakeResponsePath = path.join(projectPaths.working, 'visual-intake-response.json');
+fs.writeFileSync(visualIntakeResponsePath, JSON.stringify({
+  visual_hierarchy: ['headline', 'phone mockup', 'cloud background'],
+  elements: [
+    {
+      id: 'phone-mockup',
+      kind: 'complex_art',
+      description: 'large phone mockup on the right',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      suggested_route: 'reference_cutout',
+      confidence: 0.86,
+      evidence: ['right side rectangular phone body'],
+      uncertainty_reason: '',
+    },
+  ],
+  business_text_candidates: ['Travel eSIM'],
+  unknowns_requiring_user_or_agent_review: [],
+}, null, 2));
+const visualIntakeWithResponse = runVisualIntake({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  responsePath: visualIntakeResponsePath,
+  targetCanvas: { width: 900, height: 1200 },
+  taskType: 'recreate',
+});
+assert(visualIntakeWithResponse.manifest.status === 'pass', 'visual intake with confident response should pass');
+assert(visualIntakeWithResponse.manifest.elements[0].id === 'phone-mockup', 'visual intake should preserve element id');
+const visualIntakeCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'visual-intake.js'),
+  '--project', projectId,
+  '--source-image', routeSourcePath,
+  '--response', visualIntakeResponsePath,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(visualIntakeCliOutput.includes('Visual intake manifest written'), 'visual-intake should print manifest path');
+const visualIntakeManifest = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'visual-intake-manifest.json'), 'utf8'));
+assert(visualIntakeManifest.elements[0].suggested_route === 'reference_cutout', 'visual intake manifest should preserve suggested route');
+
+const cutoutNoResponse = runCutoutDecompose({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  mode: 'hybrid',
+});
+assert(cutoutNoResponse.plan.status === 'review', 'cutout decomposition without response should remain review');
+assert(fs.existsSync(path.join(projectPaths.reports, 'agent-cutout-request.json')), 'cutout decomposition should write agent request package');
+assert(fs.existsSync(path.join(projectPaths.reports, 'element-decomposition-plan.json')), 'cutout decomposition should write element-decomposition-plan.json');
+assert(fs.existsSync(path.join(projectPaths.reports, 'agent-cutout-review.json')), 'cutout decomposition should write agent-cutout-review.json');
+const cutoutResponsePath = path.join(projectPaths.working, 'cutout-response.json');
+fs.writeFileSync(cutoutResponsePath, JSON.stringify({
+  elements: [
+    {
+      id: 'phone-mockup',
+      label: 'phone mockup',
+      prompt: 'phone mockup',
+      kind: 'product',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      bbox_source: 'grounding',
+      route: 'reference_cutout',
+      confidence: 0.88,
+      uncertainty_reason: '',
+    },
+  ],
+  merge_candidates: [],
+  split_candidates: [],
+}, null, 2));
+const cutoutWithResponse = runCutoutDecompose({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  mode: 'hybrid',
+  responsePath: cutoutResponsePath,
+});
+assert(cutoutWithResponse.plan.status === 'review', 'cutout plan without layer files should stay review');
+assert(cutoutWithResponse.plan.elements[0].bbox_source === 'grounding', 'cutout plan should preserve bbox source');
+const maskPath = path.join(projectPaths.working, 'phone-mask.png');
+const layerPath = path.join(projectPaths.source, 'phone-layer.png');
+const maskPng = new PNG({ width: 900, height: 1200 });
+const layerPng = new PNG({ width: 260, height: 520 });
+for (let y = 0; y < maskPng.height; y += 1) {
+  for (let x = 0; x < maskPng.width; x += 1) {
+    setPixel(maskPng, x, y, x >= 520 && x < 780 && y >= 300 && y < 820 ? [255, 255, 255, 255] : [0, 0, 0, 0]);
+  }
+}
+for (let y = 0; y < layerPng.height; y += 1) {
+  for (let x = 0; x < layerPng.width; x += 1) {
+    setPixel(layerPng, x, y, [30, 80, 160, 255]);
+  }
+}
+fs.writeFileSync(maskPath, PNG.sync.write(maskPng));
+fs.writeFileSync(layerPath, PNG.sync.write(layerPng));
+const cutoutReadyResponsePath = path.join(projectPaths.working, 'cutout-ready-response.json');
+fs.writeFileSync(cutoutReadyResponsePath, JSON.stringify({
+  elements: [
+    {
+      id: 'phone-mockup',
+      label: 'phone mockup',
+      prompt: 'phone mockup',
+      kind: 'product',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      bbox_source: 'grounding',
+      mask_path: maskPath,
+      layer_path: layerPath,
+      route: 'reference_cutout',
+      confidence: 0.91,
+      uncertainty_reason: '',
+    },
+  ],
+  merge_candidates: [],
+  split_candidates: [],
+}, null, 2));
+const cutoutReady = runCutoutDecompose({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  mode: 'hybrid',
+  responsePath: cutoutReadyResponsePath,
+});
+assert(cutoutReady.plan.status === 'pass', `cutout plan with mask and layer should pass: ${cutoutReady.plan.blocking_errors.join('; ')}`);
+assert(fs.existsSync(path.join(projectPaths.reports, 'mask-quality-report.json')), 'cutout decomposition should write mask-quality-report.json');
+assert(fs.existsSync(path.join(projectPaths.reports, 'cutout-layer-package.json')), 'cutout decomposition should write cutout-layer-package.json');
+const maskQualityReport = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'mask-quality-report.json'), 'utf8'));
+assert(maskQualityReport.status === 'pass', 'mask quality report should pass for valid mask and layer');
+assert(maskQualityReport.checks[0].alpha_min === 0, 'mask quality should record alpha_min');
+assert(maskQualityReport.checks[0].alpha_max === 255, 'mask quality should record alpha_max');
+assert(fs.existsSync(maskQualityReport.checks[0].overlay_path), 'mask quality should write overlay image');
+const layerPackageReport = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'cutout-layer-package.json'), 'utf8'));
+assert(layerPackageReport.status === 'pass', 'layer package report should pass for valid layer');
+assert(layerPackageReport.layers[0].placement.left === 520, 'layer package should preserve placement left');
+const cutoutCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'cutout-decompose.js'),
+  '--project', projectId,
+  '--source-image', routeSourcePath,
+  '--mode', 'hybrid',
+  '--response', cutoutReadyResponsePath,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(cutoutCliOutput.includes('Element decomposition plan written'), 'cutout-decompose should print plan path');
+
 const routeElements = {
   elements: [
     {
