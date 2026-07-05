@@ -3,11 +3,14 @@ const path = require('path');
 const { PNG } = require('pngjs');
 const { writeJson } = require('./workflow-core');
 
-const TEXT_KINDS = new Set(['text', 'copy', 'headline', 'title', 'subtitle', 'caption', 'label', 'price', 'cta', 'legal', 'table_text', 'business_label']);
-const VECTOR_KINDS = new Set(['card', 'panel', 'border', 'divider', 'dot', 'pill', 'badge', 'simple_icon', 'notice_bar', 'shape']);
-const HARD_TO_VECTOR_KINDS = new Set(['person', 'map', 'cloud', 'skyline', 'landmark', 'globe', 'application_icon', 'app_icon', 'complex_icon', 'brand_icon', 'multicolor_icon', 'screenshot_icon']);
+const TEXT_KINDS = new Set(['text', 'editable_text', 'copy', 'headline', 'title', 'subtitle', 'caption', 'label', 'price', 'cta', 'legal', 'table', 'table_text', 'feature_matrix', 'multilingual_copy', 'business_label']);
+const VECTOR_KINDS = new Set(['card', 'panel', 'border', 'divider', 'dot', 'pill', 'badge', 'simple_icon', 'notice_bar', 'shape', 'dashboard_widget', 'route_lines', 'route_points']);
+const HARD_TO_VECTOR_KINDS = new Set(['person', 'map', 'cloud', 'skyline', 'landmark', 'globe', 'application_icon', 'app_icon', 'complex_icon', 'brand_icon', 'multicolor_icon', 'screenshot_icon', 'qr', 'qr_code', 'barcode', 'payment_logo', 'country_flag']);
 const HARD_TO_VECTOR_ALLOWED_ROUTES = new Set(['reference_cutout', 'regenerated_image', 'locked_base_layer', 'review']);
-const COMPLEX_KINDS = new Set(['person', 'character', 'mascot', 'map', 'globe', 'cloud', 'skyline', 'landmark', 'device', 'product_render', 'illustration', 'complex_art', 'application_icon', 'app_icon', 'complex_icon', 'brand_icon', 'multicolor_icon', 'screenshot_icon']);
+const SOURCE_TRUTH_KINDS = new Set(['qr', 'qr_code', 'barcode', 'payment_logo', 'country_flag']);
+const SOURCE_TRUTH_ALLOWED_ROUTES = new Set(['reference_cutout', 'locked_base_layer', 'review']);
+const LOCKED_BASE_KINDS = new Set(['photo_background', 'photography_background', 'airport_photography']);
+const COMPLEX_KINDS = new Set(['person', 'character', 'mascot', 'map', 'globe', 'cloud', 'skyline', 'landmark', 'device', 'product_render', 'illustration', 'complex_art', 'complex_gradient', 'application_icon', 'app_icon', 'complex_icon', 'brand_icon', 'multicolor_icon', 'screenshot_icon']);
 const FIXED_COMPLEX_ASSET_INSTRUCTION = '人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行。';
 const IMAGEGEN_FORBIDDEN_BACKGROUNDS = [
   'green screen',
@@ -121,7 +124,8 @@ function scoreElement(element, canvas) {
   pushSignal(signals, Boolean(element.visual_noise || /noisy|busy|dense/.test(description)), 'visual_noise');
   pushSignal(signals, Boolean(element.needs_style_consistency || /consistent style|same style|3d|illustration/.test(description)), 'style_consistency_needed');
   pushSignal(signals, Boolean(element.needs_independent_adjustment), 'independent_adjustment_needed');
-  pushSignal(signals, areaRatio > 0.35 && COMPLEX_KINDS.has(kind), 'large_locked_art_candidate');
+  pushSignal(signals, Boolean(element.contains_flattened_text && element.requires_dom_overlay), 'flattened_text_conflicts_dom_overlay');
+  pushSignal(signals, areaRatio > 0.35 && COMPLEX_KINDS.has(kind) && kind !== 'complex_gradient', 'large_locked_art_candidate');
 
   let cutoutScore = 2;
   if (signals.includes('missing_bbox')) cutoutScore -= 2;
@@ -136,7 +140,7 @@ function scoreElement(element, canvas) {
 
   let regenerationScore = 0;
   if (COMPLEX_KINDS.has(kind)) regenerationScore += 2;
-  if (['person', 'character', 'mascot', 'cloud', 'skyline', 'landmark', 'globe', 'map', 'illustration'].includes(kind)) regenerationScore += 1;
+  if (['person', 'character', 'mascot', 'cloud', 'skyline', 'landmark', 'globe', 'map', 'illustration', 'complex_gradient'].includes(kind)) regenerationScore += 1;
   if (signals.includes('partially_occluded')) regenerationScore += 1;
   if (signals.includes('soft_edges')) regenerationScore += 1;
   if (signals.includes('style_consistency_needed')) regenerationScore += 1;
@@ -159,10 +163,17 @@ function expectedOutputFor(element, route) {
 function decideRoute(element, score) {
   const kind = normalizeKind(element.kind);
   if (TEXT_KINDS.has(kind)) return 'editable_text';
+  if (LOCKED_BASE_KINDS.has(kind) && element.contains_flattened_text && element.requires_dom_overlay) return 'review';
+  if (LOCKED_BASE_KINDS.has(kind)) return 'locked_base_layer';
   if (VECTOR_KINDS.has(kind)) return 'editable_vector';
   const requestedRoute = normalizeKind(element.route);
-  if (requestedRoute && isHardToVectorKind(kind) && HARD_TO_VECTOR_ALLOWED_ROUTES.has(requestedRoute)) return requestedRoute;
-  if (requestedRoute && !isHardToVectorKind(kind)) return requestedRoute;
+  if (requestedRoute && SOURCE_TRUTH_KINDS.has(kind)) {
+    if (SOURCE_TRUTH_ALLOWED_ROUTES.has(requestedRoute)) return requestedRoute;
+  } else if (requestedRoute && isHardToVectorKind(kind) && HARD_TO_VECTOR_ALLOWED_ROUTES.has(requestedRoute)) {
+    return requestedRoute;
+  } else if (requestedRoute && !isHardToVectorKind(kind)) {
+    return requestedRoute;
+  }
   if (score.signals.includes('missing_bbox') || score.signals.includes('missing_description')) return 'review';
   if (element.locked_base_layer || score.signals.includes('large_locked_art_candidate')) return 'locked_base_layer';
   if (element.omit || element.simplify) return 'omit_or_simplify';
@@ -218,6 +229,8 @@ function routeAssets(options) {
       requires_imagegen_prompt: route === 'regenerated_image',
       expected_output: expectedOutputFor({ ...element, id }, route),
       needs_independent_adjustment: Boolean(element.needs_independent_adjustment),
+      container_id: element.container_id || null,
+      clip_to_container: Boolean(element.clip_to_container),
     };
   });
 
