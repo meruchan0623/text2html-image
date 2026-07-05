@@ -67,13 +67,22 @@ Required evidence:
 
 - `reports/reverse-prompt-brief.md`: visual structure, text hierarchy, simple vector shapes, complex art subjects, decorative layers, and likely editable/localizable content.
 - `reports/asset-routing-table.json`: one route per meaningful visible element plus `cutout_feasibility`, `regeneration_fit`, difficulty signals, and decision reason.
+- `reports/route-contract-audit.json`: expected route validation from `npm run audit:routes -- --expected <expected-contract.json> --routing <asset-routing-table.json> --report <reports/route-contract-audit.json>`. Use `allowed_routes` when a route family is valid, and keep `forbidden_routes` authoritative.
 - `reports/asset-generation-prompts.json`: `prompt_only` ImageGen prompt packages for `regenerated_image` elements; these must request transparent PNG with alpha channel, forbid green screen / chroma key / matte backgrounds, and are not final assets.
+- `reports/imagegen-candidates.json`: returned ImageGen candidate audit from `npm run audit:imagegen`; accepted candidates need alpha extrema, transparent corners, and `transparency_method` provenance, while rejected candidates stay `blocked_from_final_html=true`.
 - `reports/split-art-assets.json`: each independent PNG asset, output path, placement, dimensions, z-index, alpha extrema, mask/debug path, and limitations.
 - `reports/asset-provenance.json`: source type for each complex art asset so CSS/SVG/PIL geometric placeholders cannot be mistaken for final art.
+- `reports/bitmap-layer-contract-audit.json`: HTML bitmap layer validation from `npm run audit:bitmap-layers -- --html <html/index.html> --provenance <asset-provenance.json> --report <reports/bitmap-layer-contract-audit.json>`. Every final `<img>` / SVG `<image>` layer must declare or inherit `data-asset-id`, resolve to the provenance path, and have final readiness plus `css_placement`.
+- `reports/source-truth-bitmap-audit.json`: source-truth bitmap validation from `npm run audit:source-truth -- --assets <asset-provenance.json> --report <reports/source-truth-bitmap-audit.json>`. QR/barcode assets must be local high-contrast bitmaps with provenance, final-ready status, source-preserving routes, and `css_filter_allowed=false`.
+- `reports/review-gate-contract-audit.json`: review-gate validation from `npm run audit:review-gates -- --html <html/index.html> --provenance <asset-provenance.json> --report <reports/review-gate-contract-audit.json>`. Review-gated assets must stay explicitly non-final, explain why or what is missing, and must not contain final-looking bitmap placeholders.
+- `reports/asset-readiness-audit.json`: final/review readiness validation from `npm run audit:asset-readiness -- --expected <expected-contract.json> --provenance <asset-provenance.json> --routing <asset-routing-table.json> --imagegen <imagegen-candidates.json> --review-gates <review-gate-contract-audit.json> --report <reports/asset-readiness-audit.json>`. Asset-like routes must have final-ready provenance or explicit review-gate coverage; prompt-only, rejected ImageGen candidates, planned cutouts, and flattened-text photo backgrounds cannot silently count as usable assets.
+- `reports/source-truth-acquisition-audit.json`: acquisition plan validation from `npm run audit:source-truth-acquisition -- --expected <expected-contract.json> --provenance <asset-provenance.json> --plan <source-truth-acquisition-plan.json> --review-gates <review-gate-contract-audit.json> --report <reports/source-truth-acquisition-audit.json>`. Review-gated QR/barcode/logo/icon/flag assets must name allowed real source types and explicitly forbid regenerated images, approximate redraws, and editable-vector substitutes.
 
 The visual brief is an intake and routing aid, not final business truth. OCR text, table content, prices, country/operator rows, QR/barcode assets, and legal copy still need DOM/source verification.
 
 Even if ImageGen returns a PNG, do not accept green-background channel images, chroma-key backgrounds, or colored matte backgrounds as transparent assets. Regenerate as real alpha PNG or reject before HTML composition.
+
+Use `npm run audit:imagegen -- --input <candidates.json> --report <reports/imagegen-candidates.json>` before adding any regenerated image to HTML. A visual-looking PNG is not enough; the report must prove alpha, record whether transparency came from `native_alpha`, `chroma_key_removed`, or `flood_cutout`, and unblock final HTML placement.
 
 When a subject may need later movement, scaling, replacement, localization, or independent tuning, keep it as a separate DOM node with explicit CSS placement. Do not fuse multiple independently adjustable art subjects into one PNG unless the user approves a locked composition.
 
@@ -125,10 +134,10 @@ It must fail-fast instead of silently degrading output when HTML/CSS requires un
 Use the cheapest proof that can catch the current failure mode, then escalate only when needed:
 
 1. Static DOM contract: no scripts, expected image count, editable text count, i18n/business key count, local asset existence, and `reports/dom-editability-report.json` status.
-2. Asset routing contract: reverse prompt brief, asset routing table with `cutout_feasibility` and `regeneration_fit`, prompt package, split art asset report, provenance report, resolved paths, and `old_geometric_css=false` for replaced art.
+2. Asset routing contract: reverse prompt brief, asset routing table with `cutout_feasibility` and `regeneration_fit`, route-contract audit, prompt package, split art asset report, provenance report, bitmap-layer contract audit, source-truth bitmap audit, review-gate contract audit, asset readiness audit, source-truth acquisition audit, resolved paths, and `old_geometric_css=false` for replaced art.
 3. HTML group consistency: canonical and localized variants share the expected structure and asset references.
 4. Render profile: direct renderer pass/fail and unsupported CSS reasons.
-5. Layout check: page overflow and cell/text overflow, especially for tables and long locale strings.
+5. Layout check: page overflow, cell/text overflow, and key-region overlap for cards, review gates, maps, tables, truth assets, and major copy blocks. Record the result as `layout-contract-audit.json` or an equivalent browser/layout report with coordinate evidence.
 6. Visual preview: browser screenshot against reference or accepted design.
 7. Export audit: PNG file count, language variants, scale variants, and pixel dimensions.
 
@@ -154,6 +163,7 @@ Run-level examples:
 - `runs/latest/reports/intake-report.json`
 - `runs/latest/reports/html-patch-report.json`
 - `runs/latest/reports/layout-impact-report.json`
+- `runs/latest/reports/layout-contract-audit.json`
 - `runs/latest/reports/dom-contract-report.json`
 - `runs/latest/reports/dom-editability-report.json`
 - `runs/latest/reports/dom-editability-summary.md`
@@ -180,6 +190,7 @@ visual-intake-manifest.json
 -> cutout-layer-package.json
 -> asset-routing-table.json
 -> dom-editability-report.json
+-> layout-contract-audit.json
 -> visual-review-round-NN.json
 ```
 
@@ -190,6 +201,8 @@ visual-intake-manifest.json
 `mask-quality-report.json` records alpha evidence and overlay paths for masks.
 
 `cutout-layer-package.json` records transparent PNG layer paths, mask paths, placement, z-index, and provenance.
+
+`layout-contract-audit.json` records page overflow, text/cell overflow, and key-region overlap evidence before visual scoring.
 
 `visual-review-round-NN.json` records screenshot comparison scores, evidence coordinates or DOM paths, and the next action.
 

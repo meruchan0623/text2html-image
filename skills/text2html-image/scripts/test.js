@@ -22,6 +22,14 @@ const { checkCopySchema } = require('./utils/copy-schema-core');
 const { runVisualIntake } = require('./utils/visual-intake-core');
 const { runCutoutDecompose } = require('./utils/cutout-decompose-core');
 const { validateVisualReviewReport } = require('./utils/visual-review-core');
+const { auditImagegenCandidate } = require('./utils/imagegen-candidate-core');
+const { auditLayoutContract } = require('./utils/layout-contract-core');
+const { auditExpectedRouteContract } = require('./utils/expected-route-contract-core');
+const { auditSourceTruthBitmaps } = require('./utils/source-truth-bitmap-core');
+const { auditBitmapLayerContract } = require('./utils/bitmap-layer-contract-core');
+const { auditReviewGateContract } = require('./utils/review-gate-contract-core');
+const { auditAssetReadinessContract } = require('./utils/asset-readiness-contract-core');
+const { auditSourceTruthAcquisitionPlan } = require('./utils/source-truth-acquisition-core');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -242,6 +250,13 @@ for (const script of [
   'visual-intake.js',
   'cutout-decompose.js',
   'visual-review.js',
+  'audit-imagegen-candidates.js',
+  'audit-expected-routes.js',
+  'audit-source-truth-bitmaps.js',
+  'audit-bitmap-layers.js',
+  'audit-review-gates.js',
+  'audit-asset-readiness.js',
+  'audit-source-truth-acquisition.js',
   'test.js',
 ]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
@@ -258,6 +273,13 @@ assert(packageJson.scripts['copy-schema'] === 'node scripts/copy-schema.js', 'pa
 assert(packageJson.scripts['visual:intake'] === 'node scripts/visual-intake.js', 'package.json missing visual:intake script');
 assert(packageJson.scripts['cutout:decompose'] === 'node scripts/cutout-decompose.js', 'package.json missing cutout:decompose script');
 assert(packageJson.scripts['visual:review'] === 'node scripts/visual-review.js', 'package.json missing visual:review script');
+assert(packageJson.scripts['audit:imagegen'] === 'node scripts/audit-imagegen-candidates.js', 'package.json missing audit:imagegen script');
+assert(packageJson.scripts['audit:routes'] === 'node scripts/audit-expected-routes.js', 'package.json missing audit:routes script');
+assert(packageJson.scripts['audit:source-truth'] === 'node scripts/audit-source-truth-bitmaps.js', 'package.json missing audit:source-truth script');
+assert(packageJson.scripts['audit:bitmap-layers'] === 'node scripts/audit-bitmap-layers.js', 'package.json missing audit:bitmap-layers script');
+assert(packageJson.scripts['audit:review-gates'] === 'node scripts/audit-review-gates.js', 'package.json missing audit:review-gates script');
+assert(packageJson.scripts['audit:asset-readiness'] === 'node scripts/audit-asset-readiness.js', 'package.json missing audit:asset-readiness script');
+assert(packageJson.scripts['audit:source-truth-acquisition'] === 'node scripts/audit-source-truth-acquisition.js', 'package.json missing audit:source-truth-acquisition script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
   assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
@@ -390,6 +412,14 @@ assert(skillBody.includes('green screen, green background, chroma key background
 assert(skillBody.includes('transparent PNG with alpha channel'), 'skill must require transparent PNG with alpha channel in regenerated prompts');
 assert(skillBody.includes('## Flood Cutout Asset Cleanup'), 'skill must document flood cutout asset cleanup');
 assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cutout command');
+assert(skillBody.includes('npm run audit:imagegen'), 'skill must document audit:imagegen command');
+assert(skillBody.includes('npm run audit:asset-readiness'), 'skill must document audit:asset-readiness command');
+assert(skillBody.includes('npm run audit:source-truth-acquisition'), 'skill must document audit:source-truth-acquisition command');
+assert(skillBody.includes('--routing <asset-routing-table.json>'), 'skill must document asset-readiness routing input');
+assert(skillBody.includes('source type or route, source/output path, dimensions, checksum, and license/source scope'), 'skill must document final source-truth metadata requirements');
+assert(skillBody.includes('blocking_condition') && skillBody.includes('evidence_required'), 'skill must document source-truth acquisition blocker metadata requirements');
+assert(skillBody.includes('reports/imagegen-candidates.json'), 'skill must document imagegen candidate audit report');
+assert(skillBody.includes('transparency_method'), 'skill must document ImageGen transparency provenance metadata');
 assert(skillBody.includes('*-mask-debug.png'), 'skill must require mask debug output');
 assert(skillBody.includes('*-cutout-report.json'), 'skill must require cutout report output');
 assert(skillBody.includes('PNG layers must not contain poster-level title'), 'skill must forbid localized poster text in PNG layers');
@@ -435,10 +465,26 @@ assert(skillBody.includes('Do not claim browser annotation was used unless the c
 const executionFlow = read('references/execution-flow.md');
 assert(executionFlow.includes('Reference Image Asset Routing'), 'execution flow must document reference image asset routing');
 assert(executionFlow.includes('asset-routing-table.json'), 'execution flow must include asset routing table evidence');
+assert(executionFlow.includes('npm run audit:routes'), 'execution flow must include expected route contract audit command');
+assert(executionFlow.includes('route-contract-audit.json'), 'execution flow must include expected route contract audit evidence');
+assert(executionFlow.includes('npm run audit:source-truth'), 'execution flow must include source-truth bitmap audit command');
+assert(executionFlow.includes('source-truth-bitmap-audit.json'), 'execution flow must include source-truth bitmap audit evidence');
+assert(executionFlow.includes('npm run audit:bitmap-layers'), 'execution flow must include bitmap layer contract audit command');
+assert(executionFlow.includes('bitmap-layer-contract-audit.json'), 'execution flow must include bitmap layer contract audit evidence');
+assert(executionFlow.includes('npm run audit:review-gates'), 'execution flow must include review-gate audit command');
+assert(executionFlow.includes('review-gate-contract-audit.json'), 'execution flow must include review-gate audit evidence');
+assert(executionFlow.includes('npm run audit:asset-readiness'), 'execution flow must include asset readiness audit command');
+assert(executionFlow.includes('asset-readiness-audit.json'), 'execution flow must include asset readiness audit evidence');
+assert(executionFlow.includes('npm run audit:source-truth-acquisition'), 'execution flow must include source-truth acquisition audit command');
+assert(executionFlow.includes('source-truth-acquisition-audit.json'), 'execution flow must include source-truth acquisition audit evidence');
+assert(executionFlow.includes('--routing <asset-routing-table.json>'), 'execution flow must document asset readiness routing input');
 assert(executionFlow.includes('asset-provenance.json'), 'execution flow must include asset provenance evidence');
 assert(executionFlow.includes('split-art-assets.json'), 'execution flow must include split art assets evidence');
 assert(executionFlow.includes('asset-generation-prompts.json'), 'execution flow must include generated prompt package evidence');
 assert(executionFlow.includes('transparent PNG with alpha channel'), 'execution flow must require transparent PNG ImageGen prompts');
+assert(executionFlow.includes('npm run audit:imagegen'), 'execution flow must include ImageGen candidate audit command');
+assert(executionFlow.includes('reports/imagegen-candidates.json'), 'execution flow must include ImageGen candidate report');
+assert(executionFlow.includes('transparency_method'), 'execution flow must document ImageGen transparency provenance metadata');
 assert(executionFlow.includes('green-background channel images'), 'execution flow must reject green-background channel images');
 assert(executionFlow.includes('人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分'), 'execution flow must include the fixed complex asset routing prompt');
 assert(executionFlow.includes('visual-intake-manifest.json'), 'execution flow must document visual intake manifest');
@@ -446,6 +492,8 @@ assert(executionFlow.includes('element-decomposition-plan.json'), 'execution flo
 assert(executionFlow.includes('mask-quality-report.json'), 'execution flow must document mask quality report');
 assert(executionFlow.includes('cutout-layer-package.json'), 'execution flow must document cutout layer package');
 assert(executionFlow.includes('visual-review-round-NN.json'), 'execution flow must document visual review rounds');
+assert(executionFlow.includes('layout-contract-audit.json'), 'execution flow must include key-region layout contract evidence');
+assert(executionFlow.includes('key-region overlap'), 'execution flow must require key-region overlap checks');
 assert(executionFlow.includes('dom-editability-report.json'), 'execution flow must include DOM editability report');
 assert(executionFlow.includes('dom-editability-summary.md'), 'execution flow must include DOM editability summary');
 assert(executionFlow.includes('plain-text reports must include local HTML file paths'), 'execution flow must require local HTML file paths in plain-text reports');
@@ -480,7 +528,10 @@ assert(stageGuides.includes('Visual intake is a hypothesis package'), 'stage gui
 assert(stageGuides.includes('Cutout decomposition is not a provider client'), 'stage guides must document provider-neutral cutout decomposition');
 assert(stageGuides.includes('Mask quality requires alpha evidence'), 'stage guides must document alpha evidence for masks');
 assert(stageGuides.includes('ImageGen / Codex image generation must request transparent PNG with alpha channel'), 'stage guides must require alpha PNG ImageGen assets');
+assert(stageGuides.includes('npm run audit:imagegen'), 'stage guides must require ImageGen candidate audit command');
 assert(stageGuides.includes('green screen, green background, chroma key background'), 'stage guides must forbid green/chroma-key ImageGen backgrounds');
+assert(stageGuides.includes('edge_fringe_green_ratio'), 'stage guide must preserve explicit fringe ratio evidence');
+assert(stageGuides.includes('explicit fringe evidence blocks final HTML'), 'stage guide must state that explicit fringe evidence blocks final HTML');
 assert(stageGuides.includes('real PNG with alpha channel'), 'stage guides must keep regenerated_image prompt-only until real alpha PNG exists');
 assert(stageGuides.includes('Current preview edit checklist'), 'stage guides must document current preview edits');
 assert(stageGuides.includes('Detached outputs path checklist'), 'stage guides must document detached output path checks');
@@ -1127,6 +1178,50 @@ const routeElements = {
       bbox: { x: 500, y: 220, w: 40, h: 40 },
     },
     {
+      id: 'activation-qr',
+      kind: 'qr',
+      route: 'editable_vector',
+      description: 'high contrast scannable QR code block for activation',
+      bbox: { x: 700, y: 120, w: 112, h: 112 },
+    },
+    {
+      id: 'ticket-barcode',
+      kind: 'barcode',
+      route: 'editable_vector',
+      description: 'high contrast scannable barcode strip',
+      bbox: { x: 650, y: 260, w: 180, h: 48 },
+    },
+    {
+      id: 'wallet-payment-logo',
+      kind: 'payment_logo',
+      route: 'editable_vector',
+      description: 'brand-like payment logo mark that must remain source-accurate',
+      bbox: { x: 710, y: 340, w: 96, h: 42 },
+    },
+    {
+      id: 'country-flag-jp',
+      kind: 'country_flag',
+      route: 'regenerated_image',
+      description: 'Japan country flag with semantic identity requirement',
+      bbox: { x: 720, y: 410, w: 54, h: 36 },
+    },
+    {
+      id: 'airline-route-lines',
+      kind: 'route_lines',
+      description: 'dozens of airline route curves clipped inside the map card',
+      bbox: { x: 140, y: 520, w: 520, h: 280 },
+      container_id: 'route-map',
+      clip_to_container: true,
+    },
+    {
+      id: 'map-route-points',
+      kind: 'route_points',
+      description: 'simple glowing map connection points clipped inside the map card',
+      bbox: { x: 180, y: 560, w: 430, h: 210 },
+      container_id: 'route-map',
+      clip_to_container: true,
+    },
+    {
       id: 'route-map',
       kind: 'map',
       description: 'decorative map background that is hard to recreate with geometry',
@@ -1163,10 +1258,76 @@ const routeElements = {
       bbox: { x: 260, y: 80, w: 340, h: 64 },
     },
     {
+      id: 'pricing-table',
+      kind: 'table',
+      description: 'pricing comparison table with selectable plan names prices and feature cells',
+      bbox: { x: 160, y: 760, w: 520, h: 260 },
+    },
+    {
+      id: 'feature-matrix',
+      kind: 'feature_matrix',
+      description: 'feature matrix with checkmarks plan names and multilingual values',
+      bbox: { x: 160, y: 820, w: 520, h: 190 },
+    },
+    {
+      id: 'language-tabs',
+      kind: 'multilingual_copy',
+      description: 'Japanese Traditional Chinese and English language selector copy',
+      bbox: { x: 690, y: 80, w: 160, h: 130 },
+    },
+    {
+      id: 'airport-photo-bg',
+      kind: 'photo_background',
+      description: 'airport terminal photography background that should remain locked visual context',
+      bbox: { x: 0, y: 0, w: 900, h: 460 },
+    },
+    {
+      id: 'airport-photo-with-flattened-copy',
+      kind: 'photo_background',
+      description: 'airport terminal photo crop that still contains flattened headline text behind required DOM copy',
+      bbox: { x: 0, y: 0, w: 900, h: 460 },
+      contains_flattened_text: true,
+      requires_dom_overlay: true,
+    },
+    {
+      id: 'marketing-copy-layer',
+      kind: 'editable_text',
+      description: 'marketing headline and subtitle that must remain selectable DOM text',
+      bbox: { x: 60, y: 70, w: 520, h: 130 },
+    },
+    {
       id: 'card-grid',
       kind: 'card',
       description: 'regular rounded app icon card grid',
       bbox: { x: 140, y: 190, w: 540, h: 660 },
+    },
+    {
+      id: 'glass-dashboard',
+      kind: 'dashboard_widget',
+      description: 'glassmorphism SaaS dashboard card with chart and data labels',
+      bbox: { x: 540, y: 520, w: 300, h: 220 },
+    },
+    {
+      id: 'volumetric-glow',
+      kind: 'complex_gradient',
+      description: 'soft volumetric lighting glow and particles over the poster background',
+      bbox: { x: 0, y: 0, w: 900, h: 1200 },
+      soft_edges: true,
+      needs_style_consistency: true,
+    },
+    {
+      id: 'decorative-particles',
+      kind: 'particle',
+      description: 'tiny decorative floating particles that may be omitted for readability',
+      bbox: { x: 0, y: 0, w: 900, h: 1200 },
+      omit: true,
+    },
+    {
+      id: 'card-shadow',
+      kind: 'shadow',
+      description: 'simple layered card shadow that should be simplified as CSS effect',
+      bbox: { x: 90, y: 460, w: 620, h: 260 },
+      simplify: true,
     },
     {
       id: 'unknown-art',
@@ -1183,18 +1344,45 @@ const routeReport = routeAssets({
 const appIconRoute = routeReport.routing.elements.find((item) => item.id === 'app-icon');
 const softAppIconRoute = routeReport.routing.elements.find((item) => item.id === 'soft-app-icon');
 const monoToolIconRoute = routeReport.routing.elements.find((item) => item.id === 'mono-tool-icon');
+const activationQrRoute = routeReport.routing.elements.find((item) => item.id === 'activation-qr');
+const ticketBarcodeRoute = routeReport.routing.elements.find((item) => item.id === 'ticket-barcode');
+const walletPaymentLogoRoute = routeReport.routing.elements.find((item) => item.id === 'wallet-payment-logo');
+const countryFlagRoute = routeReport.routing.elements.find((item) => item.id === 'country-flag-jp');
+const airlineRouteLinesRoute = routeReport.routing.elements.find((item) => item.id === 'airline-route-lines');
+const mapRoutePointsRoute = routeReport.routing.elements.find((item) => item.id === 'map-route-points');
 const mapRoute = routeReport.routing.elements.find((item) => item.id === 'route-map');
 const cloudRoute = routeReport.routing.elements.find((item) => item.id === 'cloud-layer');
 const skylineRoute = routeReport.routing.elements.find((item) => item.id === 'skyline-layer');
 const travelerRoute = routeReport.routing.elements.find((item) => item.id === 'traveler');
 const headlineRoute = routeReport.routing.elements.find((item) => item.id === 'headline');
+const pricingTableRoute = routeReport.routing.elements.find((item) => item.id === 'pricing-table');
+const featureMatrixRoute = routeReport.routing.elements.find((item) => item.id === 'feature-matrix');
+const languageTabsRoute = routeReport.routing.elements.find((item) => item.id === 'language-tabs');
+const airportPhotoBgRoute = routeReport.routing.elements.find((item) => item.id === 'airport-photo-bg');
+const airportPhotoWithFlattenedCopyRoute = routeReport.routing.elements.find((item) => item.id === 'airport-photo-with-flattened-copy');
+const marketingCopyLayerRoute = routeReport.routing.elements.find((item) => item.id === 'marketing-copy-layer');
 const cardRoute = routeReport.routing.elements.find((item) => item.id === 'card-grid');
+const glassDashboardRoute = routeReport.routing.elements.find((item) => item.id === 'glass-dashboard');
+const volumetricGlowRoute = routeReport.routing.elements.find((item) => item.id === 'volumetric-glow');
+const decorativeParticlesRoute = routeReport.routing.elements.find((item) => item.id === 'decorative-particles');
+const cardShadowRoute = routeReport.routing.elements.find((item) => item.id === 'card-shadow');
 const unknownRoute = routeReport.routing.elements.find((item) => item.id === 'unknown-art');
 assert(appIconRoute.route === 'reference_cutout', 'clear hard-boundary icon should route to reference_cutout');
 assert(appIconRoute.cutout_feasibility === 'high', 'clear icon should have high cutout feasibility');
 assert(softAppIconRoute.route === 'regenerated_image', 'soft complex app icon should route to regenerated_image');
 assert(softAppIconRoute.requires_imagegen_prompt === true, 'soft complex app icon should require ImageGen prompt');
 assert(monoToolIconRoute.route === 'editable_vector', 'simple_icon should remain editable_vector');
+for (const mapOverlayRoute of [airlineRouteLinesRoute, mapRoutePointsRoute]) {
+  assert(mapOverlayRoute.route === 'editable_vector', `${mapOverlayRoute.id} should route to editable_vector`);
+  assert(mapOverlayRoute.clip_to_container === true, `${mapOverlayRoute.id} should preserve clip_to_container`);
+  assert(mapOverlayRoute.container_id === 'route-map', `${mapOverlayRoute.id} should preserve container_id`);
+}
+for (const bitmapTruthRoute of [activationQrRoute, ticketBarcodeRoute, walletPaymentLogoRoute, countryFlagRoute]) {
+  assert(bitmapTruthRoute.route !== 'editable_vector', `${bitmapTruthRoute.id} must not accept requested editable_vector route`);
+  assert(bitmapTruthRoute.route !== 'editable_text', `${bitmapTruthRoute.id} must not route to editable_text`);
+  assert(bitmapTruthRoute.route !== 'regenerated_image', `${bitmapTruthRoute.id} must not route to regenerated_image`);
+  assert(['reference_cutout', 'locked_base_layer', 'review'].includes(bitmapTruthRoute.route), `${bitmapTruthRoute.id} must preserve bitmap/source truth or require review`);
+}
 for (const complexRoute of [appIconRoute, softAppIconRoute, mapRoute, cloudRoute, skylineRoute, travelerRoute]) {
   assert(complexRoute.route !== 'editable_vector', `${complexRoute.id} must not route to editable_vector`);
   assert(complexRoute.route !== 'editable_text', `${complexRoute.id} must not route to editable_text`);
@@ -1204,7 +1392,19 @@ assert(travelerRoute.cutout_feasibility === 'low', 'occluded person should have 
 assert(travelerRoute.regeneration_fit === 'high', 'occluded person should have high regeneration fit');
 assert(travelerRoute.requires_imagegen_prompt === true, 'regenerated image route should require ImageGen prompt');
 assert(headlineRoute.route === 'editable_text', 'text element should route to editable_text');
+for (const domTextRoute of [pricingTableRoute, featureMatrixRoute, languageTabsRoute]) {
+  assert(domTextRoute.route === 'editable_text', `${domTextRoute.id} should route to editable_text`);
+}
+assert(airportPhotoBgRoute.route === 'locked_base_layer', 'photo_background should route to locked_base_layer');
+assert(airportPhotoWithFlattenedCopyRoute.route === 'review', 'photo_background with flattened text behind DOM overlay should route to review');
+assert(airportPhotoWithFlattenedCopyRoute.difficulty_signals.includes('flattened_text_conflicts_dom_overlay'), 'photo_background review should record flattened text DOM overlay conflict');
+assert(marketingCopyLayerRoute.route === 'editable_text', 'editable_text kind should route to editable_text');
 assert(cardRoute.route === 'editable_vector', 'card element should route to editable_vector');
+assert(glassDashboardRoute.route === 'editable_vector', 'dashboard_widget should route to editable_vector');
+assert(volumetricGlowRoute.route === 'regenerated_image', 'complex_gradient should route to regenerated_image');
+assert(volumetricGlowRoute.requires_imagegen_prompt === true, 'complex_gradient regenerated route should require ImageGen prompt');
+assert(decorativeParticlesRoute.route === 'omit_or_simplify', 'omitted particle effects should route to omit_or_simplify');
+assert(cardShadowRoute.route === 'omit_or_simplify', 'simplified shadows should route to omit_or_simplify');
 assert(unknownRoute.status === 'review', 'missing bbox or description should require review');
 assert(routeReport.prompts.prompts.length >= 2, 'regenerated_image elements should get prompt packages');
 assert(routeReport.prompts.prompts[0].status === 'prompt_only', 'generated prompt package should be prompt_only');
@@ -1240,6 +1440,85 @@ for (const reportName of [
 const routeTable = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'asset-routing-table.json'), 'utf8'));
 assert(routeTable.elements.every((item) => item.cutout_feasibility && item.regeneration_fit), 'routing table should include difficulty fields');
 assert(routeTable.elements.filter((item) => ['app_icon', 'application_icon', 'complex_icon', 'person', 'map', 'cloud', 'skyline'].includes(item.kind)).every((item) => !['editable_vector', 'editable_text'].includes(item.route)), 'hard-to-vector assets must not route to editable vector/text');
+assert(routeTable.elements.filter((item) => ['qr', 'barcode', 'payment_logo', 'country_flag'].includes(item.kind)).every((item) => !['editable_vector', 'editable_text', 'regenerated_image'].includes(item.route)), 'bitmap/source-truth assets must not route to editable vector/text or regenerated image');
+assert(routeTable.elements.filter((item) => ['route_lines', 'route_points'].includes(item.kind)).every((item) => item.route === 'editable_vector' && item.clip_to_container === true && item.container_id), 'map route overlays must be clipped editable vectors');
+const exactRouteContractAudit = auditExpectedRouteContract({
+  expectedContract: {
+    case_id: 'unit-route-exact',
+    required_routes: [
+      {
+        element_id: 'traveler',
+        kind: 'person',
+        expected_route: 'reference_cutout',
+        forbidden_routes: ['editable_vector', 'editable_text'],
+        reason: 'person must remain bitmap/review truth',
+      },
+    ],
+  },
+  routingTable: {
+    elements: [
+      {
+        id: 'traveler',
+        kind: 'person',
+        route: 'regenerated_image',
+      },
+    ],
+  },
+});
+assert(exactRouteContractAudit.status === 'fail', 'exact expected route mismatch should fail without allowed_routes');
+assert(exactRouteContractAudit.failures.some((failure) => failure.code === 'route_mismatch'), 'exact expected route mismatch should report route_mismatch');
+const allowedRouteContractAudit = auditExpectedRouteContract({
+  expectedContract: {
+    case_id: 'unit-route-allowed-family',
+    required_routes: [
+      {
+        element_id: 'traveler',
+        kind: 'person',
+        expected_route: 'reference_cutout',
+        allowed_routes: ['reference_cutout', 'regenerated_image', 'locked_base_layer', 'review'],
+        forbidden_routes: ['editable_vector', 'editable_text'],
+        reason: 'person must remain bitmap/review truth',
+      },
+    ],
+  },
+  routingTable: {
+    elements: [
+      {
+        id: 'traveler',
+        kind: 'person',
+        route: 'regenerated_image',
+      },
+    ],
+  },
+});
+assert(allowedRouteContractAudit.status === 'pass', 'allowed_routes should permit valid route-family alternatives');
+assert(allowedRouteContractAudit.results[0].route_match_type === 'allowed_route', 'allowed route-family pass should record allowed_route match type');
+const forbiddenRouteContractAudit = auditExpectedRouteContract({
+  expectedContract: {
+    case_id: 'unit-route-forbidden',
+    required_routes: [
+      {
+        element_id: 'activation_qr',
+        kind: 'qr',
+        expected_route: 'reference_cutout',
+        allowed_routes: ['reference_cutout', 'review'],
+        forbidden_routes: ['editable_vector', 'editable_text', 'regenerated_image'],
+        reason: 'QR must remain source truth',
+      },
+    ],
+  },
+  routingTable: {
+    elements: [
+      {
+        id: 'activation_qr',
+        kind: 'qr',
+        route: 'regenerated_image',
+      },
+    ],
+  },
+});
+assert(forbiddenRouteContractAudit.status === 'fail', 'forbidden routes must fail even when route families exist');
+assert(forbiddenRouteContractAudit.failures.some((failure) => failure.code === 'forbidden_route'), 'forbidden route should report forbidden_route');
 const promptPackage = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'asset-generation-prompts.json'), 'utf8'));
 assert(promptPackage.prompts.every((item) => item.route === 'regenerated_image'), 'prompt package should only include regenerated_image elements');
 assert(promptPackage.prompts.every((item) => item.status === 'prompt_only'), 'prompt package entries should remain prompt_only');
@@ -1250,6 +1529,648 @@ assert(promptPackage.prompts.every((item) => item.required_format === 'png'), 'w
 assert(promptPackage.prompts.every((item) => item.requires_alpha_channel === true), 'written prompt package should include alpha-channel requirement');
 assert(promptPackage.prompts.every((item) => item.exterior_alpha === 0), 'written prompt package should include exterior alpha 0');
 assert(promptPackage.prompts.every((item) => item.forbidden_backgrounds.includes('green background') && item.forbidden_backgrounds.includes('white matte') && item.forbidden_backgrounds.includes('gradient background')), 'written prompt package should list forbidden solid/matte backgrounds');
+
+const opaqueCandidatePath = path.join(projectPaths.working, 'imagegen-opaque-rgb-candidate.png');
+const opaqueCandidatePng = new PNG({ width: 10, height: 10 });
+for (let index = 0; index < opaqueCandidatePng.data.length; index += 4) {
+  opaqueCandidatePng.data[index] = 232;
+  opaqueCandidatePng.data[index + 1] = 235;
+  opaqueCandidatePng.data[index + 2] = 238;
+  opaqueCandidatePng.data[index + 3] = 255;
+}
+fs.writeFileSync(opaqueCandidatePath, PNG.sync.write(opaqueCandidatePng, { colorType: 2 }));
+const opaqueCandidateAudit = auditImagegenCandidate({
+  id: 'volumetric_glow_candidate_01',
+  routeTarget: 'volumetric_glow',
+  outputPath: opaqueCandidatePath,
+  prompt: 'transparent PNG with alpha channel for soft volumetric light',
+});
+assert(opaqueCandidateAudit.accepted === false, 'RGB/no-alpha ImageGen candidate must be rejected');
+assert(opaqueCandidateAudit.status === 'rejected', 'RGB/no-alpha candidate should have rejected status');
+assert(opaqueCandidateAudit.edge_fringe_issues.includes('no_alpha_channel'), 'RGB/no-alpha candidate should report no_alpha_channel');
+assert(opaqueCandidateAudit.rejection_reason.includes('alpha'), 'RGB/no-alpha candidate rejection should explain alpha failure');
+assert(opaqueCandidateAudit.blocked_from_final_html === true, 'rejected ImageGen candidate must be blocked from final HTML');
+assert(opaqueCandidateAudit.alpha_extrema === null, 'RGB/no-alpha candidate should not invent alpha extrema');
+
+const transparentCandidatePath = path.join(projectPaths.working, 'imagegen-transparent-alpha-candidate.png');
+const transparentCandidatePng = new PNG({ width: 10, height: 10 });
+for (let y = 0; y < transparentCandidatePng.height; y += 1) {
+  for (let x = 0; x < transparentCandidatePng.width; x += 1) {
+    const offset = (transparentCandidatePng.width * y + x) << 2;
+    const inside = x >= 3 && x <= 6 && y >= 3 && y <= 6;
+    transparentCandidatePng.data[offset] = inside ? 32 : 0;
+    transparentCandidatePng.data[offset + 1] = inside ? 140 : 0;
+    transparentCandidatePng.data[offset + 2] = inside ? 220 : 0;
+    transparentCandidatePng.data[offset + 3] = inside ? 255 : 0;
+  }
+}
+fs.writeFileSync(transparentCandidatePath, PNG.sync.write(transparentCandidatePng));
+const transparentCandidateAudit = auditImagegenCandidate({
+  id: 'cloud_layers_candidate_01',
+  routeTarget: 'cloud_layers',
+  outputPath: transparentCandidatePath,
+  prompt: 'transparent PNG with alpha channel for decorative clouds',
+  transparency_method: 'native_alpha',
+  alpha_source: 'model_native_transparent_png',
+});
+assert(transparentCandidateAudit.accepted === true, 'candidate with transparent exterior and opaque subject should be accepted');
+assert(transparentCandidateAudit.status === 'accepted', 'accepted candidate should have accepted status');
+assert(transparentCandidateAudit.alpha_extrema.min === 0 && transparentCandidateAudit.alpha_extrema.max === 255, 'accepted candidate should record alpha extrema');
+assert(transparentCandidateAudit.transparent_corner_count === 4, 'accepted candidate should record transparent corners');
+assert(transparentCandidateAudit.blocked_from_final_html === false, 'accepted candidate should not be blocked from final HTML');
+assert(transparentCandidateAudit.transparency_provenance?.method === 'native_alpha', 'accepted native-alpha candidate should record transparency method');
+
+const missingTransparencyProvenanceAudit = auditImagegenCandidate({
+  id: 'cloud_layers_missing_transparency_method',
+  routeTarget: 'cloud_layers',
+  outputPath: transparentCandidatePath,
+  prompt: 'transparent PNG with alpha channel for decorative clouds',
+});
+assert(missingTransparencyProvenanceAudit.accepted === false, 'alpha PNG candidate without transparency provenance must be rejected');
+assert(missingTransparencyProvenanceAudit.edge_fringe_issues.includes('missing_transparency_method'), 'missing provenance candidate should report missing_transparency_method');
+const chromaMissingEvidenceAudit = auditImagegenCandidate({
+  id: 'phone_chroma_missing_evidence',
+  routeTarget: 'phone_shell',
+  outputPath: transparentCandidatePath,
+  prompt: 'phone shell cutout from flat #00ff00 chroma-key background',
+  transparency_method: 'chroma_key_removed',
+  alpha_source: 'local_chroma_key_removal',
+});
+assert(chromaMissingEvidenceAudit.accepted === false, 'chroma-removed candidate without source/report evidence must be rejected');
+assert(chromaMissingEvidenceAudit.edge_fringe_issues.includes('missing_source_chroma_path'), 'chroma-removed candidate should require source_chroma_path');
+assert(chromaMissingEvidenceAudit.edge_fringe_issues.includes('missing_postprocess_report_path'), 'chroma-removed candidate should require postprocess_report_path');
+const chromaPostprocessReportPath = path.join(projectPaths.reports, 'unit-chroma-postprocess-report.json');
+fs.writeFileSync(chromaPostprocessReportPath, JSON.stringify({
+  tool: 'remove_chroma_key.py',
+  input: opaqueCandidatePath,
+  output: transparentCandidatePath,
+  method: 'chroma_key_removed',
+}, null, 2));
+const chromaWithEvidenceAudit = auditImagegenCandidate({
+  id: 'phone_chroma_with_evidence',
+  routeTarget: 'phone_shell',
+  outputPath: transparentCandidatePath,
+  prompt: 'phone shell cutout from flat #00ff00 chroma-key background',
+  transparency_method: 'chroma_key_removed',
+  alpha_source: 'local_chroma_key_removal',
+  source_chroma_path: opaqueCandidatePath,
+  postprocess_report_path: chromaPostprocessReportPath,
+});
+assert(chromaWithEvidenceAudit.accepted === true, 'chroma-removed candidate with source and postprocess report evidence can be accepted');
+assert(chromaWithEvidenceAudit.transparency_provenance.postprocess_report_exists === true, 'chroma evidence should confirm postprocess report exists');
+
+const sourceTruthQrPath = path.join(projectPaths.working, 'source-truth-qr-high-contrast.png');
+const sourceTruthQrPng = new PNG({ width: 20, height: 20 });
+for (let y = 0; y < sourceTruthQrPng.height; y += 1) {
+  for (let x = 0; x < sourceTruthQrPng.width; x += 1) {
+    const offset = (sourceTruthQrPng.width * y + x) << 2;
+    const value = (x + y) % 2 === 0 ? 0 : 255;
+    sourceTruthQrPng.data[offset] = value;
+    sourceTruthQrPng.data[offset + 1] = value;
+    sourceTruthQrPng.data[offset + 2] = value;
+    sourceTruthQrPng.data[offset + 3] = 255;
+  }
+}
+fs.writeFileSync(sourceTruthQrPath, PNG.sync.write(sourceTruthQrPng));
+const lowContrastBarcodePath = path.join(projectPaths.working, 'source-truth-barcode-low-contrast.png');
+const lowContrastBarcodePng = new PNG({ width: 40, height: 12 });
+for (let y = 0; y < lowContrastBarcodePng.height; y += 1) {
+  for (let x = 0; x < lowContrastBarcodePng.width; x += 1) {
+    const offset = (lowContrastBarcodePng.width * y + x) << 2;
+    const value = x % 2 === 0 ? 120 : 145;
+    lowContrastBarcodePng.data[offset] = value;
+    lowContrastBarcodePng.data[offset + 1] = value;
+    lowContrastBarcodePng.data[offset + 2] = value;
+    lowContrastBarcodePng.data[offset + 3] = 255;
+  }
+}
+fs.writeFileSync(lowContrastBarcodePath, PNG.sync.write(lowContrastBarcodePng));
+const sourceTruthAudit = auditSourceTruthBitmaps({
+  assets: [
+    {
+      id: 'activation_qr',
+      route: 'reference_cutout',
+      path: sourceTruthQrPath,
+      asset_source_type: 'local_deterministic_truth_asset',
+      final_asset_ready: true,
+      css_filter_allowed: false,
+      symbology: 'QR',
+    },
+    {
+      id: 'bad_barcode',
+      kind: 'barcode',
+      route: 'regenerated_image',
+      path: lowContrastBarcodePath,
+      asset_source_type: '',
+      final_asset_ready: true,
+      css_filter_allowed: true,
+      symbology: 'Code39',
+    },
+  ],
+});
+const qrSourceTruth = sourceTruthAudit.assets.find((asset) => asset.id === 'activation_qr');
+const badBarcodeTruth = sourceTruthAudit.assets.find((asset) => asset.id === 'bad_barcode');
+assert(sourceTruthAudit.status === 'fail', 'mixed source-truth bitmap audit should fail when one asset is invalid');
+assert(qrSourceTruth.status === 'pass', 'valid high-contrast QR source-truth bitmap should pass');
+assert(qrSourceTruth.high_contrast.pass === true, 'valid QR should record high-contrast pass');
+assert(badBarcodeTruth.status === 'fail', 'invalid barcode source-truth bitmap should fail');
+assert(badBarcodeTruth.failures.some((failure) => failure.code === 'forbidden_source_truth_route'), 'source-truth barcode must reject regenerated route');
+assert(badBarcodeTruth.failures.some((failure) => failure.code === 'css_filter_allowed'), 'source-truth barcode must reject CSS filter allowance');
+assert(badBarcodeTruth.failures.some((failure) => failure.code === 'low_contrast_bitmap'), 'source-truth barcode must reject low contrast');
+
+const bitmapLayerHtmlPath = path.join(projectPaths.working, 'bitmap-layer-contract.html');
+fs.writeFileSync(bitmapLayerHtmlPath, `<!doctype html>
+<html>
+<body>
+  <main class="poster" style="width: 400px; height: 300px">
+    <figure class="qr-card" data-asset-id="activation_qr" data-route="reference_cutout" data-final-asset-ready="true">
+      <img class="qr-code" src="${sourceTruthQrPath}" width="20" height="20" data-asset-text-policy="no-text" data-source-truth="true">
+    </figure>
+    <img class="floating-bitmap" src="${lowContrastBarcodePath}" data-asset-text-policy="no-text">
+  </main>
+</body>
+</html>`);
+const bitmapLayerContractAudit = auditBitmapLayerContract({
+  htmlPath: bitmapLayerHtmlPath,
+  provenance: {
+    assets: [
+      {
+        id: 'activation_qr',
+        path: sourceTruthQrPath,
+        route: 'reference_cutout',
+        asset_source_type: 'local_deterministic_truth_asset',
+        final_asset_ready: true,
+        css_placement: { selector: '.qr-card img', width: 20, height: 20, z_index: 'normal' },
+      },
+    ],
+  },
+});
+assert(bitmapLayerContractAudit.status === 'fail', 'bitmap layer contract should fail when one HTML bitmap lacks provenance');
+const validLayer = bitmapLayerContractAudit.layers.find((layer) => layer.asset_id === 'activation_qr');
+const invalidLayer = bitmapLayerContractAudit.layers.find((layer) => layer.src && layer.src.endsWith('source-truth-barcode-low-contrast.png'));
+assert(validLayer.status === 'pass', 'valid bitmap layer should pass provenance and placement contract');
+assert(invalidLayer.status === 'fail', 'bitmap layer without asset id/provenance should fail');
+assert(invalidLayer.failures.some((failure) => failure.code === 'missing_asset_id'), 'invalid bitmap layer should report missing asset id');
+assert(invalidLayer.failures.some((failure) => failure.code === 'missing_provenance'), 'invalid bitmap layer should report missing provenance');
+assert(bitmapLayerContractAudit.summary.pass_count === 1 && bitmapLayerContractAudit.summary.fail_count === 1, 'bitmap layer contract should summarize pass/fail layers');
+
+const reviewGateHtmlPath = path.join(projectPaths.working, 'review-gate-contract.html');
+fs.writeFileSync(reviewGateHtmlPath, `<!doctype html>
+<html>
+<body>
+  <main class="poster" style="width: 400px; height: 300px">
+    <section data-route="review" data-asset-id="traveler" data-final-asset-ready="false">
+      <p>Traveler remains under review until an accepted transparent cutout exists.</p>
+    </section>
+    <section data-route="review" data-asset-id="fake-map">
+      <img src="${sourceTruthQrPath}" data-asset-text-policy="no-text">
+    </section>
+  </main>
+</body>
+</html>`);
+const reviewGateAudit = auditReviewGateContract({
+  htmlPath: reviewGateHtmlPath,
+  reviewGatedAssets: ['traveler', 'fake-map'],
+});
+const travelerGate = reviewGateAudit.gates.find((gate) => gate.asset_id === 'traveler');
+const fakeMapGate = reviewGateAudit.gates.find((gate) => gate.asset_id === 'fake-map');
+assert(reviewGateAudit.status === 'fail', 'review gate contract should fail invalid review gates');
+assert(travelerGate.status === 'pass', 'explicit non-final review gate with reason should pass');
+assert(fakeMapGate.status === 'fail', 'review gate containing image placeholder and no final flag should fail');
+assert(fakeMapGate.failures.some((failure) => failure.code === 'missing_final_false'), 'invalid review gate should require data-final-asset-ready=false');
+assert(fakeMapGate.failures.some((failure) => failure.code === 'review_gate_contains_bitmap'), 'invalid review gate should reject hidden bitmap placeholders');
+
+const assetReadinessAudit = auditAssetReadinessContract({
+  expectedContract: {
+    case_id: 'unit-asset-readiness',
+    required_routes: [
+      {
+        element_id: 'app_icons',
+        kind: 'app_icon',
+        expected_route: 'review',
+        allowed_routes: ['reference_cutout', 'review'],
+      },
+      {
+        element_id: 'cloud_layers',
+        kind: 'cloud',
+        expected_route: 'regenerated_image',
+      },
+      {
+        element_id: 'pricing_table',
+        kind: 'table',
+        expected_route: 'editable_text',
+      },
+    ],
+  },
+  provenance: {
+    assets: [
+      {
+        id: 'cloud_layers',
+        route: 'regenerated_image',
+        asset_source_type: 'prompt_only',
+        status: 'prompt_only',
+        final_asset_ready: false,
+      },
+    ],
+    dom_assets: [
+      {
+        id: 'app_icons',
+        route: 'review',
+        final_asset_ready: false,
+      },
+    ],
+  },
+  imagegenCandidates: {
+    candidates: [
+      {
+        id: 'cloud_layers_candidate_01',
+        route_target: 'cloud_layers',
+        accepted: false,
+        blocked_from_final_html: true,
+        rejection_reason: 'no_alpha_channel',
+      },
+    ],
+  },
+  reviewGateAudit: {
+    status: 'pass',
+    gates: [
+      {
+        asset_id: 'app_icons',
+        review_covers: [],
+        status: 'pass',
+      },
+    ],
+  },
+});
+const appIconsReadiness = assetReadinessAudit.assets.find((asset) => asset.asset_id === 'app_icons');
+const cloudReadiness = assetReadinessAudit.assets.find((asset) => asset.asset_id === 'cloud_layers');
+const tableReadiness = assetReadinessAudit.assets.find((asset) => asset.asset_id === 'pricing_table');
+assert(assetReadinessAudit.status === 'fail', 'asset readiness should fail when a prompt-only regenerated asset lacks final provenance and review coverage');
+assert(appIconsReadiness.status === 'review', 'review-gated app icons should be reported as review, not pass');
+assert(cloudReadiness.status === 'fail', 'prompt-only cloud asset without accepted candidate or review gate should fail readiness');
+assert(cloudReadiness.failures.some((failure) => failure.code === 'prompt_only_not_review_gated'), 'prompt-only asset should require review gate coverage');
+assert(cloudReadiness.failures.some((failure) => failure.code === 'no_accepted_imagegen_candidate'), 'regenerated asset should require an accepted ImageGen candidate or review gate');
+assert(tableReadiness.status === 'pass' && tableReadiness.readiness === 'not_asset_required', 'editable text/table routes should not require bitmap asset readiness');
+
+const sourceTruthAcquisitionAudit = auditSourceTruthAcquisitionPlan({
+  expectedContract: {
+    case_id: 'unit-source-truth-acquisition',
+    required_routes: [
+      { element_id: 'app_icons', kind: 'app_icon', expected_route: 'review', allowed_routes: ['reference_cutout', 'review'] },
+      { element_id: 'payment_marks', kind: 'payment_logo', expected_route: 'review', allowed_routes: ['reference_cutout', 'review'] },
+      { element_id: 'country_flags', kind: 'country_flag', expected_route: 'review', allowed_routes: ['reference_cutout', 'review'] },
+      { element_id: 'unblocked_app_icon', kind: 'app_icon', expected_route: 'review', allowed_routes: ['reference_cutout', 'review'] },
+      { element_id: 'activation_qr', kind: 'qr', expected_route: 'reference_cutout' },
+      { element_id: 'unscoped_qr', kind: 'qr', expected_route: 'reference_cutout' },
+      { element_id: 'floating_payment_logo', kind: 'payment_logo', expected_route: 'reference_cutout' },
+    ],
+  },
+  provenance: {
+    assets: [
+      {
+        id: 'activation_qr',
+        kind: 'qr',
+        route: 'reference_cutout',
+        path: '/tmp/unit-activation-qr.png',
+        width: 256,
+        height: 256,
+        sha256: 'unit-sha256-activation-qr',
+        asset_source_type: 'copied_from_qr_barcode_case_local_deterministic_truth_asset',
+        source_truth_scope: 'lab_owned_deterministic_test_fixture',
+        license: 'internal_test_fixture',
+        status: 'accepted_for_html',
+        final_asset_ready: true,
+      },
+      {
+        id: 'unscoped_qr',
+        kind: 'qr',
+        route: 'reference_cutout',
+        path: '/tmp/unit-unscoped-qr.png',
+        width: 256,
+        height: 256,
+        sha256: 'unit-sha256-unscoped-qr',
+        asset_source_type: 'source_bitmap',
+        status: 'accepted_for_html',
+        final_asset_ready: true,
+      },
+      { id: 'floating_payment_logo', kind: 'payment_logo', route: 'reference_cutout', status: 'accepted_for_html', final_asset_ready: true },
+    ],
+    dom_assets: [
+      { id: 'app_icons', route: 'review', final_asset_ready: false },
+      { id: 'unblocked_app_icon', route: 'review', final_asset_ready: false },
+      { id: 'payment_marks', route: 'review', final_asset_ready: false },
+      { id: 'country_flags', route: 'review', final_asset_ready: false },
+    ],
+  },
+  reviewGateAudit: {
+    gates: [
+      { asset_id: 'app_icons', status: 'pass', review_covers: [] },
+      { asset_id: 'unblocked_app_icon', status: 'pass', review_covers: [] },
+      { asset_id: 'payment_marks', status: 'pass', review_covers: [] },
+      { asset_id: 'country_flags', status: 'pass', review_covers: [] },
+    ],
+  },
+  acquisitionPlan: {
+    assets: [
+      {
+        asset_id: 'app_icons',
+        kind: 'app_icon',
+        status: 'review_required',
+        allowed_source_types: ['user_provided_asset', 'licensed_asset', 'reference_cutout'],
+        forbidden_actions: ['regenerated_image', 'approximate_redraw', 'editable_vector'],
+        blocking_condition: 'external_source_asset_missing',
+        evidence_required: ['source_file_path', 'license_or_usage_scope', 'checksum', 'dimensions'],
+        next_action: 'Request user-provided app icon assets or licensed source artwork.',
+      },
+      {
+        asset_id: 'unblocked_app_icon',
+        kind: 'app_icon',
+        status: 'review_required',
+        allowed_source_types: ['user_provided_asset', 'licensed_asset', 'reference_cutout'],
+        forbidden_actions: ['regenerated_image', 'approximate_redraw', 'editable_vector'],
+        next_action: 'Request user-provided app icon assets or licensed source artwork.',
+      },
+      {
+        asset_id: 'payment_marks',
+        kind: 'payment_logo',
+        status: 'review_required',
+        allowed_source_types: ['user_provided_asset', 'licensed_asset'],
+        forbidden_actions: ['regenerated_image'],
+        next_action: 'Request licensed payment logo source artwork.',
+      },
+    ],
+  },
+});
+const appIconAcquisition = sourceTruthAcquisitionAudit.assets.find((asset) => asset.asset_id === 'app_icons');
+const unblockedAppIconAcquisition = sourceTruthAcquisitionAudit.assets.find((asset) => asset.asset_id === 'unblocked_app_icon');
+const paymentAcquisition = sourceTruthAcquisitionAudit.assets.find((asset) => asset.asset_id === 'payment_marks');
+const flagAcquisition = sourceTruthAcquisitionAudit.assets.find((asset) => asset.asset_id === 'country_flags');
+const qrAcquisition = sourceTruthAcquisitionAudit.assets.find((asset) => asset.asset_id === 'activation_qr');
+const unscopedQrAcquisition = sourceTruthAcquisitionAudit.assets.find((asset) => asset.asset_id === 'unscoped_qr');
+const floatingPaymentAcquisition = sourceTruthAcquisitionAudit.assets.find((asset) => asset.asset_id === 'floating_payment_logo');
+assert(sourceTruthAcquisitionAudit.status === 'fail', 'source-truth acquisition audit should fail missing or incomplete acquisition plans');
+assert(appIconAcquisition.status === 'review', 'complete review-gated app icon acquisition plan should be review');
+assert(unblockedAppIconAcquisition.status === 'fail', 'review-gated source-truth acquisition plans without blocker metadata should fail');
+assert(unblockedAppIconAcquisition.failures.some((failure) => failure.code === 'missing_blocking_condition'), 'review-gated source-truth plans should require a blocking condition');
+assert(unblockedAppIconAcquisition.failures.some((failure) => failure.code === 'missing_evidence_required'), 'review-gated source-truth plans should require evidence requirements');
+assert(paymentAcquisition.status === 'fail', 'payment logo plan missing required forbidden actions should fail');
+assert(paymentAcquisition.failures.some((failure) => failure.code === 'missing_forbidden_action'), 'payment logo plan should require forbidden action coverage');
+assert(flagAcquisition.status === 'fail', 'country flags without acquisition plan should fail');
+assert(flagAcquisition.failures.some((failure) => failure.code === 'missing_acquisition_plan'), 'missing country flag acquisition plan should be explicit');
+assert(qrAcquisition.status === 'pass', 'final-ready QR source-truth asset does not need acquisition plan');
+assert(unscopedQrAcquisition.status === 'fail', 'final-ready source-truth assets without license/source scope should fail acquisition audit');
+assert(unscopedQrAcquisition.failures.some((failure) => failure.code === 'missing_final_source_scope'), 'final-ready source-truth assets should require license/source scope evidence');
+assert(floatingPaymentAcquisition.status === 'fail', 'final-ready source-truth assets without source metadata should fail acquisition audit');
+assert(floatingPaymentAcquisition.failures.some((failure) => failure.code === 'missing_final_source_metadata'), 'final-ready source-truth assets should require source metadata evidence');
+
+const lockedPhotoReadinessAudit = auditAssetReadinessContract({
+  expectedContract: {
+    case_id: 'unit-locked-photo-readiness',
+    required_routes: [
+      {
+        element_id: 'airport_terminal',
+        kind: 'photo_background',
+        expected_route: 'locked_base_layer',
+        allowed_routes: ['locked_base_layer', 'review'],
+      },
+    ],
+  },
+  routingTable: {
+    elements: [
+      {
+        id: 'airport_terminal',
+        kind: 'photo_background',
+        route: 'review',
+        status: 'review',
+        difficulty_signals: ['flattened_text_conflicts_dom_overlay'],
+      },
+    ],
+  },
+  provenance: {
+    assets: [
+      {
+        id: 'airport_terminal',
+        route: 'locked_base_layer',
+        asset_source_type: 'reference_image',
+        status: 'accepted_for_html',
+        final_asset_ready: true,
+        contains_flattened_text: true,
+        requires_dom_overlay: true,
+      },
+    ],
+  },
+});
+const lockedPhotoReadiness = lockedPhotoReadinessAudit.assets.find((asset) => asset.asset_id === 'airport_terminal');
+assert(lockedPhotoReadinessAudit.status === 'fail', 'locked photo layer with flattened text conflict must fail without clean-base proof or review gate');
+assert(lockedPhotoReadiness.failures.some((failure) => failure.code === 'locked_base_contains_flattened_text'), 'locked photo readiness should report flattened text conflict');
+
+const greenFringeCandidatePath = path.join(projectPaths.working, 'imagegen-green-fringe-alpha-candidate.png');
+const greenFringeCandidatePng = new PNG({ width: 12, height: 12 });
+for (let y = 0; y < greenFringeCandidatePng.height; y += 1) {
+  for (let x = 0; x < greenFringeCandidatePng.width; x += 1) {
+    const offset = (greenFringeCandidatePng.width * y + x) << 2;
+    const inSubject = x >= 3 && x <= 8 && y >= 3 && y <= 8;
+    const inGreenFringe = inSubject && (x === 3 || x === 8 || y === 3 || y === 8);
+    greenFringeCandidatePng.data[offset] = inGreenFringe ? 0 : inSubject ? 46 : 0;
+    greenFringeCandidatePng.data[offset + 1] = inGreenFringe ? 250 : inSubject ? 118 : 0;
+    greenFringeCandidatePng.data[offset + 2] = inGreenFringe ? 0 : inSubject ? 180 : 0;
+    greenFringeCandidatePng.data[offset + 3] = inSubject ? 255 : 0;
+  }
+}
+fs.writeFileSync(greenFringeCandidatePath, PNG.sync.write(greenFringeCandidatePng));
+const greenFringeCandidateAudit = auditImagegenCandidate({
+  id: 'traveler_green_fringe_candidate',
+  routeTarget: 'human_traveler',
+  outputPath: greenFringeCandidatePath,
+  prompt: 'traveler cutout from flat #00ff00 chroma-key background',
+  keyColor: '#00ff00',
+});
+assert(greenFringeCandidateAudit.accepted === false, 'candidate with alpha proof but chroma-key fringe must be rejected');
+assert(greenFringeCandidateAudit.edge_fringe_issues.includes('chroma_key_fringe'), 'green fringe candidate should report chroma_key_fringe');
+assert(greenFringeCandidateAudit.chroma_key_fringe && greenFringeCandidateAudit.chroma_key_fringe.contaminated_pixel_ratio > 0, 'green fringe candidate should record contamination ratio');
+assert(greenFringeCandidateAudit.rejection_reason.includes('chroma'), 'green fringe rejection should mention chroma contamination');
+const precomputedFringeCandidateAudit = auditImagegenCandidate({
+  id: 'traveler_precomputed_fringe_candidate',
+  routeTarget: 'human_traveler',
+  outputPath: transparentCandidatePath,
+  prompt: 'traveler cutout from case-local chroma removal',
+  edge_fringe_green_ratio: 0.0032,
+});
+assert(precomputedFringeCandidateAudit.accepted === false, 'candidate with precomputed green fringe ratio must be rejected');
+assert(precomputedFringeCandidateAudit.edge_fringe_issues.includes('chroma_key_fringe'), 'precomputed fringe candidate should report chroma_key_fringe');
+assert(precomputedFringeCandidateAudit.chroma_key_fringe.source === 'precomputed_edge_fringe_green_ratio', 'precomputed fringe evidence should record its source');
+const smallPrecomputedFringeCandidateAudit = auditImagegenCandidate({
+  id: 'phone_small_precomputed_fringe_candidate',
+  routeTarget: 'phone_shell',
+  outputPath: transparentCandidatePath,
+  prompt: 'phone shell cutout from case-local chroma removal',
+  keyColor: '#00ff00',
+  edge_fringe_green_ratio: 0.0008,
+});
+assert(smallPrecomputedFringeCandidateAudit.accepted === false, 'any explicit precomputed visible green fringe should block final HTML');
+assert(smallPrecomputedFringeCandidateAudit.chroma_key_fringe.source === 'precomputed_edge_fringe_green_ratio', 'precomputed fringe should remain the reported evidence source even when computed key-color scan is clean');
+
+const imagegenManifestPath = path.join(projectPaths.working, 'imagegen-candidates-input.json');
+const imagegenReportPath = path.join(projectPaths.reports, 'imagegen-candidates-audit.json');
+fs.writeFileSync(imagegenManifestPath, JSON.stringify({
+  case_id: 'unit-imagegen-candidates',
+  candidates: [
+    {
+      id: 'opaque_candidate',
+      route_target: 'volumetric_glow',
+      output_path: opaqueCandidatePath,
+      prompt: 'transparent PNG with alpha channel',
+    },
+    {
+      id: 'transparent_candidate',
+      route_target: 'cloud_layers',
+      output_path: transparentCandidatePath,
+      prompt: 'transparent PNG with alpha channel',
+      transparency_method: 'native_alpha',
+      alpha_source: 'model_native_transparent_png',
+    },
+  ],
+}, null, 2));
+const imagegenAuditOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'audit-imagegen-candidates.js'),
+  '--input', imagegenManifestPath,
+  '--report', imagegenReportPath,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(imagegenAuditOutput.includes('ImageGen candidate audit written'), 'audit:imagegen should print report path');
+assert(fs.existsSync(imagegenReportPath), 'audit:imagegen should write a JSON report');
+const imagegenAuditReport = JSON.parse(fs.readFileSync(imagegenReportPath, 'utf8'));
+assert(imagegenAuditReport.status === 'partial', 'mixed candidate audit should have partial status');
+assert(imagegenAuditReport.summary.accepted === 1, 'candidate audit should count accepted candidate');
+assert(imagegenAuditReport.summary.rejected === 1, 'candidate audit should count rejected candidate');
+assert(imagegenAuditReport.candidates.find((item) => item.id === 'opaque_candidate').blocked_from_final_html === true, 'rejected candidate must be blocked from final HTML in report');
+assert(imagegenAuditReport.candidates.find((item) => item.id === 'transparent_candidate').alpha_extrema.min === 0, 'accepted candidate report should include alpha evidence');
+
+const assetReadinessExpectedPath = path.join(projectPaths.working, 'asset-readiness-expected-contract.json');
+const assetReadinessProvenancePath = path.join(projectPaths.working, 'asset-readiness-provenance.json');
+const assetReadinessCandidatesPath = path.join(projectPaths.working, 'asset-readiness-imagegen-candidates.json');
+const assetReadinessReviewPath = path.join(projectPaths.working, 'asset-readiness-review-gates.json');
+const assetReadinessReportPath = path.join(projectPaths.reports, 'asset-readiness-audit.json');
+fs.writeFileSync(assetReadinessExpectedPath, JSON.stringify({
+  case_id: 'unit-asset-readiness-cli',
+  required_routes: [
+    { element_id: 'payment_marks', kind: 'payment_logo', expected_route: 'review', allowed_routes: ['reference_cutout', 'review'] },
+    { element_id: 'phone_shell', kind: 'complex_gradient', expected_route: 'regenerated_image' },
+  ],
+}, null, 2));
+fs.writeFileSync(assetReadinessProvenancePath, JSON.stringify({
+  assets: [
+    { id: 'phone_shell', route: 'regenerated_image', asset_source_type: 'prompt_only', status: 'prompt_only', final_asset_ready: false },
+  ],
+  dom_assets: [
+    { id: 'payment_marks', route: 'review', final_asset_ready: false },
+  ],
+}, null, 2));
+fs.writeFileSync(assetReadinessCandidatesPath, JSON.stringify({
+  candidates: [
+    { id: 'phone_shell_candidate_01', route_target: 'phone_shell', accepted: false, blocked_from_final_html: true, rejection_reason: 'no_alpha_channel' },
+  ],
+}, null, 2));
+fs.writeFileSync(assetReadinessReviewPath, JSON.stringify({
+  status: 'pass',
+  gates: [
+    { asset_id: 'payment_marks', status: 'pass', review_covers: [] },
+  ],
+}, null, 2));
+const assetReadinessCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'audit-asset-readiness.js'),
+  '--expected', assetReadinessExpectedPath,
+  '--provenance', assetReadinessProvenancePath,
+  '--imagegen', assetReadinessCandidatesPath,
+  '--review-gates', assetReadinessReviewPath,
+  '--report', assetReadinessReportPath,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(assetReadinessCliOutput.includes('Asset readiness audit written'), 'audit:asset-readiness should print report path');
+assert(fs.existsSync(assetReadinessReportPath), 'audit:asset-readiness should write report JSON');
+const assetReadinessReport = JSON.parse(fs.readFileSync(assetReadinessReportPath, 'utf8'));
+assert(assetReadinessReport.status === 'fail', 'CLI asset readiness report should preserve helper status');
+assert(assetReadinessReport.summary.review_count === 1, 'CLI asset readiness report should count review-gated assets');
+assert(assetReadinessReport.summary.fail_count === 1, 'CLI asset readiness report should count failed prompt-only assets');
+
+const acquisitionExpectedPath = path.join(projectPaths.working, 'source-truth-acquisition-expected-contract.json');
+const acquisitionProvenancePath = path.join(projectPaths.working, 'source-truth-acquisition-provenance.json');
+const acquisitionReviewPath = path.join(projectPaths.working, 'source-truth-acquisition-review-gates.json');
+const acquisitionPlanPath = path.join(projectPaths.working, 'source-truth-acquisition-plan.json');
+const acquisitionReportPath = path.join(projectPaths.reports, 'source-truth-acquisition-audit.json');
+fs.writeFileSync(acquisitionExpectedPath, JSON.stringify({
+  case_id: 'unit-source-truth-acquisition-cli',
+  required_routes: [
+    { element_id: 'payment_marks', kind: 'payment_logo', expected_route: 'review', allowed_routes: ['reference_cutout', 'review'] },
+  ],
+}, null, 2));
+fs.writeFileSync(acquisitionProvenancePath, JSON.stringify({
+  dom_assets: [
+    { id: 'payment_marks', route: 'review', final_asset_ready: false },
+  ],
+}, null, 2));
+fs.writeFileSync(acquisitionReviewPath, JSON.stringify({
+  status: 'pass',
+  gates: [
+    { asset_id: 'payment_marks', status: 'pass', review_covers: [] },
+  ],
+}, null, 2));
+fs.writeFileSync(acquisitionPlanPath, JSON.stringify({
+  assets: [
+    {
+      asset_id: 'payment_marks',
+      kind: 'payment_logo',
+      status: 'review_required',
+      allowed_source_types: ['user_provided_asset', 'licensed_asset'],
+      forbidden_actions: ['regenerated_image', 'approximate_redraw', 'editable_vector'],
+      blocking_condition: 'external_source_asset_missing',
+      evidence_required: ['source_file_path', 'license_or_usage_scope', 'checksum', 'dimensions'],
+      next_action: 'Request licensed payment logo source artwork.',
+    },
+  ],
+}, null, 2));
+const acquisitionCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'audit-source-truth-acquisition.js'),
+  '--expected', acquisitionExpectedPath,
+  '--provenance', acquisitionProvenancePath,
+  '--review-gates', acquisitionReviewPath,
+  '--plan', acquisitionPlanPath,
+  '--report', acquisitionReportPath,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(acquisitionCliOutput.includes('Source-truth acquisition audit written'), 'audit:source-truth-acquisition should print report path');
+assert(fs.existsSync(acquisitionReportPath), 'audit:source-truth-acquisition should write report JSON');
+const acquisitionReport = JSON.parse(fs.readFileSync(acquisitionReportPath, 'utf8'));
+assert(acquisitionReport.status === 'review', 'CLI source-truth acquisition report should preserve review status');
+assert(acquisitionReport.summary.review_count === 1, 'CLI source-truth acquisition report should count review-gated plans');
+
+const overlapLayoutAudit = auditLayoutContract({
+  canvas: { width: 1024, height: 1536 },
+  regions: [
+    { id: 'dashboard', role: 'dom_widget', bbox: { x: 334, y: 472, w: 640, h: 325 } },
+    { id: 'map-panel', role: 'review_gate', bbox: { x: 278, y: 760, w: 520, h: 240 } },
+    { id: 'pricing-table', role: 'dom_table', bbox: { x: 70, y: 1020, w: 560, h: 246 } },
+  ],
+});
+assert(overlapLayoutAudit.status === 'fail', 'layout contract should fail key-region overlap');
+assert(overlapLayoutAudit.failures.some((item) => item.code === 'key_region_overlap' && item.a === 'dashboard' && item.b === 'map-panel'), 'layout contract should identify overlapping regions by id');
+assert(overlapLayoutAudit.failures.every((item) => item.coordinate_evidence), 'layout failures should include coordinate evidence');
+const cleanLayoutAudit = auditLayoutContract({
+  canvas: { width: 1024, height: 1536 },
+  regions: [
+    { id: 'dashboard', role: 'dom_widget', bbox: { x: 334, y: 472, w: 640, h: 325 } },
+    { id: 'map-panel', role: 'review_gate', bbox: { x: 278, y: 805, w: 520, h: 200 } },
+    { id: 'pricing-table', role: 'dom_table', bbox: { x: 70, y: 1020, w: 560, h: 246 } },
+  ],
+});
+assert(cleanLayoutAudit.status === 'pass', 'layout contract should pass separated key regions');
+assert(cleanLayoutAudit.summary.overlap_count === 0, 'clean layout should have no overlap failures');
 
 const floodInputPath = path.join(projectPaths.working, 'flood-cutout-input.png');
 const floodOutputPath = path.join(projectPaths.working, 'flood-cutout-output.png');

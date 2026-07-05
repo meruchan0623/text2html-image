@@ -7,6 +7,8 @@ Use this reference only when stage rules are unclear, when extending templates, 
 - Backgrounds and patches must not contain flattened text, logos, prices, CTAs, or legal copy.
 - Hero, product, and character assets should be transparent PNG when compositing is required.
 - ImageGen / Codex image generation must request transparent PNG with alpha channel for composited assets. Do not request or accept green screen, green background, chroma key background, white matte, gray matte, beige matte, colored matte, or gradient background as a transparency substitute.
+- After ImageGen returns candidate PNGs, run `npm run audit:imagegen -- --input <candidates.json> --report <reports/imagegen-candidates.json>`. Only candidates with real alpha evidence, `transparency_method`, and `blocked_from_final_html=false` can move into HTML or asset provenance. Use `native_alpha` for model-native transparent PNGs, `chroma_key_removed` for locally processed chroma-key outputs, and `flood_cutout` for flood-cutout processed outputs.
+- Preserve explicit fringe evidence such as `edge_fringe_green_ratio` from checker composites or case-local alpha review. Numeric alpha pass does not override it; explicit fringe evidence blocks final HTML until the candidate is regenerated or manually accepted as review-only.
 - For irregular bitmap cutouts, run `npm run flood-cutout -- --input <source.png>` and use the generated `*-transparent.png` as the compositing asset. Keep `*-mask-debug.png` and `*-cutout-report.json` in `working/` or `reports/` for review.
 - 固定复杂资产规则：人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行。
 - Reject transparent assets that still depend on gradient glow, gray matte, or semi-transparent exterior haze to blend into the poster.
@@ -37,6 +39,8 @@ Hard-to-vector kinds such as `person`, `map`, `cloud`, `skyline`, `landmark`, `g
 Do not accept `css_geometry`, `svg_placeholder`, or `pil_geometry_placeholder` as final source types when the user asked for cutout or regenerated imagery. They can be temporary scaffolding only if clearly labeled and removed before delivery.
 
 Before choosing `reference_cutout` or `regenerated_image`, record `cutout_feasibility`, `regeneration_fit`, difficulty signals, and a decision reason. Low cutout feasibility or high regeneration fit should route to `regenerated_image`, which only produces a `prompt_only` entry in `reports/asset-generation-prompts.json` until a real PNG with alpha channel, alpha audit, and mask/debug report exist.
+
+For `regenerated_image` candidates, `reports/imagegen-candidates.json` is the gate between prompt output and usable asset. RGB/no-alpha, matte, checkerboard, non-transparent-corner, or missing-`transparency_method` outputs must remain rejected and blocked from final HTML.
 
 Asset index records should follow this shape:
 
