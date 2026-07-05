@@ -67,6 +67,7 @@ Required evidence:
 
 - `reports/reverse-prompt-brief.md`: visual structure, text hierarchy, simple vector shapes, complex art subjects, decorative layers, and likely editable/localizable content.
 - `reports/asset-routing-table.json`: one route per meaningful visible element plus `cutout_feasibility`, `regeneration_fit`, difficulty signals, and decision reason.
+- `reports/codex-first-pass-html-prompt.md`: stable Codex read-in prompt composed from visual intake, reverse prompt brief, and asset routing before writing the first HTML/CSS pass.
 - `reports/route-contract-audit.json`: expected route validation from `npm run audit:routes -- --expected <expected-contract.json> --routing <asset-routing-table.json> --report <reports/route-contract-audit.json>`. Use `allowed_routes` when a route family is valid, and keep `forbidden_routes` authoritative.
 - `reports/asset-generation-prompts.json`: `prompt_only` ImageGen prompt packages for `regenerated_image` elements; these must request transparent PNG with alpha channel, forbid green screen / chroma key / matte backgrounds, and are not final assets.
 - `reports/imagegen-candidates.json`: returned ImageGen candidate audit from `npm run audit:imagegen`; accepted candidates need alpha extrema, transparent corners, and `transparency_method` provenance, while rejected candidates stay `blocked_from_final_html=true`.
@@ -138,8 +139,9 @@ Use the cheapest proof that can catch the current failure mode, then escalate on
 3. HTML group consistency: canonical and localized variants share the expected structure and asset references.
 4. Render profile: direct renderer pass/fail and unsupported CSS reasons.
 5. Layout check: page overflow, cell/text overflow, and key-region overlap for cards, review gates, maps, tables, truth assets, and major copy blocks. Record the result as `layout-contract-audit.json` or an equivalent browser/layout report with coordinate evidence.
-6. Visual preview: browser screenshot against reference or accepted design.
-7. Export audit: PNG file count, language variants, scale variants, and pixel dimensions.
+6. Visual-DOM preview gate: run `npm run audit:visual-dom -- --project <project-id> [--group <html-group>]` for bitmap-base, layered, or reference-image recreation work. Treat failures in `visual-dom-audit.json` as blocking even when `dom-editability-report.json` passes.
+7. Visual preview: browser screenshot against reference or accepted design. For reference recreation, run `npm run audit:visual-compare -- --reference <source/reference.png> --render <screenshot-or-export.png> --dom-report <reports/visual-dom-audit.json>` after the Visual-DOM preview gate. Use `reference-vs-render-overlay.png`, `reference-vs-render-heatmap.json`, and `reference-vs-render-repair-queue.json` as the next repair queue.
+8. Export audit: PNG file count, language variants, scale variants, and pixel dimensions.
 
 If the in-app browser refuses `file://`, do not retry indefinitely or call the page broken. Use static DOM checks plus direct renderer profile or system browser fallback as appropriate.
 
@@ -153,6 +155,8 @@ For reference-image recreation, do not finish on DOM/export evidence alone. Writ
 - `reports/reference-vs-render-review.md`
 
 The review compares `source/reference.png` with the current browser screenshot or `exports/index.png`. It must score canvas, layout, hierarchy, asset-route match, text fidelity, typography, color/lighting, image quality, overflow/clipping, and editability preservation. High or blocking issues need screenshot coordinates or DOM paths.
+
+`audit:visual-compare` now creates overlay, diff, heatmap, and repair-queue evidence. When paired with `visual-dom-audit.json`, top mismatch regions should include candidate DOM selectors, asset ids/routes, and likely issue types. Treat the repair queue as the objective visual fix list for the next iteration; repair the largest or most severe regions before subjective polishing.
 
 `visual similarity cannot override DOM or asset-route failure`: if DOM text is layered over a bitmap that still contains the same phone UI label, map legend, region label, table text, CTA, or legal copy, record the problem as baked raster text conflicts with DOM overlays. Use a clean no-text base before calling the overlay visually clean; otherwise keep the asset review-gated.
 
@@ -189,6 +193,7 @@ Run-level examples:
 - `runs/latest/reports/reverse-prompt-brief.md`
 - `runs/latest/reports/asset-routing-table.json`
 - `runs/latest/reports/asset-generation-prompts.json`
+- `runs/latest/reports/codex-first-pass-html-prompt.md`
 - `runs/latest/reports/split-art-assets.json`
 - `runs/latest/reports/asset-provenance.json`
 - `runs/latest/reports/locale-risk-report.json`
@@ -208,6 +213,7 @@ visual-intake-manifest.json
 -> mask-quality-report.json
 -> cutout-layer-package.json
 -> asset-routing-table.json
+-> codex-first-pass-html-prompt.md
 -> dom-editability-report.json
 -> layout-contract-audit.json
 -> visual-review-round-NN.json

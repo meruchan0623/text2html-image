@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { readImageDimensions } = require('./asset-routing-core');
 const { buildLayerPackage, buildMaskQualityReport } = require('./mask-quality-core');
+const { runMacPersonCutout } = require('./person-cutout-mac-core');
 const { normalizeBbox } = require('./visual-intake-core');
 const { writeJson } = require('./workflow-core');
 
@@ -9,6 +10,8 @@ const MODES = new Set(['agent_first', 'grounding_first', 'hybrid', 'review_only'
 const ROUTES = new Set(['editable_text', 'editable_vector', 'reference_cutout', 'regenerated_image', 'locked_base_layer', 'review']);
 const BBOX_SOURCES = new Set(['agent', 'grounding', 'manual', 'merged']);
 const HARD_TO_VECTOR = new Set(['person', 'map', 'cloud', 'skyline', 'landmark', 'app_icon', 'application_icon', 'complex_icon']);
+const LOCAL_MAC_PERSON_KINDS = new Set(['person', 'human', 'portrait', 'traveler', 'character', 'mascot', 'cartoon_person']);
+const SEMANTIC_CUTOUT_KINDS = new Set(['person', 'human', 'portrait', 'traveler', 'character', 'mascot', 'cartoon_person', 'map', 'cloud', 'skyline', 'landmark', 'globe', 'app_icon', 'application_icon', 'complex_icon']);
 
 function normalizeId(value, fallback) {
   return String(value || fallback)
@@ -39,6 +42,7 @@ function normalizeCutoutElement(element, index) {
     requires_review: true,
     uncertainty_reason: String(element.uncertainty_reason || '').trim(),
     must_preserve_text: Boolean(element.must_preserve_text),
+    auto_cutout: null,
   };
 }
 
@@ -58,6 +62,137 @@ function validatePlanElements(elements) {
     }
   }
   return blockingErrors;
+}
+
+function textLooksPersonLike(element) {
+  return /person|human|portrait|traveler|character|mascot|人物|人像|真人|卡通人像/i.test([
+    element.kind,
+    element.label,
+    element.prompt,
+  ].filter(Boolean).join(' '));
+}
+
+function isLocalMacPersonKind(element) {
+  return LOCAL_MAC_PERSON_KINDS.has(String(element.kind || '').toLowerCase()) || textLooksPersonLike(element);
+}
+
+function needsSemanticCutout(element) {
+  const kind = String(element.kind || '').toLowerCase();
+  return (
+    element.route === 'reference_cutout' &&
+    !element.mask_path &&
+    !element.layer_path &&
+    (SEMANTIC_CUTOUT_KINDS.has(kind) || HARD_TO_VECTOR.has(kind) || textLooksPersonLike(element))
+  );
+}
+
+function shouldAutoSemanticCutout(element) {
+  return needsSemanticCutout(element) && isLocalMacPersonKind(element);
+}
+
+function macPersonCutoutPaths(projectPaths, element) {
+  const id = normalizeId(element.id, 'person');
+  return {
+    output: path.join(projectPaths.source, `${id}-mac-person-same-canvas.png`),
+    cropOutput: path.join(projectPaths.source, `${id}-mac-person-cropped.png`),
+    mask: path.join(projectPaths.working, `${id}-mac-person-alpha-mask.png`),
+    checker: path.join(projectPaths.working, `${id}-mac-person-checker.png`),
+    report: path.join(projectPaths.reports, `${id}-mac-person-cutout-report.json`),
+  };
+}
+
+function readReportIfPresent(reportPath) {
+  if (!reportPath || !fs.existsSync(reportPath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+  } catch (_error) {
+    return {};
+  }
+}
+
+function markExternalSemanticReview(element) {
+  if (!needsSemanticCutout(element) || shouldAutoSemanticCutout(element)) return null;
+  element.auto_cutout = {
+    status: 'review',
+    provider: null,
+    reason: 'no_local_semantic_provider_for_kind',
+    next_action: 'provide_external_semantic_mask_or_regenerated_asset',
+  };
+  return element.auto_cutout;
+}
+
+function dispatchSemanticCutouts(elements, options = {}) {
+  const dispatches = [];
+  const provider = options.semanticCutoutProvider || runMacPersonCutout;
+  const projectPaths = options.projectPaths;
+  const sourceImage = options.sourceImage;
+  const canvas = options.canvas;
+  if (!projectPaths || !sourceImage || !canvas) return dispatches;
+
+  for (const element of elements) {
+    if (shouldAutoSemanticCutout(element)) {
+      const paths = macPersonCutoutPaths(projectPaths, element);
+      try {
+        const result = provider({
+          input: sourceImage,
+          ...paths,
+        });
+        const report = readReportIfPresent(result.report || paths.report);
+        element.mask_path = result.mask || paths.mask;
+        element.layer_path = result.output || paths.output;
+        element.crop_layer_path = result.cropOutput || paths.cropOutput;
+        element.checker_path = result.checker || paths.checker;
+        element.cutout_report_path = result.report || paths.report;
+        element.transparency_method = report.transparency_method || 'macos_vision_person_segmentation';
+        element.asset_source_type = 'reference_cutout';
+        element.css_placement = { left: 0, top: 0, width: canvas.width, height: canvas.height };
+        element.auto_cutout = {
+          status: 'pass',
+          provider: 'macos_vision_person',
+          transparency_method: element.transparency_method,
+          output: element.layer_path,
+          crop_output: element.crop_layer_path,
+          mask: element.mask_path,
+          checker: element.checker_path,
+          report: element.cutout_report_path,
+        };
+        dispatches.push({
+          element_id: element.id,
+          status: 'pass',
+          provider: 'macos_vision_person',
+          output: element.layer_path,
+          mask: element.mask_path,
+          report: element.cutout_report_path,
+        });
+      } catch (error) {
+        element.auto_cutout = {
+          status: 'review',
+          provider: 'macos_vision_person',
+          error: error.message,
+          next_action: 'run_on_macos_or_provide_external_semantic_mask',
+        };
+        dispatches.push({
+          element_id: element.id,
+          status: 'review',
+          provider: 'macos_vision_person',
+          error: error.message,
+        });
+      }
+      continue;
+    }
+
+    const review = markExternalSemanticReview(element);
+    if (review) {
+      dispatches.push({
+        element_id: element.id,
+        status: review.status,
+        provider: review.provider,
+        reason: review.reason,
+        next_action: review.next_action,
+      });
+    }
+  }
+  return dispatches;
 }
 
 function runCutoutDecompose(options = {}) {
@@ -80,6 +215,14 @@ function runCutoutDecompose(options = {}) {
   const response = readJsonFile(options.responsePath);
   const elements = response && Array.isArray(response.elements) ? response.elements.map(normalizeCutoutElement) : [];
   const blockingErrors = response ? validatePlanElements(elements) : ['No decomposition response was supplied.'];
+  const autoCutoutDispatches = response && options.autoCutout !== false
+    ? dispatchSemanticCutouts(elements, {
+      projectPaths,
+      sourceImage,
+      canvas: { width: dimensions.width, height: dimensions.height },
+      semanticCutoutProvider: options.semanticCutoutProvider,
+    })
+    : [];
   const maskQualityReport = response ? buildMaskQualityReport(elements, sourceImage, projectPaths) : {
     generated_at: new Date().toISOString(),
     status: 'review',
@@ -98,6 +241,7 @@ function runCutoutDecompose(options = {}) {
     canvas: { width: dimensions.width, height: dimensions.height, format: dimensions.format },
     mode,
     elements,
+    auto_cutout_dispatches: autoCutoutDispatches,
     merge_candidates: response && Array.isArray(response.merge_candidates) ? response.merge_candidates : [],
     split_candidates: response && Array.isArray(response.split_candidates) ? response.split_candidates : [],
     blocking_errors: blockingErrors,
@@ -134,7 +278,9 @@ function runCutoutDecompose(options = {}) {
 }
 
 module.exports = {
+  dispatchSemanticCutouts,
   normalizeCutoutElement,
   runCutoutDecompose,
+  shouldAutoSemanticCutout,
   validatePlanElements,
 };

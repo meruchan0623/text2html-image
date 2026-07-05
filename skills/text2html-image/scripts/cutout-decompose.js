@@ -5,9 +5,9 @@ const { createProjectWorkspace, parseArgs } = require('./utils/workflow-core');
 
 function usage() {
   return [
-    'Usage: npm run cutout:decompose -- --project <project-id> --source-image <path> [--mode hybrid] [--response <json>] [--subproject <subproject-id>]',
+    'Usage: npm run cutout:decompose -- --project <project-id> --source-image <path> [--mode hybrid] [--response <json>] [--subproject <subproject-id>] [--no-auto-cutout]',
     '',
-    'The script writes an Agent cutout request and validates model/tool-authored decomposition JSON.',
+    'The script writes an Agent cutout request, validates model/tool-authored decomposition JSON, and auto-dispatches supported semantic cutouts.',
   ].join('\n');
 }
 
@@ -23,6 +23,7 @@ function main() {
     sourceImage: path.resolve(String(args['source-image'])),
     mode: args.mode || 'hybrid',
     responsePath: args.response,
+    autoCutout: args['no-auto-cutout'] ? false : true,
   });
   console.log(`Agent cutout request written: ${result.requestPath}`);
   console.log(`Element decomposition plan written: ${result.planPath}`);

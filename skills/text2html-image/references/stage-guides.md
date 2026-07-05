@@ -85,6 +85,7 @@ Asset index records should follow this shape:
 - Use bitmap images only for background, hero/product/character, and patch assets.
 - For reference-image recreation, start from `reports/reverse-prompt-brief.md` and `reports/asset-routing-table.json` so text, vectors, cutouts, regenerated imagery, locked base layers, and omitted details are separated before coding.
 - Use `npm run route:assets` to generate the initial routing table and ImageGen prompt-only package from an agent/human-supplied element list.
+- After visual intake and asset routing, run `npm run prompt:compose` and read `reports/codex-first-pass-html-prompt.md` before writing the first HTML/CSS pass.
 - Keep independently adjustable complex art as separate `<img>` nodes with explicit CSS `left`, `top`, `width`, `height`, and `z-index`; record them in `reports/split-art-assets.json`.
 - Remove stale CSS/SVG/PIL geometric placeholders after PNG art replaces them, and report the clean state as `old_geometric_css=false`.
 - Run `npm run build -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]` to render selected copy rows through `templates/<template_id>/master.html`.

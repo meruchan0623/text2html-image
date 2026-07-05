@@ -123,6 +123,33 @@ Required outputs:
 
 Do not use prompt wording, CSS filters, `mix-blend-mode`, opacity tricks, or a white/gray matte as a substitute for real transparency. If the report warns that the removed area ratio is too high or too low, inspect the mask debug before using the asset.
 
+## Mac-only Person Vision Cutout
+
+Use this only for `person` assets on macOS. This is macOS only and requires Apple Vision plus `/usr/bin/swift`; do not call it on Linux, Windows, remote containers, or machines without Swift. Non-Mac runs must fail with `cutout:person-mac requires macOS with Apple Vision and swift` and must not write partial transparent assets.
+
+Use `npm run cutout:person-mac -- --input <source.png> --output <same-canvas.png> --crop-output <cropped.png> --mask <alpha-mask.png> --checker <checker.png> --report <report.json>` when a full poster or bitmap source contains a real or cartoon person that needs semantic person extraction. Prefer this before `flood-cutout` for human subjects inside a flattened poster, because `flood-cutout is not semantic segmentation`.
+
+This command uses Apple Vision `VNGeneratePersonSegmentationRequest` and `VNGenerateForegroundInstanceMaskRequest`, then writes:
+
+- `same-canvas transparent PNG`: the source canvas dimensions and origin with non-person pixels alpha 0.
+- `cropped transparent PNG`: the alpha bounding box with padding for standalone placement.
+- `alpha mask`: the final mask used for transparency.
+- `checker preview`: the cropped result over a checkerboard for edge review.
+- JSON report: source/output paths, dimensions, alpha bbox, cropped dimensions, alpha extrema, nonzero/solid alpha pixel counts, `transparency_method: "macos_vision_person_segmentation"`, and known limitations.
+
+Use it only for people,真人,卡通人像, mascots, or human-like characters. Do not use it for maps, clouds, buildings, App icons, payment badges, country flags, QR/barcodes, or product renders. The output is a final-ready candidate only after visual inspection of the checker preview and alpha mask.
+
+Known limitation: pixels already baked into the source image, such as poster waves, light streaks, text overlays, occlusion, or transparency effects on clothing, cannot be recovered. The command can only cut out currently visible pixels from the flattened source.
+
+## Auto Semantic Cutout Dispatch
+
+`cutout:decompose auto-dispatches` supported semantic cutouts when a decomposition response identifies an element that needs `reference_cutout` and has no `mask_path` or `layer_path`.
+
+- On macOS, `kind: "person"` or person-like labels such as 人物, 人像, 真人, 卡通人像, traveler, character, or mascot automatically run the Mac-only Apple Vision person cutout and populate the element with `mask_path`, same-canvas `layer_path`, cropped layer path, checker preview, cutout report, and `transparency_method: "macos_vision_person_segmentation"`.
+- The auto-created same-canvas layer uses placement `left: 0`, `top: 0`, `width: canvas width`, `height: canvas height` so it can be overlaid without losing the source origin.
+- Non-person semantic objects such as maps, clouds, skylines, landmarks, globes, App icons, buildings, scenery, or other complex foregrounds must not be sent to Apple Vision person cutout. They stay in review with `next_action: "provide_external_semantic_mask_or_regenerated_asset"` until a provider-specific mask/layer or regenerated alpha PNG exists.
+- Use `--no-auto-cutout` only when you need a pure request/validation package without local semantic cutout side effects.
+
 ## Repository Hygiene
 
 Keep the skill package limited to reusable runtime resources: `SKILL.md`, `agents/`, `scripts/`, `references/`, `config/`, `templates/`, `data/`, `package*.json`, `workflow.config.json`, and intentionally reusable `assets/`.
@@ -484,6 +511,28 @@ When an element may need later movement, scaling, replacement, localization, or 
 
 Before the loop, decide which parts are bitmap base assets and which parts must remain editable HTML/SVG. If text editability is required, never use OCR output as final rendered pixels. If a clean no-text base image is available, prefer base image plus editable text overlay. Do not start the HTML/CSS recreation until the reverse prompt brief and asset routing table exist for reference-image recreation work.
 
+## Codex First-Pass HTML Prompt Bundle
+
+For reference-image recreation, run `npm run prompt:compose` after `npm run visual:intake` has a model/agent response and after `npm run route:assets` has written routing evidence. This step makes the Codex read-in method explicit and stable before the first HTML/CSS pass. It does not call a model, generate HTML, or mark assets final.
+
+Required inputs:
+
+- `reports/visual-intake-manifest.json` with `status: "pass"` unless `--allow-review` is explicitly used.
+- `reports/reverse-prompt-brief.md`
+- `reports/asset-routing-table.json`
+- optional `reports/asset-generation-prompts.json`
+- optional `reports/asset-provenance.json`
+
+Required outputs:
+
+- `reports/reverse-visual-spec.md`
+- `reports/visual-elements.json`
+- `reports/first-pass-html-plan.md`
+- `reports/codex-first-pass-html-prompt.md`
+- `reports/codex-prompt-compose-audit.json`
+
+The prompt bundle must tell Codex to read those local artifacts before writing HTML, separate editable DOM text from CSS/SVG vectors and bitmap/source-truth layers, and preserve the rule that `prompt_only` assets are not final assets. Do not start the first HTML/CSS pass until `reports/codex-first-pass-html-prompt.md` exists for reference-image recreation work.
+
 Loop:
 
 1. Build or revise editable HTML/CSS/SVG. Keep text, price, CTA, labels, and legal copy editable unless the user explicitly accepts bitmap text.
@@ -538,13 +587,16 @@ Browser/multimodal boundary:
 For reference-image recreation, write direct comparison evidence before reporting completion:
 
 - Create `reports/reference-vs-render-review.json` and `reports/reference-vs-render-review.md`.
-- Run `npm run audit:visual-compare -- --reference <source/reference.png> --render <exports/index.png> --report <reports/reference-vs-render-pixel-audit.json> --diff <reports/reference-vs-render-diff.png>` for coarse pixel evidence and a diff map. This supplements, but does not replace, route/DOM/editability review.
+- Run `npm run audit:visual-compare -- --reference <source/reference.png> --render <exports/index.png> --report <reports/reference-vs-render-pixel-audit.json> --diff <reports/reference-vs-render-diff.png> --overlay <reports/reference-vs-render-overlay.png> --heatmap <reports/reference-vs-render-heatmap.json> --repair-queue <reports/reference-vs-render-repair-queue.json>` for pixel evidence, overlay evidence, top mismatch regions, and a repair queue. This supplements, but does not replace, route/DOM/editability review.
+- When `reports/visual-dom-audit.json` exists, pass it with `--dom-report <reports/visual-dom-audit.json>` so top mismatch regions are attributed to likely DOM selectors, asset ids, routes, text boxes, or marked as unattributed background/global visual gaps.
 - Compare `source/reference.png` with the current screenshot or `exports/index.png`; score canvas match, layout, hierarchy, asset route match, text fidelity, typography, color/lighting, image quality, overflow/clipping, and editability preservation.
-- Every high or blocking issue needs screenshot coordinates or a DOM path plus a next action.
+- Every high or blocking issue needs screenshot coordinates or a DOM path plus a next action. Prefer the generated `reference-vs-render-repair-queue.json` as the next-round fix list, and repair the top one to three regions before lower-priority tuning.
 - Visual similarity cannot override DOM, route, source-truth, or editability failure. A page that looks close but has rasterized business copy, unresolved source-truth assets, missing provenance, broken image paths, or failed DOM checks is still not complete.
 - If `overall_similarity_score` is below the task gate, run at least one focused repair round or record the gap as a RED candidate/blocking limitation.
 - Treat baked raster text conflicts with DOM overlays as review/fail evidence: phone screen labels, map legends, region labels, table text, CTA, or legal copy must not be visibly duplicated by text still baked into a bitmap layer.
 - When DOM text overlays a bitmap background, prefer a clean no-text base. If no clean no-text base exists, keep the bitmap review-gated and list the exact baked text conflict in the review report.
+
+Before treating a browser preview as visually usable, run `npm run audit:visual-dom -- --project <project-id> [--group <html-group>]` when the poster uses bitmap base layers, same-canvas overlays, independently movable art, or CSS wave/card layers. This audit binds the screenshot preview to DOM geometry, `z-index`, `data-route`, `data-asset-id`, and editable text hit-test evidence. A passing `audit:dom` report does not override `visual-dom-audit.json` failures.
 
 ## Final Preview Links
 
@@ -667,9 +719,11 @@ npm run build -- --project <project-id> [--subproject <subproject-id>] [--copy-d
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]
 npm run audit:dom -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
 npm run audit:overflow -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
+npm run audit:visual-dom -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
 npm run template:check -- --project <project-id> [--subproject <subproject-id>]
 npm run copy-schema -- --project <project-id> [--subproject <subproject-id>]
 npm run visual:intake -- --project <project-id> --source-image <path> [--response <json>]
+npm run prompt:compose -- --project <project-id> [--subproject <subproject-id>] [--allow-review]
 npm run cutout:decompose -- --project <project-id> --source-image <path> --mode hybrid [--response <json>]
 npm run route:assets -- --project <project-id> --source-image <path> --elements <json-or-path> [--subproject <subproject-id>]
 npm run audit:imagegen -- --input <candidates.json> [--report <reports/imagegen-candidates.json>] [--project <project-id>] [--subproject <subproject-id>]
@@ -682,6 +736,7 @@ npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  #
 npm run render:profile -- --project <project-id> [--group <html-group>]
 npm run export-fast -- --project <project-id> [--group <html-group>] [--scale 2]
 npm run flood-cutout -- --input <source.png> [--output <clean.png>] [--mask <mask-debug.png>] [--report <report.json>]
+npm run cutout:person-mac -- --input <source.png> --output <same-canvas.png> --crop-output <cropped.png> --mask <alpha-mask.png> --checker <checker.png> --report <report.json>
 npm test
 ```
 
@@ -695,7 +750,9 @@ Use these commands when a reference image needs structured visual understanding,
 
 `npm run visual:intake` writes `reports/visual-intake-request.json` and `reports/visual-intake-manifest.json`. Visual intake is a hypothesis package. Without a supplied response JSON, the manifest status remains `review`.
 
-`npm run cutout:decompose` writes `reports/agent-cutout-request.json`, `reports/element-decomposition-plan.json`, `reports/mask-quality-report.json`, `reports/cutout-layer-package.json`, and `reports/agent-cutout-review.json`. Cutout decomposition is not a provider client. It can consume Agent/model JSON, external masks, and external transparent PNG layers.
+`npm run prompt:compose` writes `reports/reverse-visual-spec.md`, `reports/visual-elements.json`, `reports/first-pass-html-plan.md`, `reports/codex-first-pass-html-prompt.md`, and `reports/codex-prompt-compose-audit.json`. Use it to stabilize the Codex first-pass HTML prompt after visual intake and asset routing, before writing HTML/CSS.
+
+`npm run cutout:decompose` writes `reports/agent-cutout-request.json`, `reports/element-decomposition-plan.json`, `reports/mask-quality-report.json`, `reports/cutout-layer-package.json`, and `reports/agent-cutout-review.json`. Cutout decomposition is not a general provider client. It can consume Agent/model JSON, external masks, and external transparent PNG layers, and it auto-dispatches Mac-only person cutouts when Apple Vision is available.
 
 `npm run visual:review` writes `reports/visual-review-round-NN.json` and must include issue evidence. A visual pass cannot override a failing DOM audit.
 
@@ -713,6 +770,11 @@ Stop when an element is identified but has no bbox, no mask, no layer, missing p
 - Expected i18n or business metadata is missing.
 - Output was written to the repo root or the wrong project folder.
 - `reports/dom-editability-report.json` has `status: "fail"` for the affected HTML group.
+- `reports/visual-dom-audit.json` has `status: "fail"` for the active HTML group.
+- A full-canvas locked bitmap base contains or may contain old editable text, and the only mitigation is covering it with an opaque DOM/card layer without clean-base proof or review-gate evidence.
+- A routed asset layer with `data-asset-id` is hidden, disabled, zero-size, or not measurable in the rendered browser preview.
+- Editable DOM text is visually covered by an unrelated top element in browser hit-test evidence.
+- A visual layer's computed `z-index` contradicts its route role, such as vector/text layers placed in base-image bands or decorative waves covering copy.
 - A task-specific source image, generated PNG, screenshot, or deliverable has been added to the skill repo without a reusable asset reason and metadata.
 - A transparent bitmap layer still has visible exterior glow, gray matte, or partial-alpha haze after flood cutout.
 - A flood cutout report warns about removed area ratio and the mask debug has not been inspected.

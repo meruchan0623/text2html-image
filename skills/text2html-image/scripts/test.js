@@ -22,10 +22,16 @@ const { routeAssets } = require('./utils/asset-routing-core');
 const { checkTemplates } = require('./utils/template-registry-core');
 const { checkCopySchema } = require('./utils/copy-schema-core');
 const { runVisualIntake } = require('./utils/visual-intake-core');
-const { runCutoutDecompose } = require('./utils/cutout-decompose-core');
+const { composeCodexHtmlPrompt } = require('./utils/codex-html-prompt-core');
+const { runCutoutDecompose, shouldAutoSemanticCutout } = require('./utils/cutout-decompose-core');
 const { validateVisualReviewReport } = require('./utils/visual-review-core');
 const { auditImagegenCandidate } = require('./utils/imagegen-candidate-core');
 const { auditLayoutContract } = require('./utils/layout-contract-core');
+const {
+  auditVisualDomSnapshot,
+  renderVisualDomOverlaySvg,
+  renderVisualDomSummaryMarkdown,
+} = require('./utils/visual-dom-audit-core');
 const { auditExpectedRouteContract } = require('./utils/expected-route-contract-core');
 const { auditSourceTruthBitmaps } = require('./utils/source-truth-bitmap-core');
 const { auditBitmapLayerContract } = require('./utils/bitmap-layer-contract-core');
@@ -34,6 +40,7 @@ const { auditAssetReadinessContract } = require('./utils/asset-readiness-contrac
 const { auditSourceTruthAcquisitionPlan } = require('./utils/source-truth-acquisition-core');
 const { buildOverflowEvaluationScript, removeTemporaryDirectory } = require('./utils/overflow-audit-core');
 const { comparePngImages } = require('./utils/visual-compare-core');
+const { assertMacPersonCutoutAvailable } = require('./utils/person-cutout-mac-core');
 const {
   buildNormalizedProjectIndex,
   buildPromotionCandidates,
@@ -51,6 +58,18 @@ const {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function assertThrows(fn, pattern, message) {
+  try {
+    fn();
+  } catch (error) {
+    if (!pattern.test(String(error.message || error))) {
+      throw new Error(`${message}: unexpected error ${error.message || error}`);
+    }
+    return error;
+  }
+  throw new Error(`${message}: expected an error`);
 }
 
 function read(file) {
@@ -265,12 +284,14 @@ for (const script of [
   'review-score.js',
   'render-fast.js',
   'flood-cutout.js',
+  'person-cutout-mac.js',
   'audit-dom.js',
   'route-assets.js',
   'template-check.js',
   'copy-schema.js',
   'visual-intake.js',
   'cutout-decompose.js',
+  'compose-codex-html-prompt.js',
   'visual-review.js',
   'audit-imagegen-candidates.js',
   'audit-expected-routes.js',
@@ -281,6 +302,7 @@ for (const script of [
   'audit-source-truth-acquisition.js',
   'audit-overflow.js',
   'audit-visual-compare.js',
+  'audit-visual-dom.js',
   'learning-index.js',
   'learning-report.js',
   'test.js',
@@ -292,11 +314,13 @@ const packageJson = JSON.parse(read('package.json'));
 assert(packageJson.scripts['render:profile'] === 'node scripts/render-fast.js --profile-only', 'package.json missing render:profile script');
 assert(packageJson.scripts['export-fast'] === 'node scripts/render-fast.js', 'package.json missing export-fast script');
 assert(packageJson.scripts['flood-cutout'] === 'node scripts/flood-cutout.js', 'package.json missing flood-cutout script');
+assert(packageJson.scripts['cutout:person-mac'] === 'node scripts/person-cutout-mac.js', 'package.json missing cutout:person-mac script');
 assert(packageJson.scripts['audit:dom'] === 'node scripts/audit-dom.js', 'package.json missing audit:dom script');
 assert(packageJson.scripts['route:assets'] === 'node scripts/route-assets.js', 'package.json missing route:assets script');
 assert(packageJson.scripts['template:check'] === 'node scripts/template-check.js', 'package.json missing template:check script');
 assert(packageJson.scripts['copy-schema'] === 'node scripts/copy-schema.js', 'package.json missing copy-schema script');
 assert(packageJson.scripts['visual:intake'] === 'node scripts/visual-intake.js', 'package.json missing visual:intake script');
+assert(packageJson.scripts['prompt:compose'] === 'node scripts/compose-codex-html-prompt.js', 'package.json missing prompt:compose script');
 assert(packageJson.scripts['cutout:decompose'] === 'node scripts/cutout-decompose.js', 'package.json missing cutout:decompose script');
 assert(packageJson.scripts['visual:review'] === 'node scripts/visual-review.js', 'package.json missing visual:review script');
 assert(packageJson.scripts['audit:imagegen'] === 'node scripts/audit-imagegen-candidates.js', 'package.json missing audit:imagegen script');
@@ -308,6 +332,7 @@ assert(packageJson.scripts['audit:asset-readiness'] === 'node scripts/audit-asse
 assert(packageJson.scripts['audit:source-truth-acquisition'] === 'node scripts/audit-source-truth-acquisition.js', 'package.json missing audit:source-truth-acquisition script');
 assert(packageJson.scripts['audit:overflow'] === 'node scripts/audit-overflow.js', 'package.json missing audit:overflow script');
 assert(packageJson.scripts['audit:visual-compare'] === 'node scripts/audit-visual-compare.js', 'package.json missing audit:visual-compare script');
+assert(packageJson.scripts['audit:visual-dom'] === 'node scripts/audit-visual-dom.js', 'package.json missing audit:visual-dom script');
 assert(packageJson.scripts['learning:index'] === 'node scripts/learning-index.js', 'package.json missing learning:index script');
 assert(packageJson.scripts['learning:report'] === 'node scripts/learning-report.js', 'package.json missing learning:report script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
@@ -432,6 +457,9 @@ assert(skillBody.includes('asset-generation-prompts.json'), 'skill must document
 assert(skillBody.includes('npm run template:check'), 'skill must document template:check command');
 assert(skillBody.includes('npm run copy-schema'), 'skill must document copy-schema command');
 assert(skillBody.includes('npm run visual:intake'), 'skill must document visual:intake command');
+assert(skillBody.includes('## Codex First-Pass HTML Prompt Bundle'), 'skill must document Codex first-pass prompt bundle');
+assert(skillBody.includes('reports/codex-first-pass-html-prompt.md'), 'skill must document codex first-pass prompt output');
+assert(skillBody.includes('npm run prompt:compose'), 'skill must document prompt:compose command');
 assert(skillBody.includes('npm run cutout:decompose'), 'skill must document cutout:decompose command');
 assert(skillBody.includes('npm run visual:review'), 'skill must document visual:review command');
 assert(skillBody.includes('element-decomposition-plan.json'), 'skill must document element decomposition plan output');
@@ -442,6 +470,18 @@ assert(skillBody.includes('green screen, green background, chroma key background
 assert(skillBody.includes('transparent PNG with alpha channel'), 'skill must require transparent PNG with alpha channel in regenerated prompts');
 assert(skillBody.includes('## Flood Cutout Asset Cleanup'), 'skill must document flood cutout asset cleanup');
 assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cutout command');
+assert(skillBody.includes('## Mac-only Person Vision Cutout'), 'skill must document Mac-only person cutout');
+assert(skillBody.includes('macOS only'), 'skill must explicitly say Mac person cutout is macOS only');
+assert(skillBody.includes('Apple Vision'), 'skill must name Apple Vision for Mac person cutout');
+assert(skillBody.includes('VNGeneratePersonSegmentationRequest'), 'skill must document Vision person segmentation request');
+assert(skillBody.includes('VNGenerateForegroundInstanceMaskRequest'), 'skill must document Vision foreground instance request');
+assert(skillBody.includes('same-canvas transparent PNG'), 'skill must require same-canvas transparent PNG output');
+assert(skillBody.includes('cropped transparent PNG'), 'skill must require cropped transparent PNG output');
+assert(skillBody.includes('alpha mask'), 'skill must require alpha mask output');
+assert(skillBody.includes('cutout:person-mac requires macOS with Apple Vision and swift'), 'skill must document non-mac failure message');
+assert(skillBody.includes('Auto Semantic Cutout Dispatch'), 'skill must document automatic semantic cutout dispatch');
+assert(skillBody.includes('cutout:decompose auto-dispatches'), 'skill must document cutout:decompose auto-dispatch behavior');
+assert(skillBody.includes('provide_external_semantic_mask_or_regenerated_asset'), 'skill must document unsupported semantic cutout next action');
 assert(skillBody.includes('npm run audit:imagegen'), 'skill must document audit:imagegen command');
 assert(skillBody.includes('npm run audit:asset-readiness'), 'skill must document audit:asset-readiness command');
 assert(skillBody.includes('npm run audit:source-truth-acquisition'), 'skill must document audit:source-truth-acquisition command');
@@ -511,8 +551,13 @@ assert(skillBody.includes('## Reference-vs-Render Hard Gate'), 'skill must docum
 assert(skillBody.includes('reports/reference-vs-render-review.json'), 'skill must require reference-vs-render review JSON before completion');
 assert(skillBody.includes('reports/reference-vs-render-review.md'), 'skill must require reference-vs-render review markdown before completion');
 assert(skillBody.includes('npm run audit:visual-compare'), 'skill must document audit:visual-compare command');
+assert(skillBody.includes('audit:visual-dom'), 'SKILL.md must document audit:visual-dom command');
+assert(skillBody.includes('visual-dom-audit.json'), 'SKILL.md must treat visual DOM failures as completion blockers');
 assert(skillBody.includes('reference-vs-render-pixel-audit.json'), 'skill must document pixel audit output for reference-vs-render evidence');
 assert(skillBody.includes('reference-vs-render-diff.png'), 'skill must document visual compare diff map output');
+assert(skillBody.includes('reference-vs-render-overlay.png'), 'skill must document visual compare overlay output');
+assert(skillBody.includes('reference-vs-render-heatmap.json'), 'skill must document visual compare heatmap output');
+assert(skillBody.includes('reference-vs-render-repair-queue.json'), 'skill must document visual compare repair queue output');
 assert(skillBody.includes('baked raster text conflicts with DOM overlays'), 'skill must document baked raster text and DOM overlay conflicts');
 assert(skillBody.includes('clean no-text base'), 'skill must require clean no-text base layers before DOM overlays are considered visually clean');
 const executionFlow = read('references/execution-flow.md');
@@ -534,6 +579,7 @@ assert(executionFlow.includes('--routing <asset-routing-table.json>'), 'executio
 assert(executionFlow.includes('asset-provenance.json'), 'execution flow must include asset provenance evidence');
 assert(executionFlow.includes('split-art-assets.json'), 'execution flow must include split art assets evidence');
 assert(executionFlow.includes('asset-generation-prompts.json'), 'execution flow must include generated prompt package evidence');
+assert(executionFlow.includes('codex-first-pass-html-prompt.md'), 'execution flow must include codex prompt bundle evidence');
 assert(executionFlow.includes('transparent PNG with alpha channel'), 'execution flow must require transparent PNG ImageGen prompts');
 assert(executionFlow.includes('npm run audit:imagegen'), 'execution flow must include ImageGen candidate audit command');
 assert(executionFlow.includes('reports/imagegen-candidates.json'), 'execution flow must include ImageGen candidate report');
@@ -547,6 +593,10 @@ assert(executionFlow.includes('cutout-layer-package.json'), 'execution flow must
 assert(executionFlow.includes('visual-review-round-NN.json'), 'execution flow must document visual review rounds');
 assert(executionFlow.includes('layout-contract-audit.json'), 'execution flow must include key-region layout contract evidence');
 assert(executionFlow.includes('key-region overlap'), 'execution flow must require key-region overlap checks');
+assert(executionFlow.includes('Visual-DOM preview gate'), 'execution flow must include the Visual-DOM preview gate');
+assert(executionFlow.includes('visual-dom-audit.json'), 'execution flow must name the visual DOM report artifact');
+assert(executionFlow.includes('reference-vs-render-overlay.png'), 'execution flow must name the visual compare overlay artifact');
+assert(executionFlow.includes('reference-vs-render-repair-queue.json'), 'execution flow must name the visual compare repair queue artifact');
 assert(executionFlow.includes('dom-editability-report.json'), 'execution flow must include DOM editability report');
 assert(executionFlow.includes('dom-editability-summary.md'), 'execution flow must include DOM editability summary');
 assert(executionFlow.includes('plain-text reports must include local HTML file paths'), 'execution flow must require local HTML file paths in plain-text reports');
@@ -582,6 +632,7 @@ assert(stageGuides.includes('One export group -> direct `exports/`'), 'stage-gui
 assert(stageGuides.includes('Multiple delivery/export packs -> `exports/<delivery-id-or-group>/`'), 'stage-guides must document multi-delivery export path');
 assert(stageGuides.includes('Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/`'), 'stage-guides must document run-level iterative diagnostics path');
 assert(stageGuides.includes('Prompt package is not an asset'), 'stage guides must separate prompt packages from usable assets');
+assert(stageGuides.includes('npm run prompt:compose'), 'stage guides must require prompt:compose before first-pass HTML');
 assert(stageGuides.includes('Visual intake is a hypothesis package'), 'stage guides must document visual intake hypothesis status');
 assert(stageGuides.includes('Cutout decomposition is not a provider client'), 'stage guides must document provider-neutral cutout decomposition');
 assert(stageGuides.includes('Mask quality requires alpha evidence'), 'stage guides must document alpha evidence for masks');
@@ -1224,6 +1275,8 @@ const identicalVisualCompare = comparePngImages({
 });
 assert(identicalVisualCompare.status === 'pass', 'visual compare should pass identical PNGs');
 assert(identicalVisualCompare.similarity_score === 100, 'visual compare should score identical PNGs as 100');
+assert(identicalVisualCompare.top_mismatch_regions.length === 0, 'visual compare should not create mismatch regions for identical PNGs');
+assert(identicalVisualCompare.repair_queue.length === 0, 'visual compare should not create repair items for identical PNGs');
 const differentVisualCompare = comparePngImages({
   referencePath: visualCompareReferencePath,
   renderPath: visualCompareDifferentPath,
@@ -1234,6 +1287,55 @@ assert(differentVisualCompare.status === 'review', 'visual compare should review
 assert(differentVisualCompare.similarity_score < 40, 'visual compare should give low score to inverted PNGs');
 assert(differentVisualCompare.diff_path && fs.existsSync(differentVisualCompare.diff_path), 'visual compare should write a diff map PNG when diffPath is provided');
 assert(differentVisualCompare.diff_dimensions.width === 48 && differentVisualCompare.diff_dimensions.height === 32, 'visual compare diff map should preserve compared dimensions');
+
+const visualCompareTargetedPath = path.join(projectPaths.working, 'visual-compare-targeted.png');
+const visualCompareTargetedPng = PNG.sync.read(fs.readFileSync(visualCompareReferencePath));
+for (let y = 8; y < 24; y += 1) {
+  for (let x = 16; x < 32; x += 1) {
+    const offset = (48 * y + x) << 2;
+    visualCompareTargetedPng.data[offset] = 250;
+    visualCompareTargetedPng.data[offset + 1] = 20;
+    visualCompareTargetedPng.data[offset + 2] = 20;
+    visualCompareTargetedPng.data[offset + 3] = 255;
+  }
+}
+fs.writeFileSync(visualCompareTargetedPath, PNG.sync.write(visualCompareTargetedPng));
+const targetedVisualCompare = comparePngImages({
+  referencePath: visualCompareReferencePath,
+  renderPath: visualCompareTargetedPath,
+  stride: 1,
+  regionSize: 8,
+  maxRegions: 4,
+  overlayPath: path.join(projectPaths.working, 'visual-compare-overlay.png'),
+  heatmapPath: path.join(projectPaths.working, 'visual-compare-heatmap.json'),
+  domEvidence: {
+    entries: [{
+      elements: [{
+        selector: '.hero-phone',
+        tag: 'img',
+        visible: true,
+        display: 'block',
+        data_asset_id: 'phone-hero',
+        data_route: 'reference_cutout',
+        rect: { x: 16, y: 8, width: 16, height: 16, left: 16, top: 8, right: 32, bottom: 24 },
+      }],
+      text_boxes: [{
+        selector: '.headline',
+        text: 'Travel eSIM',
+        i18n_key: 'headline.title',
+        rect: { x: 0, y: 0, width: 12, height: 8, left: 0, top: 0, right: 12, bottom: 8 },
+      }],
+    }],
+  },
+});
+assert(targetedVisualCompare.overlay_path && fs.existsSync(targetedVisualCompare.overlay_path), 'visual compare should write an overlay PNG');
+assert(targetedVisualCompare.heatmap_path && fs.existsSync(targetedVisualCompare.heatmap_path), 'visual compare should write heatmap JSON');
+assert(targetedVisualCompare.top_mismatch_regions.length > 0, 'visual compare should extract top mismatch regions');
+assert(targetedVisualCompare.top_mismatch_regions[0].primary_dom_candidate.selector === '.hero-phone', 'visual compare should attribute mismatch regions to DOM candidates');
+assert(targetedVisualCompare.top_mismatch_regions[0].candidate_elements.some((candidate) => candidate.asset_id === 'phone-hero'), 'visual compare should preserve attributed asset ids');
+assert(targetedVisualCompare.top_mismatch_regions[0].likely_issue_type === 'missing_asset', 'visual compare should classify routed asset mismatches');
+assert(targetedVisualCompare.repair_queue.length > 0, 'visual compare should build a repair queue from mismatch regions');
+assert(targetedVisualCompare.repair_queue[0].selector === '.hero-phone', 'visual compare repair queue should include attributed selectors');
 
 const fastExportOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'render-fast.js'),
@@ -1466,6 +1568,121 @@ const cutoutWithResponse = runCutoutDecompose({
 });
 assert(cutoutWithResponse.plan.status === 'review', 'cutout plan without layer files should stay review');
 assert(cutoutWithResponse.plan.elements[0].bbox_source === 'grounding', 'cutout plan should preserve bbox source');
+assert(shouldAutoSemanticCutout({
+  id: 'traveler',
+  kind: 'person',
+  route: 'reference_cutout',
+  mask_path: null,
+  layer_path: null,
+}), 'person reference_cutout without mask/layer should auto-dispatch semantic cutout');
+assert(!shouldAutoSemanticCutout({
+  id: 'kyoto-landmark',
+  kind: 'landmark',
+  route: 'reference_cutout',
+  mask_path: null,
+  layer_path: null,
+}), 'non-person semantic cutout should not auto-dispatch to Mac person Vision');
+const autoPersonResponsePath = path.join(projectPaths.working, 'auto-person-cutout-response.json');
+fs.writeFileSync(autoPersonResponsePath, JSON.stringify({
+  elements: [
+    {
+      id: 'traveler',
+      label: 'traveler person',
+      prompt: 'traveler person',
+      kind: 'person',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      bbox_source: 'grounding',
+      route: 'reference_cutout',
+      confidence: 0.93,
+      uncertainty_reason: '',
+    },
+  ],
+  merge_candidates: [],
+  split_candidates: [],
+}, null, 2));
+let autoPersonProviderCalls = 0;
+const autoPersonCutout = runCutoutDecompose({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  mode: 'hybrid',
+  responsePath: autoPersonResponsePath,
+  semanticCutoutProvider: ({ output, cropOutput, mask, checker, report }) => {
+    autoPersonProviderCalls += 1;
+    const sameCanvas = new PNG({ width: 900, height: 1200 });
+    const cropped = new PNG({ width: 260, height: 520 });
+    const alphaMask = new PNG({ width: 900, height: 1200 });
+    const checkerPreview = new PNG({ width: 260, height: 520 });
+    for (let y = 0; y < sameCanvas.height; y += 1) {
+      for (let x = 0; x < sameCanvas.width; x += 1) {
+        const nx = (x - 650) / 130;
+        const ny = (y - 560) / 260;
+        const inside = (nx * nx) + (ny * ny) <= 1;
+        setPixel(sameCanvas, x, y, inside ? [200, 120, 80, 255] : [0, 0, 0, 0]);
+        setPixel(alphaMask, x, y, inside ? [255, 255, 255, 255] : [0, 0, 0, 0]);
+      }
+    }
+    for (let y = 0; y < cropped.height; y += 1) {
+      for (let x = 0; x < cropped.width; x += 1) {
+        setPixel(cropped, x, y, [200, 120, 80, 255]);
+        setPixel(checkerPreview, x, y, [200, 120, 80, 255]);
+      }
+    }
+    fs.writeFileSync(output, PNG.sync.write(sameCanvas));
+    fs.writeFileSync(cropOutput, PNG.sync.write(cropped));
+    fs.writeFileSync(mask, PNG.sync.write(alphaMask));
+    fs.writeFileSync(checker, PNG.sync.write(checkerPreview));
+    fs.writeFileSync(report, JSON.stringify({
+      transparency_method: 'macos_vision_person_segmentation',
+      alpha_bbox_xyxy: [520, 300, 780, 820],
+      cropped_dimensions: [260, 520],
+    }, null, 2));
+    return { output, cropOutput, mask, checker, report };
+  },
+});
+assert(autoPersonProviderCalls === 1, 'cutout decomposition should call semantic cutout provider once for person reference_cutout');
+assert(autoPersonCutout.plan.status === 'pass', `auto person cutout should make decomposition pass: ${autoPersonCutout.plan.blocking_errors.join('; ')}`);
+assert(autoPersonCutout.plan.auto_cutout_dispatches.length === 1, 'auto person cutout should record a dispatch');
+assert(autoPersonCutout.plan.auto_cutout_dispatches[0].provider === 'macos_vision_person', 'auto person cutout should record macos vision provider');
+assert(autoPersonCutout.plan.elements[0].auto_cutout.status === 'pass', 'auto person element should record passing auto_cutout status');
+assert(autoPersonCutout.plan.elements[0].transparency_method === 'macos_vision_person_segmentation', 'auto person element should record transparency method');
+assert(fs.existsSync(autoPersonCutout.plan.elements[0].mask_path), 'auto person cutout should write mask path');
+assert(fs.existsSync(autoPersonCutout.plan.elements[0].layer_path), 'auto person cutout should write same-canvas layer path');
+const autoPersonLayerPackage = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'cutout-layer-package.json'), 'utf8'));
+assert(autoPersonLayerPackage.layers[0].placement.left === 0 && autoPersonLayerPackage.layers[0].placement.top === 0, 'same-canvas auto cutout layer should be placed at origin');
+assert(autoPersonLayerPackage.layers[0].placement.width === 900 && autoPersonLayerPackage.layers[0].placement.height === 1200, 'same-canvas auto cutout layer should use source canvas dimensions');
+const autoLandmarkResponsePath = path.join(projectPaths.working, 'auto-landmark-cutout-response.json');
+fs.writeFileSync(autoLandmarkResponsePath, JSON.stringify({
+  elements: [
+    {
+      id: 'kyoto-landmark',
+      label: 'temple landmark',
+      prompt: 'temple landmark',
+      kind: 'landmark',
+      bbox: { x: 120, y: 160, w: 300, h: 260 },
+      bbox_source: 'grounding',
+      route: 'reference_cutout',
+      confidence: 0.9,
+      uncertainty_reason: '',
+    },
+  ],
+  merge_candidates: [],
+  split_candidates: [],
+}, null, 2));
+let autoLandmarkProviderCalls = 0;
+const autoLandmarkCutout = runCutoutDecompose({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  mode: 'hybrid',
+  responsePath: autoLandmarkResponsePath,
+  semanticCutoutProvider: () => {
+    autoLandmarkProviderCalls += 1;
+    throw new Error('landmark must not use mac person cutout');
+  },
+});
+assert(autoLandmarkProviderCalls === 0, 'non-person semantic cutout should not call Mac person provider');
+assert(autoLandmarkCutout.plan.status === 'review', 'unsupported semantic cutout should remain review');
+assert(autoLandmarkCutout.plan.elements[0].auto_cutout.status === 'review', 'unsupported semantic cutout should record review status');
+assert(autoLandmarkCutout.plan.elements[0].auto_cutout.next_action === 'provide_external_semantic_mask_or_regenerated_asset', 'unsupported semantic cutout should ask for external semantic mask or regenerated asset');
 const maskPath = path.join(projectPaths.working, 'phone-mask.png');
 const layerPath = path.join(projectPaths.source, 'phone-layer.png');
 const maskPng = new PNG({ width: 900, height: 1200 });
@@ -1950,6 +2167,32 @@ assert(promptPackage.prompts.every((item) => item.required_format === 'png'), 'w
 assert(promptPackage.prompts.every((item) => item.requires_alpha_channel === true), 'written prompt package should include alpha-channel requirement');
 assert(promptPackage.prompts.every((item) => item.exterior_alpha === 0), 'written prompt package should include exterior alpha 0');
 assert(promptPackage.prompts.every((item) => item.forbidden_backgrounds.includes('green background') && item.forbidden_backgrounds.includes('white matte') && item.forbidden_backgrounds.includes('gradient background')), 'written prompt package should list forbidden solid/matte backgrounds');
+
+const missingPromptBundlePaths = createProjectWorkspace('codex prompt bundle missing evidence');
+assertThrows(
+  () => composeCodexHtmlPrompt({ projectPaths: missingPromptBundlePaths }),
+  /visual-intake-manifest\.json/,
+  'prompt compose should fail when visual intake manifest is missing'
+);
+const composedPromptBundle = composeCodexHtmlPrompt({ projectPaths });
+assert(composedPromptBundle.audit.status === 'pass', 'prompt compose audit should pass with required artifacts');
+assert(fs.existsSync(path.join(projectPaths.reports, 'reverse-visual-spec.md')), 'prompt compose should write reverse-visual-spec.md');
+assert(fs.existsSync(path.join(projectPaths.reports, 'visual-elements.json')), 'prompt compose should write visual-elements.json');
+assert(fs.existsSync(path.join(projectPaths.reports, 'first-pass-html-plan.md')), 'prompt compose should write first-pass-html-plan.md');
+assert(fs.existsSync(path.join(projectPaths.reports, 'codex-first-pass-html-prompt.md')), 'prompt compose should write codex-first-pass-html-prompt.md');
+assert(fs.existsSync(path.join(projectPaths.reports, 'codex-prompt-compose-audit.json')), 'prompt compose should write codex-prompt-compose-audit.json');
+assert(composedPromptBundle.prompt.includes('Read these local artifacts in this order'), 'prompt bundle should define artifact read order');
+assert(composedPromptBundle.prompt.includes('Do not start writing HTML until'), 'prompt bundle should block premature HTML');
+assert(composedPromptBundle.firstPassPlan.includes('DOM text'), 'first-pass plan should name DOM text responsibilities');
+assert(composedPromptBundle.firstPassPlan.includes('prompt_only assets are not final assets'), 'first-pass plan should preserve prompt-only boundary');
+const codexPromptCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'compose-codex-html-prompt.js'),
+  '--project', projectId,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(codexPromptCliOutput.includes('Codex first-pass HTML prompt written'), 'prompt:compose CLI should print prompt path');
 
 const opaqueCandidatePath = path.join(projectPaths.working, 'imagegen-opaque-rgb-candidate.png');
 const opaqueCandidatePng = new PNG({ width: 10, height: 10 });
@@ -2738,6 +2981,254 @@ const cleanLayoutAudit = auditLayoutContract({
 assert(cleanLayoutAudit.status === 'pass', 'layout contract should pass separated key regions');
 assert(cleanLayoutAudit.summary.overlap_count === 0, 'clean layout should have no overlap failures');
 
+const visualDomBadSnapshot = {
+  html: path.join(projectPaths.html, 'index.html'),
+  file_url: 'file:///visual-dom-bad.html',
+  canvas: { width: 2280, height: 800 },
+  elements: [
+    {
+      selector: '.scene-base',
+      tag: 'img',
+      rect: { x: 0, y: 0, width: 2280, height: 800, left: 0, top: 0, right: 2280, bottom: 800 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 1,
+      data_asset_id: 'locked-kyoto-scene',
+      data_route: 'locked_base_layer',
+      data_asset_text_policy: 'text_obscured_by_editable_dom_overlay',
+      data_final_asset_ready: 'true',
+      clean_base_proof: '',
+    },
+    {
+      selector: '.copy-card',
+      tag: 'section',
+      rect: { x: 842, y: 52, width: 598, height: 637, left: 842, top: 52, right: 1440, bottom: 689 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 8,
+    },
+    {
+      selector: '.aqua-wave',
+      tag: 'div',
+      rect: { x: -120, y: 585, width: 2520, height: 390, left: -120, top: 585, right: 2400, bottom: 975 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 6,
+      inferred_role: 'editable_vector',
+    },
+    {
+      selector: '.person-restore',
+      tag: 'div',
+      rect: { x: 1340, y: 215, width: 418, height: 585, left: 1340, top: 215, right: 1758, bottom: 800 },
+      visible: false,
+      display: 'none',
+      position: 'absolute',
+      z_index: 9,
+      data_asset_id: 'traveler-restore-crop',
+      data_route: 'locked_base_layer',
+    },
+  ],
+  text_boxes: [
+    {
+      selector: '.award-line.award-line-one',
+      text: '2026 Opensignal 評選',
+      i18n_key: 'award.opensignal',
+      rect: { x: 794, y: 512, width: 320, height: 38, left: 794, top: 512, right: 1114, bottom: 550 },
+      center: { x: 954, y: 531 },
+      top_selector_at_center: '.aqua-wave',
+      top_z_index_at_center: 6,
+      covered_by_unrelated_top_element: true,
+    },
+  ],
+};
+const visualDomBadAudit = auditVisualDomSnapshot(visualDomBadSnapshot);
+assert(visualDomBadAudit.status === 'fail', 'visual DOM audit should fail the locked-base / disabled-layer / occluded-text pattern');
+assert(visualDomBadAudit.failures.some((failure) => failure.code === 'locked_base_text_obscured_without_clean_base'), 'visual DOM audit should fail locked base with obscured raster text and no clean-base proof');
+assert(visualDomBadAudit.failures.some((failure) => failure.code === 'disabled_asset_layer' && failure.asset_id === 'traveler-restore-crop'), 'visual DOM audit should fail disabled routed asset layers');
+assert(visualDomBadAudit.failures.some((failure) => failure.code === 'text_center_occluded' && failure.selector === '.award-line.award-line-one'), 'visual DOM audit should fail editable text occlusion');
+assert(visualDomBadAudit.failures.some((failure) => failure.code === 'z_index_band_violation' && failure.selector === '.aqua-wave'), 'visual DOM audit should fail vector layers outside their z-index band');
+
+const visualDomCleanSnapshot = {
+  html: path.join(projectPaths.html, 'index-clean.html'),
+  file_url: 'file:///visual-dom-clean.html',
+  canvas: { width: 1200, height: 800 },
+  elements: [
+    {
+      selector: '.clean-base',
+      tag: 'img',
+      rect: { x: 0, y: 0, width: 1200, height: 800, left: 0, top: 0, right: 1200, bottom: 800 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 1,
+      data_asset_id: 'clean-scenery',
+      data_route: 'locked_base_layer',
+      data_asset_text_policy: 'clean_no_text_base',
+      data_final_asset_ready: 'true',
+      clean_base_proof: 'source/reference-clean-base.png',
+    },
+    {
+      selector: '.title',
+      tag: 'h1',
+      rect: { x: 120, y: 120, width: 420, height: 90, left: 120, top: 120, right: 540, bottom: 210 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 72,
+      inferred_role: 'editable_text',
+    },
+  ],
+  text_boxes: [
+    {
+      selector: '.title',
+      text: 'Japan eSIM',
+      i18n_key: 'headline.title',
+      rect: { x: 120, y: 120, width: 420, height: 90, left: 120, top: 120, right: 540, bottom: 210 },
+      center: { x: 330, y: 165 },
+      top_selector_at_center: '.title',
+      top_z_index_at_center: 72,
+      covered_by_unrelated_top_element: false,
+    },
+  ],
+};
+const visualDomCleanAudit = auditVisualDomSnapshot(visualDomCleanSnapshot);
+assert(visualDomCleanAudit.status === 'pass', 'visual DOM audit should pass clean base plus visible editable text');
+
+const visualDomOverlaySvg = renderVisualDomOverlaySvg(visualDomBadAudit);
+assert(visualDomOverlaySvg.includes('<svg'), 'visual DOM overlay should render an SVG document');
+assert(visualDomOverlaySvg.includes('locked_base_text_obscured_without_clean_base'), 'visual DOM overlay should include failure labels');
+assert(visualDomOverlaySvg.includes('.award-line.award-line-one'), 'visual DOM overlay should include text selectors');
+const visualDomSummaryMd = renderVisualDomSummaryMarkdown({
+  generated_at: new Date('2026-07-06T00:00:00.000Z').toISOString(),
+  project_id: 'visual-dom-unit',
+  subproject_id: null,
+  browser_backed: false,
+  status: 'fail',
+  summary: {
+    entry_count: 1,
+    pass_count: 0,
+    review_count: 0,
+    fail_count: 1,
+    element_count: visualDomBadAudit.elements.length,
+    text_box_count: visualDomBadAudit.text_boxes.length,
+    image_layer_count: visualDomBadAudit.elements.filter((element) => element.tag === 'img').length,
+    failure_count: visualDomBadAudit.failures.length,
+    failure_types: [...new Set(visualDomBadAudit.failures.map((failure) => failure.code))].sort(),
+  },
+  entries: [visualDomBadAudit],
+});
+assert(visualDomSummaryMd.includes('# Visual DOM Audit'), 'visual DOM summary should have a stable heading');
+assert(visualDomSummaryMd.includes('locked_base_text_obscured_without_clean_base'), 'visual DOM summary should list failure codes');
+
+const visualDomProjectId = 'visual-dom-smoke-preview-audit';
+assertReadableProjectName(visualDomProjectId, 'visual DOM smoke project id');
+const visualDomProjectPaths = createProjectWorkspace(visualDomProjectId);
+const visualDomHtmlPath = path.join(visualDomProjectPaths.html, 'index.html');
+fs.mkdirSync(visualDomProjectPaths.html, { recursive: true });
+fs.writeFileSync(visualDomHtmlPath, `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; }
+    .poster { position: relative; width: 320px; height: 180px; overflow: hidden; }
+    .clean-base { position: absolute; left: 0; top: 0; width: 320px; height: 180px; z-index: 1; }
+    .title { position: absolute; left: 24px; top: 24px; z-index: 72; font-size: 28px; }
+  </style>
+</head>
+<body>
+  <main class="poster" style="width:320px;height:180px">
+    <img class="clean-base" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-asset-id="clean-base" data-route="locked_base_layer" data-asset-text-policy="clean_no_text_base" data-clean-base-proof="source/clean-base.png" alt="">
+    <h1 class="title" data-i18n-key="headline.title">Japan eSIM</h1>
+  </main>
+</body>
+</html>
+`, 'utf8');
+const visualDomCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'audit-visual-dom.js'),
+  '--project', visualDomProjectPaths.project_id,
+  '--no-fail',
+  '--width', '320',
+  '--height', '180',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(visualDomCliOutput.includes('Visual DOM audit written'), 'audit:visual-dom should print report path');
+assert(fs.existsSync(path.join(visualDomProjectPaths.reports, 'visual-dom-audit.json')), 'audit:visual-dom should write JSON report');
+assert(fs.existsSync(path.join(visualDomProjectPaths.reports, 'visual-dom-summary.md')), 'audit:visual-dom should write Markdown summary');
+assert(fs.existsSync(path.join(visualDomProjectPaths.reports, 'visual-dom-overlay.svg')), 'audit:visual-dom should write SVG overlay');
+
+const visualDomConversationSnapshot = {
+  html: '/Users/tashima_meru/Documents/text2html-image-project/japan-esim-kddi-banner-copy/html/index.html',
+  file_url: 'file:///Users/tashima_meru/Documents/text2html-image-project/japan-esim-kddi-banner-copy/html/index.html',
+  canvas: { width: 2280, height: 800 },
+  elements: [
+    {
+      selector: '.scene-base',
+      tag: 'img',
+      rect: { x: 0, y: 0, width: 2280, height: 800, left: 0, top: 0, right: 2280, bottom: 800 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 1,
+      data_asset_id: 'locked-kyoto-scene',
+      data_route: 'locked_base_layer',
+      data_asset_text_policy: 'text_obscured_by_editable_dom_overlay',
+      data_final_asset_ready: 'true',
+    },
+    {
+      selector: '.copy-card',
+      tag: 'section',
+      rect: { x: 842, y: 52, width: 598, height: 637, left: 842, top: 52, right: 1440, bottom: 689 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 8,
+      inferred_role: 'editable_vector',
+    },
+    {
+      selector: '.person-restore',
+      tag: 'div',
+      rect: { x: 1340, y: 215, width: 418, height: 585, left: 1340, top: 215, right: 1758, bottom: 800 },
+      visible: false,
+      display: 'none',
+      position: 'absolute',
+      z_index: 9,
+      data_asset_id: 'traveler-restore-crop',
+      data_route: 'locked_base_layer',
+    },
+    {
+      selector: '.white-swoosh',
+      tag: 'div',
+      rect: { x: 1140, y: 500, width: 1450, height: 245, left: 1140, top: 500, right: 2590, bottom: 745 },
+      visible: true,
+      display: 'block',
+      position: 'absolute',
+      z_index: 5,
+      inferred_role: 'editable_vector',
+    },
+  ],
+  text_boxes: [
+    {
+      selector: '.brand-line',
+      text: 'Powered by KDDI',
+      i18n_key: 'brand.powered_by',
+      rect: { x: 996, y: 110, width: 310, height: 48, left: 996, top: 110, right: 1306, bottom: 158 },
+      center: { x: 1151, y: 134 },
+      top_selector_at_center: '.brand-line',
+      covered_by_unrelated_top_element: false,
+    },
+  ],
+};
+const visualDomConversationAudit = auditVisualDomSnapshot(visualDomConversationSnapshot);
+assert(visualDomConversationAudit.status === 'fail', 'visual DOM audit should fail the conversation final-state pattern');
+assert(visualDomConversationAudit.failures.some((failure) => failure.code === 'locked_base_text_obscured_without_clean_base'), 'conversation pattern should fail because full base contains hidden raster text without clean-base proof');
+assert(visualDomConversationAudit.failures.some((failure) => failure.code === 'disabled_asset_layer'), 'conversation pattern should fail because person restore asset is disabled');
+
 const floodInputPath = path.join(projectPaths.working, 'flood-cutout-input.png');
 const floodOutputPath = path.join(projectPaths.working, 'flood-cutout-output.png');
 const floodMaskPath = path.join(projectPaths.working, 'flood-cutout-mask-debug.png');
@@ -2805,6 +3296,21 @@ assert(floodReport.mode === 'edge-flood', 'flood report should name edge-flood m
 assert(floodReport.removed_pixels > 0, 'flood report should count removed pixels');
 assert(floodReport.edge_cleanup_pixels > 0, 'flood report should count edge cleanup pixels');
 assert(floodReport.warnings.length === 0, `flood report should not warn for fixture: ${floodReport.warnings.join('; ')}`);
+
+const macPersonUnavailableOutputPath = path.join(projectPaths.working, 'mac-person-guard-output.png');
+let macPersonUnavailableError = null;
+try {
+  assertMacPersonCutoutAvailable({
+    platform: 'linux',
+    swiftPath: '/usr/bin/swift',
+    fsExists: () => true,
+  });
+} catch (error) {
+  macPersonUnavailableError = error;
+}
+assert(macPersonUnavailableError, 'mac person cutout should reject non-mac platforms');
+assert(macPersonUnavailableError.message === 'cutout:person-mac requires macOS with Apple Vision and swift', 'mac person cutout should use stable non-mac error message');
+assert(!fs.existsSync(macPersonUnavailableOutputPath), 'mac person cutout guard must not write partial output files');
 
 // --- install-skill.js: 双平台符号链接安装 ---
 const installSkill = require('./install-skill');
