@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const parse5 = require('parse5');
 const { attrsToObject, parseInlineStyle, parsePx, walk } = require('./render-profile');
 
@@ -25,6 +26,10 @@ function extractInlinePosition(node) {
   };
 }
 
+function isLocalBitmapSrc(src) {
+  return src && !/^data:|^https?:/i.test(src);
+}
+
 function readCanvas(documentNode) {
   let poster;
   walk(documentNode, (node) => {
@@ -43,6 +48,25 @@ function compilePosterIr(htmlPath) {
     if (!node.tagName) return;
     const attrs = attrsToObject(node);
     const classes = classList(node);
+    if (node.tagName === 'img') {
+      const src = attrs.src || '';
+      const position = extractInlinePosition(node);
+      const finalReady = attrs['data-final-asset-ready'] === 'true';
+      if (finalReady && isLocalBitmapSrc(src) && position.width && position.height) {
+        layers.push({
+          id: attrs['data-asset-id'] || attrs.class || `image-${layers.length + 1}`,
+          type: 'image',
+          className: attrs.class || '',
+          href: path.resolve(path.dirname(htmlPath), src),
+          route: attrs['data-route'] || '',
+          x: position.x || 0,
+          y: position.y || 0,
+          width: position.width,
+          height: position.height,
+        });
+      }
+      return;
+    }
     if (node.tagName === 'svg') {
       layers.push({
         id: attrs.class || `svg-${layers.length + 1}`,

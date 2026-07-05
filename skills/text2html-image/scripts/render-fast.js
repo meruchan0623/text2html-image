@@ -6,6 +6,7 @@ const { inspectRenderProfile } = require('./utils/render-profile');
 const { compilePosterIr } = require('./utils/poster-ir');
 const { compileSvg } = require('./utils/svg-compiler');
 const { Resvg } = require('@resvg/resvg-js');
+const { PNG } = require('pngjs');
 
 function renderSvgToPng(svg, pngPath, scale) {
   const renderer = new Resvg(svg, {
@@ -20,6 +21,71 @@ function renderSvgToPng(svg, pngPath, scale) {
   const pngData = renderer.render();
   fs.mkdirSync(path.dirname(pngPath), { recursive: true });
   fs.writeFileSync(pngPath, pngData.asPng());
+}
+
+function readLayerPng(layer) {
+  if (!layer.href || !fs.existsSync(layer.href)) return null;
+  try {
+    return PNG.sync.read(fs.readFileSync(layer.href));
+  } catch (_error) {
+    return null;
+  }
+}
+
+function sampleRegionEvidence(png, layer, scale) {
+  const x0 = Math.max(0, Math.floor(layer.x * scale));
+  const y0 = Math.max(0, Math.floor(layer.y * scale));
+  const x1 = Math.min(png.width, Math.ceil((layer.x + layer.width) * scale));
+  const y1 = Math.min(png.height, Math.ceil((layer.y + layer.height) * scale));
+  const sourcePng = readLayerPng(layer);
+  const colors = new Set();
+  let sampled = 0;
+  let sourceOpaqueSampled = 0;
+  const stepX = Math.max(1, Math.floor((x1 - x0) / 24));
+  const stepY = Math.max(1, Math.floor((y1 - y0) / 24));
+  for (let y = y0; y < y1; y += stepY) {
+    for (let x = x0; x < x1; x += stepX) {
+      if (sourcePng) {
+        const localX = (x - x0) / Math.max(1, x1 - x0);
+        const localY = (y - y0) / Math.max(1, y1 - y0);
+        const sx = Math.max(0, Math.min(sourcePng.width - 1, Math.floor(localX * sourcePng.width)));
+        const sy = Math.max(0, Math.min(sourcePng.height - 1, Math.floor(localY * sourcePng.height)));
+        const sourceAlpha = sourcePng.data[((sourcePng.width * sy + sx) << 2) + 3];
+        if (sourceAlpha === 0) continue;
+        sourceOpaqueSampled += 1;
+      }
+      const offset = (png.width * y + x) << 2;
+      colors.add(`${png.data[offset]},${png.data[offset + 1]},${png.data[offset + 2]},${png.data[offset + 3]}`);
+      sampled += 1;
+    }
+  }
+  return {
+    layer_id: layer.id,
+    bbox: { x: x0, y: y0, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0) },
+    sampled_pixel_count: sampled,
+    source_opaque_sample_count: sourcePng ? sourceOpaqueSampled : null,
+    source_alpha_checked: Boolean(sourcePng),
+    distinct_sampled_color_count: colors.size,
+    status: sampled > 0 && colors.size >= 2 ? 'visible' : 'review',
+  };
+}
+
+function inspectImageLayerEvidence(pngPath, ir, scale) {
+  const imageLayers = ir.layers.filter((layer) => layer.type === 'image');
+  if (!imageLayers.length || !pngPath || !fs.existsSync(pngPath)) {
+    return {
+      image_layer_count: imageLayers.length,
+      visible_image_layer_count: 0,
+      layers: [],
+    };
+  }
+  const png = PNG.sync.read(fs.readFileSync(pngPath));
+  const layers = imageLayers.map((layer) => sampleRegionEvidence(png, layer, scale));
+  return {
+    image_layer_count: imageLayers.length,
+    visible_image_layer_count: layers.filter((layer) => layer.status === 'visible').length,
+    layers,
+  };
 }
 
 function main() {
@@ -43,12 +109,14 @@ function main() {
       if (!args['profile-only']) {
         renderSvgToPng(svg, pngPath, scale);
       }
+      const imageLayerEvidence = args['profile-only'] ? undefined : inspectImageLayerEvidence(pngPath, ir, scale);
       return {
         ...entry,
         ...profile,
         ir_path: irPath,
         svg_path: svgPath,
         png: args['profile-only'] ? undefined : pngPath,
+        image_layer_evidence: imageLayerEvidence,
         scale,
       };
     }
@@ -86,6 +154,7 @@ function main() {
           width: entry.canvas.width * entry.scale,
           height: entry.canvas.height * entry.scale,
         },
+        image_layer_evidence: entry.image_layer_evidence,
       })),
       failed: failed.map((entry) => ({
         html_group: entry.html_group,

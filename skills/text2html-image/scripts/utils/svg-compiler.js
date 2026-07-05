@@ -1,9 +1,27 @@
+const fs = require('fs');
+const path = require('path');
+
 function escapeXml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function mimeTypeFor(filePath) {
+  const ext = path.extname(String(filePath || '')).toLowerCase();
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.webp') return 'image/webp';
+  return 'image/png';
+}
+
+function imageHref(value) {
+  if (/^file:|^data:|^https?:/i.test(String(value || ''))) return String(value || '');
+  if (fs.existsSync(String(value || ''))) {
+    return `data:${mimeTypeFor(value)};base64,${fs.readFileSync(value).toString('base64')}`;
+  }
+  return `file://${String(value || '')}`;
 }
 
 function layerToSvg(layer) {
@@ -16,6 +34,9 @@ function layerToSvg(layer) {
   if (layer.type === 'text') {
     const transform = /label-portugal/.test(layer.className) ? ` transform="rotate(-65 ${layer.x} ${layer.y})"` : '';
     return `<text data-layer-id="${escapeXml(layer.id)}" x="${layer.x}" y="${layer.y}" fill="${escapeXml(layer.fill)}" font-family="Noto Sans TC, Arial, sans-serif" font-size="${layer.fontSize}" font-weight="${layer.fontWeight}" text-anchor="${layer.textAnchor || 'start'}" dominant-baseline="middle"${transform}>${escapeXml(layer.text)}</text>`;
+  }
+  if (layer.type === 'image') {
+    return `<image data-layer-id="${escapeXml(layer.id)}" href="${escapeXml(imageHref(layer.href))}" x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" preserveAspectRatio="none"/>`;
   }
   return '';
 }
@@ -35,4 +56,5 @@ ${body}
 module.exports = {
   compileSvg,
   escapeXml,
+  imageHref,
 };
