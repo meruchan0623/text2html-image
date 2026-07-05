@@ -69,11 +69,17 @@ function auditOne(asset, options = {}) {
   let highContrast = null;
 
   if (!SOURCE_TRUTH_KINDS.has(kind)) {
-    failures.push({
-      code: 'not_source_truth_kind',
-      message: 'asset kind is not a configured source-truth bitmap kind',
+    return {
+      id: asset.id || asset.asset_id || null,
       kind,
-    });
+      route: String(asset.route || '').trim(),
+      path: filePath || null,
+      dimensions,
+      high_contrast: highContrast,
+      status: 'skipped',
+      skipped_reason: 'not_source_truth_kind',
+      failures,
+    };
   }
   if (!filePath || !fs.existsSync(filePath)) {
     failures.push({
@@ -164,6 +170,7 @@ function auditSourceTruthBitmaps({ assets, baseDir } = {}) {
       asset_count: audited.length,
       pass_count: audited.filter((asset) => asset.status === 'pass').length,
       fail_count: audited.filter((asset) => asset.status === 'fail').length,
+      skipped_count: audited.filter((asset) => asset.status === 'skipped').length,
       failure_count: failures.length,
       failure_types: [...new Set(failures.map((failure) => failure.code))].sort(),
     },

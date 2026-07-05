@@ -16,6 +16,8 @@ const {
 } = require('./utils/workflow-core');
 const { listHtmlEntries } = require('./utils/html-entries');
 const { inspectHtmlEditability } = require('./utils/dom-editability-core');
+const { compilePosterIr } = require('./utils/poster-ir');
+const { compileSvg } = require('./utils/svg-compiler');
 const { routeAssets } = require('./utils/asset-routing-core');
 const { checkTemplates } = require('./utils/template-registry-core');
 const { checkCopySchema } = require('./utils/copy-schema-core');
@@ -30,6 +32,22 @@ const { auditBitmapLayerContract } = require('./utils/bitmap-layer-contract-core
 const { auditReviewGateContract } = require('./utils/review-gate-contract-core');
 const { auditAssetReadinessContract } = require('./utils/asset-readiness-contract-core');
 const { auditSourceTruthAcquisitionPlan } = require('./utils/source-truth-acquisition-core');
+const { buildOverflowEvaluationScript, removeTemporaryDirectory } = require('./utils/overflow-audit-core');
+const { comparePngImages } = require('./utils/visual-compare-core');
+const {
+  buildNormalizedProjectIndex,
+  buildPromotionCandidates,
+  extractScore,
+  normalizeProjectEvidence,
+  normalizeStatus,
+  safeReadJson,
+  scanProjectRoots,
+} = require('./utils/learning-evidence-core');
+const {
+  buildProductizationReport,
+  renderNextTrainingPlan,
+  renderProductizationMarkdown,
+} = require('./utils/learning-report-core');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -41,6 +59,10 @@ function read(file) {
 
 function maybeReadAbsolute(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+}
+
+function assertReadableProjectName(projectName, label) {
+  assert(!/(^|[-_])(test|case|tmp|temp|random|fixture)([-_]|$)|^test-p\d+$/i.test(projectName), `${label} must use a readable non-test-like project folder name`);
 }
 
 const testFixturePaths = [];
@@ -257,6 +279,10 @@ for (const script of [
   'audit-review-gates.js',
   'audit-asset-readiness.js',
   'audit-source-truth-acquisition.js',
+  'audit-overflow.js',
+  'audit-visual-compare.js',
+  'learning-index.js',
+  'learning-report.js',
   'test.js',
 ]) {
   assert(fs.existsSync(path.join(ROOT, 'scripts', script)), `missing package script target scripts/${script}`);
@@ -280,6 +306,10 @@ assert(packageJson.scripts['audit:bitmap-layers'] === 'node scripts/audit-bitmap
 assert(packageJson.scripts['audit:review-gates'] === 'node scripts/audit-review-gates.js', 'package.json missing audit:review-gates script');
 assert(packageJson.scripts['audit:asset-readiness'] === 'node scripts/audit-asset-readiness.js', 'package.json missing audit:asset-readiness script');
 assert(packageJson.scripts['audit:source-truth-acquisition'] === 'node scripts/audit-source-truth-acquisition.js', 'package.json missing audit:source-truth-acquisition script');
+assert(packageJson.scripts['audit:overflow'] === 'node scripts/audit-overflow.js', 'package.json missing audit:overflow script');
+assert(packageJson.scripts['audit:visual-compare'] === 'node scripts/audit-visual-compare.js', 'package.json missing audit:visual-compare script');
+assert(packageJson.scripts['learning:index'] === 'node scripts/learning-index.js', 'package.json missing learning:index script');
+assert(packageJson.scripts['learning:report'] === 'node scripts/learning-report.js', 'package.json missing learning:report script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
   assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
@@ -415,7 +445,16 @@ assert(skillBody.includes('npm run flood-cutout'), 'skill must document flood-cu
 assert(skillBody.includes('npm run audit:imagegen'), 'skill must document audit:imagegen command');
 assert(skillBody.includes('npm run audit:asset-readiness'), 'skill must document audit:asset-readiness command');
 assert(skillBody.includes('npm run audit:source-truth-acquisition'), 'skill must document audit:source-truth-acquisition command');
+assert(skillBody.includes('npm run learning:index'), 'skill must document learning:index command');
+assert(skillBody.includes('npm run learning:report'), 'skill must document learning:report command');
+assert(skillBody.includes('Do not resume broad ImageGen training until the learning report exists'), 'skill must block broad training before productization report');
+assert(skillBody.includes('promotion-candidates.json'), 'skill must document promotion candidates output');
+assert(skillBody.includes('training-productization-report.md'), 'skill must document training productization report output');
+assert(skillBody.includes('Mini-batch productization review'), 'skill must document mini-batch productization review');
+assert(skillBody.includes('do not treat the candidate as eliminated'), 'skill must keep historical failure candidates until tests or reports prove elimination');
+assert(skillBody.includes('hard-gated success only promotes rules that all hard gates prove'), 'skill must restrict skill-rule promotion to hard-gated evidence');
 assert(skillBody.includes('--routing <asset-routing-table.json>'), 'skill must document asset-readiness routing input');
+assert(skillBody.includes('requires_independent_children'), 'skill must document independent child asset contract field');
 assert(skillBody.includes('source type or route, source/output path, dimensions, checksum, and license/source scope'), 'skill must document final source-truth metadata requirements');
 assert(skillBody.includes('blocking_condition') && skillBody.includes('evidence_required'), 'skill must document source-truth acquisition blocker metadata requirements');
 assert(skillBody.includes('reports/imagegen-candidates.json'), 'skill must document imagegen candidate audit report');
@@ -434,9 +473,13 @@ assert(skillBody.includes('overflow-wrap: anywhere'), 'skill must document trans
 assert(skillBody.includes('outputs/<deliverable>/html/index.html'), 'skill must document detached deliverable path depth checks');
 assert(skillBody.includes('Resolved local image paths from the active HTML path'), 'completion contract must verify image paths from active HTML');
 assert(skillBody.includes('QR/scannable-code crop path'), 'completion contract must include QR crop verification');
+assert(skillBody.includes('final-ready `<img>` layers with explicit pixel `left`, `top`, `width`, and `height`'), 'skill must document export-safe final-ready bitmap image placement');
+assert(skillBody.includes('png-export-report.json` image-layer visibility evidence'), 'skill must document final PNG bitmap layer visibility evidence');
+assert(skillBody.includes('source-alpha-aware'), 'skill must document source-alpha-aware bitmap visibility sampling');
 assert(skillBody.includes('## Draw/Edit Rework Guard'), 'skill must document draw/edit rework guard');
 assert(skillBody.includes('prompt_only is not a finished transparent asset'), 'skill must block prompt-only transparent layers from final HTML');
 assert(skillBody.includes('flood-cutout is not semantic segmentation'), 'skill must document flood-cutout semantic boundary');
+assert(skillBody.includes('rectangular mask is not semantic cutout proof'), 'skill must document rectangular mask semantic cutout limitation');
 assert(skillBody.includes('current preview edit'), 'skill must document current preview edit guard');
 assert(skillBody.includes('resolved from the delivered HTML path'), 'skill must require delivered HTML asset path checks');
 assert(skillBody.includes('QR/barcode assets are bitmap truth assets'), 'skill must preserve scannable bitmap assets');
@@ -454,6 +497,8 @@ assert(skillBody.includes('runs/latest/scores/round-NN.json'), 'skill must docum
 assert(skillBody.includes('Existing historical and current runtime folders'), 'skill must preserve legacy runtime folders unless requested');
 assert(skillBody.includes('Device screen UI is partially hidden'), 'stop conditions must catch phone UI occlusion');
 assert(skillBody.includes('npm run audit:dom'), 'skill must document audit:dom command');
+assert(skillBody.includes('npm run audit:overflow'), 'skill must document audit:overflow command');
+assert(skillBody.includes('cell-overflow-report.json'), 'skill must mention cell-overflow-report.json');
 assert(skillBody.includes('DOM editability report path'), 'completion contract must include DOM editability report');
 assert(skillBody.includes('dom-editability-report.json'), 'skill must mention dom-editability-report.json');
 assert(skillBody.includes('## Final Preview Links'), 'skill must document final preview links');
@@ -462,6 +507,14 @@ assert(skillBody.includes('Every plain-text report or final response that refere
 assert(skillBody.includes('required handoff for every image-edit round'), 'skill must require HTML preview links every image-edit round');
 assert(skillBody.includes('Browser annotation capability is optional'), 'skill must document optional browser annotation capability');
 assert(skillBody.includes('Do not claim browser annotation was used unless the current session probe succeeds'), 'skill must forbid unverified annotation claims');
+assert(skillBody.includes('## Reference-vs-Render Hard Gate'), 'skill must document reference-vs-render hard gate');
+assert(skillBody.includes('reports/reference-vs-render-review.json'), 'skill must require reference-vs-render review JSON before completion');
+assert(skillBody.includes('reports/reference-vs-render-review.md'), 'skill must require reference-vs-render review markdown before completion');
+assert(skillBody.includes('npm run audit:visual-compare'), 'skill must document audit:visual-compare command');
+assert(skillBody.includes('reference-vs-render-pixel-audit.json'), 'skill must document pixel audit output for reference-vs-render evidence');
+assert(skillBody.includes('reference-vs-render-diff.png'), 'skill must document visual compare diff map output');
+assert(skillBody.includes('baked raster text conflicts with DOM overlays'), 'skill must document baked raster text and DOM overlay conflicts');
+assert(skillBody.includes('clean no-text base'), 'skill must require clean no-text base layers before DOM overlays are considered visually clean');
 const executionFlow = read('references/execution-flow.md');
 assert(executionFlow.includes('Reference Image Asset Routing'), 'execution flow must document reference image asset routing');
 assert(executionFlow.includes('asset-routing-table.json'), 'execution flow must include asset routing table evidence');
@@ -508,6 +561,11 @@ assert(executionFlow.includes('Promote `runs/latest/` to a named run only when')
 assert(executionFlow.includes('runs/latest/reports/intake-report.json'), 'execution flow must document intake run report');
 assert(executionFlow.includes('Do not promote a micro-adjustment into a full regeneration'), 'execution flow must block broad regeneration for micro-edits');
 assert(executionFlow.includes('sync-back decision'), 'execution flow must record deliverable-copy sync-back decisions');
+assert(executionFlow.includes('reports/reference-vs-render-review.json'), 'execution flow must include reference-vs-render review JSON gate');
+assert(executionFlow.includes('reports/reference-vs-render-review.md'), 'execution flow must include reference-vs-render review markdown gate');
+assert(executionFlow.includes('visual similarity cannot override DOM or asset-route failure'), 'execution flow must state visual similarity cannot override DOM or asset route failure');
+assert(executionFlow.includes('Mini-batch productization review'), 'execution flow must document mini-batch productization review');
+assert(executionFlow.includes('missing_review_gate, prompt_only_not_review_gated, or no_accepted_imagegen_candidate'), 'execution flow must name high-confidence failure candidates for productization review');
 const stageGuides = read('references/stage-guides.md');
 assert(stageGuides.includes('Complex art source types'), 'stage guides must document complex art source types');
 assert(stageGuides.includes('reference_cutout'), 'stage guides must document reference cutout routing');
@@ -573,7 +631,8 @@ assert(sanitizeProjectFolderName('商品主图复刻-价格促销海报-清爽�
 assert(sanitizeProjectFolderName('Product Poster Recreation / Price Promo / Clean Business Style') === 'Product-Poster-Recreation-Price-Promo-Clean-Business-Style', 'project folder names should keep readable English notes');
 assert(sanitizeProjectFolderName('  :::  ') === 'default', 'empty project folder names should fall back to default');
 
-const projectId = `test-p${process.pid}`;
+const projectId = 'workflow-preview-validation-recreation';
+assertReadableProjectName(projectId, 'test harness project id');
 const projectPaths = createProjectWorkspace(projectId);
 for (const dir of ['source', 'working', 'html', 'screenshots', 'scores', 'exports', 'reports']) {
   assert(fs.existsSync(projectPaths[dir]), `project workspace missing ${dir}`);
@@ -596,6 +655,150 @@ assert(chineseProjectPaths.root.endsWith(path.join('text2html-image-project', '�
 const defaultPaths = getProjectPaths();
 assert(defaultPaths.project_id === 'default', 'missing project should use default project id');
 assert(defaultPaths.root.startsWith(`${path.join(getUserDocumentsDir(), 'text2html-image-project')}${path.sep}`), `default project root must be under system Documents text2html-image-project: ${defaultPaths.root}`);
+
+const learningFixtureRoot = path.join(projectPaths.root, 'learning-productization-fixtures');
+fs.rmSync(learningFixtureRoot, { recursive: true, force: true });
+fs.mkdirSync(learningFixtureRoot, { recursive: true });
+
+const learningSuccessProject = path.join(learningFixtureRoot, 'airport-pricing-source-truth-success');
+fs.mkdirSync(path.join(learningSuccessProject, 'source'), { recursive: true });
+fs.mkdirSync(path.join(learningSuccessProject, 'html'), { recursive: true });
+fs.mkdirSync(path.join(learningSuccessProject, 'exports'), { recursive: true });
+fs.mkdirSync(path.join(learningSuccessProject, 'reports'), { recursive: true });
+fs.writeFileSync(path.join(learningSuccessProject, 'source', 'reference.png'), 'reference');
+fs.writeFileSync(path.join(learningSuccessProject, 'html', 'index.html'), '<!doctype html><main></main>');
+fs.writeFileSync(path.join(learningSuccessProject, 'exports', 'index.png'), 'export');
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'project-summary.json'), JSON.stringify({
+  status: 'complete',
+  similarity_score: 89,
+}, null, 2));
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'reference-vs-render-review.json'), JSON.stringify({
+  status: 'pass',
+  visual_similarity_score: 89,
+}, null, 2));
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'dom-editability-report.json'), JSON.stringify({ status: 'pass' }, null, 2));
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'cell-overflow-report.json'), JSON.stringify({ status: 'pass' }, null, 2));
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'asset-readiness-audit.json'), JSON.stringify({ status: 'pass' }, null, 2));
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'source-truth-acquisition-audit.json'), JSON.stringify({ status: 'pass' }, null, 2));
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'route-contract-audit.json'), JSON.stringify({ status: 'pass' }, null, 2));
+fs.writeFileSync(path.join(learningSuccessProject, 'reports', 'reference-vs-render-pixel-audit.json'), JSON.stringify({ status: 'pass', similarity_score: 88 }, null, 2));
+
+assert(safeReadJson(path.join(learningSuccessProject, 'reports', 'project-summary.json')).status === 'complete', 'learning safeReadJson should read valid JSON');
+assert(safeReadJson(path.join(learningSuccessProject, 'reports', 'missing.json')) === null, 'learning safeReadJson should return null for missing JSON');
+assert(normalizeStatus('PASS') === 'pass', 'learning normalizeStatus should lowercase pass');
+assert(normalizeStatus('partial_pass_with_review_gaps') === 'review', 'learning normalizeStatus should map partial pass to review');
+assert(normalizeStatus('not_applicable') === 'not_applicable', 'learning normalizeStatus should preserve not_applicable');
+assert(normalizeStatus(undefined) === 'missing', 'learning normalizeStatus should map empty values to missing');
+assert(extractScore({ visual_score: 77 }, { similarity_score: 88 }) === 77, 'learning extractScore should use first available score');
+assert(extractScore({ status: 'pass' }) === null, 'learning extractScore should return null when no score exists');
+
+const normalizedSuccess = normalizeProjectEvidence(learningSuccessProject);
+assert(normalizedSuccess.project_id === 'airport-pricing-source-truth-success', 'learning normalizer should use folder name as project id');
+assert(normalizedSuccess.classification === 'success', `learning success project should classify as success, got ${normalizedSuccess.classification}`);
+assert(normalizedSuccess.visual.score === 89, 'learning normalizer should capture visual score');
+assert(normalizedSuccess.visual.pixel_score === 88, 'learning normalizer should capture pixel score');
+assert(normalizedSuccess.gates.dom_editability === 'pass', 'learning normalizer should capture DOM gate');
+assert(normalizedSuccess.gates.source_truth === 'pass', 'learning normalizer should capture source-truth gate');
+assert(normalizedSuccess.paths.reference.endsWith('source/reference.png'), 'learning normalizer should preserve reference path');
+
+const learningReviewProject = path.join(learningFixtureRoot, 'logo-review-gap-project');
+fs.mkdirSync(path.join(learningReviewProject, 'source'), { recursive: true });
+fs.mkdirSync(path.join(learningReviewProject, 'html'), { recursive: true });
+fs.mkdirSync(path.join(learningReviewProject, 'exports'), { recursive: true });
+fs.mkdirSync(path.join(learningReviewProject, 'reports'), { recursive: true });
+fs.writeFileSync(path.join(learningReviewProject, 'source', 'reference.png'), 'reference');
+fs.writeFileSync(path.join(learningReviewProject, 'html', 'index.html'), '<!doctype html><main></main>');
+fs.writeFileSync(path.join(learningReviewProject, 'exports', 'index.png'), 'export');
+fs.writeFileSync(path.join(learningReviewProject, 'reports', 'project-summary.json'), JSON.stringify({ status: 'complete', similarity_score: 82 }, null, 2));
+fs.writeFileSync(path.join(learningReviewProject, 'reports', 'reference-vs-render-review.json'), JSON.stringify({ status: 'pass', visual_similarity_score: 82 }, null, 2));
+fs.writeFileSync(path.join(learningReviewProject, 'reports', 'dom-editability-report.json'), JSON.stringify({ status: 'pass' }, null, 2));
+fs.writeFileSync(path.join(learningReviewProject, 'reports', 'cell-overflow-report.json'), JSON.stringify({ status: 'pass' }, null, 2));
+fs.writeFileSync(path.join(learningReviewProject, 'reports', 'asset-readiness-audit.json'), JSON.stringify({
+  status: 'fail',
+  failures: [
+    { code: 'missing_review_gate' },
+    { code: 'prompt_only_not_review_gated' },
+    { code: 'no_accepted_imagegen_candidate' },
+  ],
+}, null, 2));
+fs.writeFileSync(path.join(learningReviewProject, 'reports', 'source-truth-acquisition-audit.json'), JSON.stringify({ status: 'review' }, null, 2));
+fs.writeFileSync(path.join(learningReviewProject, 'reports', 'route-contract-audit.json'), JSON.stringify({ status: 'pass' }, null, 2));
+
+const learningSecondReviewProject = path.join(learningFixtureRoot, 'logo-review-gap-repeat-project');
+fs.cpSync(learningReviewProject, learningSecondReviewProject, { recursive: true });
+
+const learningInvalidProject = path.join(learningFixtureRoot, 'missing-export-project');
+fs.mkdirSync(path.join(learningInvalidProject, 'reports'), { recursive: true });
+fs.writeFileSync(path.join(learningInvalidProject, 'reports', 'project-summary.json'), JSON.stringify({ status: 'complete' }, null, 2));
+
+const learningFixtureProject = path.join(learningFixtureRoot, 'test-p12345');
+fs.mkdirSync(path.join(learningFixtureProject, 'reports'), { recursive: true });
+fs.writeFileSync(path.join(learningFixtureProject, 'reports', 'project-summary.json'), JSON.stringify({ status: 'fixture' }, null, 2));
+
+const scannedLearningRoots = scanProjectRoots(learningFixtureRoot);
+assert(scannedLearningRoots.includes(learningSuccessProject), 'learning scanner should include project folders with reports');
+assert(scannedLearningRoots.includes(learningInvalidProject), 'learning scanner should include invalid samples for reporting');
+
+const learningIndex = buildNormalizedProjectIndex(learningFixtureRoot);
+assert(learningIndex.output_root === learningFixtureRoot, 'learning index should record output root');
+assert(learningIndex.summary.total_projects === 5, `learning index should count 5 fixture projects, got ${learningIndex.summary.total_projects}`);
+assert(learningIndex.summary.classification_counts.success === 1, 'learning index should count one success');
+assert(learningIndex.summary.classification_counts.blocker === 2, 'learning index should count two blocker projects');
+assert(learningIndex.summary.classification_counts.invalid_sample === 1, 'learning index should count one invalid sample');
+assert(learningIndex.summary.classification_counts.exploration === 1, 'learning index should count one random exploration project');
+assert(learningIndex.summary.score_stats.median === 82, 'learning index should compute score median from scored projects');
+
+const learningPromotions = buildPromotionCandidates(learningIndex.projects);
+assert(learningPromotions.some((candidate) => candidate.type === 'promote_to_test' && candidate.id === 'failure-missing-review-gate'), 'repeated missing_review_gate should promote to test');
+assert(learningPromotions.some((candidate) => candidate.type === 'promote_to_test' && candidate.id === 'failure-prompt-only-not-review-gated'), 'repeated prompt_only_not_review_gated should promote to test');
+assert(learningPromotions.some((candidate) => candidate.type === 'promote_to_test' && candidate.id === 'failure-no-accepted-imagegen-candidate'), 'repeated no_accepted_imagegen_candidate should promote to test');
+assert(learningPromotions.some((candidate) => candidate.type === 'keep_as_review_gap' && candidate.id === 'review-source-truth'), 'repeated source-truth review should stay review gap');
+assert(learningPromotions.some((candidate) => candidate.type === 'needs_more_training' && candidate.id === 'visual-success-pattern'), 'successful project pattern should request more training before rule promotion');
+
+const learningIndexCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'learning-index.js'),
+  '--root', learningFixtureRoot,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(learningIndexCliOutput.includes('Learning index written:'), 'learning index CLI should report output path');
+const learningIndexReportPath = path.join(learningFixtureRoot, 'imagegen-tdd-learning-lab', 'reports', 'normalized-project-index.json');
+const learningIndexReport = JSON.parse(fs.readFileSync(learningIndexReportPath, 'utf8'));
+assert(learningIndexReport.summary.total_projects === 5, 'learning index CLI should write normalized project index');
+assert(learningIndexReport.promotion_candidates.length >= 2, 'learning index CLI should include promotion candidates');
+
+const productizationReport = buildProductizationReport(learningIndexReport);
+assert(productizationReport.summary.total_projects === 5, 'productization report should preserve total project count');
+assert(productizationReport.assessment.has_clear_progress === true, 'productization report should identify progress when success projects exist');
+assert(productizationReport.shortfalls.some((item) => item.includes('asset_readiness')), 'productization report should list asset readiness shortfall');
+assert(productizationReport.next_actions[0].includes('Implement'), 'productization report should start with implementation action');
+
+const productizationMarkdown = renderProductizationMarkdown(productizationReport);
+assert(productizationMarkdown.includes('# Training Productization Report'), 'productization markdown should have title');
+assert(productizationMarkdown.includes('## What To Do Next'), 'productization markdown should include next action section');
+assert(productizationMarkdown.includes('Do not resume broad training'), 'productization markdown should stop broad training');
+
+const nextTrainingPlan = renderNextTrainingPlan(productizationReport);
+assert(nextTrainingPlan.includes('# Next Training Plan'), 'next training plan should have title');
+assert(nextTrainingPlan.includes('Regression case'), 'next training plan should name regression case');
+
+const learningReportCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'learning-report.js'),
+  '--root', learningFixtureRoot,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(learningReportCliOutput.includes('Training productization report written:'), 'learning report CLI should write markdown report');
+const productizationReportPath = path.join(learningFixtureRoot, 'imagegen-tdd-learning-lab', 'reports', 'training-productization-report.json');
+const productizationMarkdownPath = path.join(learningFixtureRoot, 'imagegen-tdd-learning-lab', 'reports', 'training-productization-report.md');
+const promotionCandidatesPath = path.join(learningFixtureRoot, 'imagegen-tdd-learning-lab', 'reports', 'promotion-candidates.json');
+const nextTrainingPlanPath = path.join(learningFixtureRoot, 'imagegen-tdd-learning-lab', 'reports', 'next-training-plan.md');
+assert(fs.existsSync(productizationReportPath), 'learning report CLI should write JSON report');
+assert(fs.existsSync(productizationMarkdownPath), 'learning report CLI should write markdown report');
+assert(fs.existsSync(promotionCandidatesPath), 'learning report CLI should write promotion candidates');
+assert(fs.existsSync(nextTrainingPlanPath), 'learning report CLI should write next training plan');
 
 const fixtureCopyRows = [
   {
@@ -688,6 +891,32 @@ assert(htmlEntries.length >= 3, 'html entries should enumerate generated canonic
 assert(htmlEntries.some((entry) => entry.variant === 'canonical'), 'html entries should include canonical index.html');
 assert(htmlEntries.some((entry) => entry.variant === 'zh-cn'), 'html entries should include zh-cn localized html');
 assert(htmlEntries.every((entry) => entry.file_url === toFileUrl(entry.html)), 'html entries should include correct file_url');
+const shallowProjectId = 'shallow-html-entry-validation-recreation';
+assertReadableProjectName(shallowProjectId, 'shallow html entry fixture project id');
+const shallowProjectPaths = createProjectWorkspace(shallowProjectId);
+fs.writeFileSync(path.join(shallowProjectPaths.html, 'index.html'), `<!doctype html>
+<html>
+<head><meta charset="utf-8"><link rel="stylesheet" href="master.css"></head>
+<body><main class="poster" style="width: 320px; height: 180px"><h1 data-i18n-key="title">Shallow Preview</h1></main></body>
+</html>
+`);
+fs.writeFileSync(path.join(shallowProjectPaths.html, 'master.css'), 'body { margin: 0; }\n');
+const shallowHtmlEntries = listHtmlEntries(shallowProjectPaths);
+assert(shallowHtmlEntries.length === 1, 'html entries should include shallow single-group html/index.html');
+assert(shallowHtmlEntries[0].html_group === 'default', 'shallow html entry should use default html_group');
+assert(shallowHtmlEntries[0].variant === 'canonical', 'shallow html/index.html should be canonical variant');
+assert(shallowHtmlEntries[0].html === path.join(shallowProjectPaths.html, 'index.html'), 'shallow html entry should point at html/index.html');
+const overflowEvaluationScript = buildOverflowEvaluationScript();
+assert(overflowEvaluationScript.includes('document.createRange()'), 'overflow audit must use browser Range geometry');
+assert(overflowEvaluationScript.includes('range.getClientRects()'), 'overflow audit must use Range.getClientRects for wrapped text');
+assert(overflowEvaluationScript.includes('scrollWidth') && overflowEvaluationScript.includes('clientWidth'), 'overflow audit must compare scroll and client widths');
+assert(overflowEvaluationScript.includes('data-overflow-check'), 'overflow audit must support explicit data-overflow-check selectors');
+assert(typeof removeTemporaryDirectory === 'function', 'overflow audit must expose retrying temporary profile cleanup');
+const overflowCleanupDir = path.join(projectPaths.working, 'overflow-cleanup-validation');
+fs.mkdirSync(overflowCleanupDir, { recursive: true });
+fs.writeFileSync(path.join(overflowCleanupDir, 'profile-file'), 'pending chrome profile file');
+removeTemporaryDirectory(overflowCleanupDir);
+assert(!fs.existsSync(overflowCleanupDir), 'overflow audit temporary profile cleanup should remove nested profile files');
 const buildOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'build.js'),
   '--project', projectId,
@@ -855,6 +1084,156 @@ const vectorSvg = fs.readFileSync(vectorEntry.svg_path, 'utf8');
 assert(vectorSvg.includes('<svg'), 'compiled SVG should contain svg root');
 assert(vectorSvg.includes('viewBox="0 0 1000 1263"'), 'compiled SVG should preserve canvas viewBox');
 assert(vectorSvg.includes('向量'), 'compiled SVG should contain editable text content as SVG text');
+
+const bitmapTruthPng = new PNG({ width: 24, height: 24 });
+for (let y = 0; y < bitmapTruthPng.height; y += 1) {
+  for (let x = 0; x < bitmapTruthPng.width; x += 1) {
+    const offset = (bitmapTruthPng.width * y + x) * 4;
+    const dark = (x + y) % 2 === 0;
+    bitmapTruthPng.data[offset] = dark ? 0 : 255;
+    bitmapTruthPng.data[offset + 1] = dark ? 0 : 255;
+    bitmapTruthPng.data[offset + 2] = dark ? 0 : 255;
+    bitmapTruthPng.data[offset + 3] = 255;
+  }
+}
+const bitmapTruthPath = path.join(projectPaths.source, 'bitmap-truth-render-fixture.png');
+fs.writeFileSync(bitmapTruthPath, PNG.sync.write(bitmapTruthPng));
+const bitmapTruthHtmlPath = path.join(projectPaths.html, 'bitmap-truth-render-fixture.html');
+fs.writeFileSync(bitmapTruthHtmlPath, `<!doctype html>
+<html>
+<head><meta charset="utf-8"><link rel="stylesheet" href="master.css"></head>
+<body>
+  <main class="poster" style="width: 240px; height: 160px">
+    <img class="qr-layer" src="../source/bitmap-truth-render-fixture.png" data-asset-id="qr_truth_fixture" data-route="locked_base_layer" data-final-asset-ready="true" data-asset-text-policy="no-text" style="position: absolute; left: 32px; top: 44px; width: 72px; height: 72px; z-index: 4;">
+    <span class="map-label" data-i18n-key="label.qr" style="left: 148px; top: 86px;">QR truth</span>
+  </main>
+</body>
+</html>
+`);
+const bitmapTruthIr = compilePosterIr(bitmapTruthHtmlPath);
+const bitmapTruthImageLayer = bitmapTruthIr.layers.find((layer) => layer.type === 'image' && layer.id === 'qr_truth_fixture');
+assert(bitmapTruthImageLayer, 'poster IR should include final-ready bitmap truth img layers');
+assert(bitmapTruthImageLayer.href === path.resolve(path.dirname(bitmapTruthHtmlPath), '../source/bitmap-truth-render-fixture.png'), 'image layer href should resolve from the HTML path');
+assert(bitmapTruthImageLayer.x === 32 && bitmapTruthImageLayer.y === 44 && bitmapTruthImageLayer.width === 72 && bitmapTruthImageLayer.height === 72, 'image layer should preserve inline pixel placement');
+const bitmapTruthSvg = compileSvg(bitmapTruthIr);
+assert(bitmapTruthSvg.includes('<image'), 'compiled SVG should contain bitmap image layers');
+assert(bitmapTruthSvg.includes('data-layer-id="qr_truth_fixture"'), 'compiled SVG image should preserve asset id');
+assert(bitmapTruthSvg.includes('href="data:image/png;base64,'), 'compiled SVG image should embed local bitmap layers for reliable PNG export');
+const bitmapVisibilityProjectId = 'bitmap-layer-visibility-validation-recreation';
+assertReadableProjectName(bitmapVisibilityProjectId, 'bitmap visibility fixture project id');
+const bitmapVisibilityPaths = createProjectWorkspace(bitmapVisibilityProjectId);
+const bitmapVisibilitySourcePath = path.join(bitmapVisibilityPaths.source, 'checker-bitmap-layer.png');
+fs.copyFileSync(bitmapTruthPath, bitmapVisibilitySourcePath);
+fs.writeFileSync(path.join(bitmapVisibilityPaths.html, 'index.html'), `<!doctype html>
+<html>
+<head><meta charset="utf-8"><link rel="stylesheet" href="master.css"></head>
+<body>
+  <main class="poster" style="width: 160px; height: 120px">
+    <img class="checker-layer" src="../source/checker-bitmap-layer.png" data-asset-id="checker_bitmap_layer" data-route="locked_base_layer" data-final-asset-ready="true" data-asset-text-policy="no-text" style="position: absolute; left: 20px; top: 24px; width: 96px; height: 72px; z-index: 3;">
+    <span class="map-label" data-i18n-key="label.bitmap" style="left: 132px; top: 62px;">OK</span>
+  </main>
+</body>
+</html>
+`);
+fs.writeFileSync(path.join(bitmapVisibilityPaths.html, 'master.css'), 'body { margin: 0; }\n.poster { position: relative; }\n');
+require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'render-fast.js'),
+  '--project', bitmapVisibilityProjectId,
+  '--scale', '1',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+const bitmapVisibilityReport = JSON.parse(fs.readFileSync(path.join(bitmapVisibilityPaths.reports, 'png-export-report.json'), 'utf8'));
+const bitmapVisibilityExport = bitmapVisibilityReport.exports.find((entry) => entry.variant === 'canonical');
+assert(bitmapVisibilityExport?.image_layer_evidence, 'png export report should include image layer visibility evidence');
+assert(bitmapVisibilityExport.image_layer_evidence.image_layer_count === 1, 'image layer evidence should count exported bitmap layers');
+assert(bitmapVisibilityExport.image_layer_evidence.visible_image_layer_count === 1, 'image layer evidence should prove bitmap layer pixels are visible in the exported PNG');
+assert(bitmapVisibilityExport.image_layer_evidence.layers[0].status === 'visible', 'bitmap layer visibility evidence should mark checker layer visible');
+
+const transparentLayerProjectId = 'transparent-layer-visibility-validation-recreation';
+assertReadableProjectName(transparentLayerProjectId, 'transparent visibility fixture project id');
+const transparentLayerPaths = createProjectWorkspace(transparentLayerProjectId);
+const transparentLayerSourcePath = path.join(transparentLayerPaths.source, 'transparent-bitmap-layer.png');
+const transparentLayerPng = new PNG({ width: 32, height: 32 });
+for (let y = 0; y < transparentLayerPng.height; y += 1) {
+  for (let x = 0; x < transparentLayerPng.width; x += 1) {
+    const offset = (transparentLayerPng.width * y + x) << 2;
+    transparentLayerPng.data[offset] = 255;
+    transparentLayerPng.data[offset + 1] = 0;
+    transparentLayerPng.data[offset + 2] = 0;
+    transparentLayerPng.data[offset + 3] = 0;
+  }
+}
+fs.writeFileSync(transparentLayerSourcePath, PNG.sync.write(transparentLayerPng));
+fs.writeFileSync(path.join(transparentLayerPaths.html, 'index.html'), `<!doctype html>
+<html>
+<head><meta charset="utf-8"><link rel="stylesheet" href="master.css"></head>
+<body>
+  <main class="poster" style="width: 160px; height: 120px">
+    <svg width="160" height="120" viewBox="0 0 160 120">
+      <rect width="160" height="120" fill="#111827"/>
+      <rect x="20" y="20" width="100" height="80" fill="#facc15"/>
+      <rect x="48" y="42" width="48" height="36" fill="#38bdf8"/>
+    </svg>
+    <img class="transparent-layer" src="../source/transparent-bitmap-layer.png" data-asset-id="transparent_bitmap_layer" data-route="regenerated_image" data-final-asset-ready="true" data-asset-text-policy="no-text" style="position: absolute; left: 20px; top: 24px; width: 96px; height: 72px; z-index: 3;">
+  </main>
+</body>
+</html>
+`);
+fs.writeFileSync(path.join(transparentLayerPaths.html, 'master.css'), 'body { margin: 0; }\n.poster { position: relative; }\n');
+require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'render-fast.js'),
+  '--project', transparentLayerProjectId,
+  '--scale', '1',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+const transparentLayerReport = JSON.parse(fs.readFileSync(path.join(transparentLayerPaths.reports, 'png-export-report.json'), 'utf8'));
+const transparentLayerExport = transparentLayerReport.exports.find((entry) => entry.variant === 'canonical');
+assert(transparentLayerExport.image_layer_evidence.image_layer_count === 1, 'transparent layer evidence should count image layer');
+assert(transparentLayerExport.image_layer_evidence.visible_image_layer_count === 0, 'transparent bitmap layer must not be counted visible because of varied background pixels');
+assert(transparentLayerExport.image_layer_evidence.layers[0].status === 'review', 'transparent bitmap layer should stay review');
+assert(transparentLayerExport.image_layer_evidence.layers[0].source_opaque_sample_count === 0, 'transparent bitmap evidence should report zero source opaque samples');
+
+const visualCompareReferencePath = path.join(projectPaths.working, 'visual-compare-reference.png');
+const visualCompareDifferentPath = path.join(projectPaths.working, 'visual-compare-different.png');
+const visualCompareReferencePng = new PNG({ width: 48, height: 32 });
+const visualCompareDifferentPng = new PNG({ width: 48, height: 32 });
+for (let y = 0; y < 32; y += 1) {
+  for (let x = 0; x < 48; x += 1) {
+    const offset = (48 * y + x) << 2;
+    const value = x < 24 ? 20 : 230;
+    visualCompareReferencePng.data[offset] = value;
+    visualCompareReferencePng.data[offset + 1] = value;
+    visualCompareReferencePng.data[offset + 2] = value;
+    visualCompareReferencePng.data[offset + 3] = 255;
+    visualCompareDifferentPng.data[offset] = 255 - value;
+    visualCompareDifferentPng.data[offset + 1] = 255 - value;
+    visualCompareDifferentPng.data[offset + 2] = 255 - value;
+    visualCompareDifferentPng.data[offset + 3] = 255;
+  }
+}
+fs.writeFileSync(visualCompareReferencePath, PNG.sync.write(visualCompareReferencePng));
+fs.writeFileSync(visualCompareDifferentPath, PNG.sync.write(visualCompareDifferentPng));
+const identicalVisualCompare = comparePngImages({
+  referencePath: visualCompareReferencePath,
+  renderPath: visualCompareReferencePath,
+  stride: 1,
+});
+assert(identicalVisualCompare.status === 'pass', 'visual compare should pass identical PNGs');
+assert(identicalVisualCompare.similarity_score === 100, 'visual compare should score identical PNGs as 100');
+const differentVisualCompare = comparePngImages({
+  referencePath: visualCompareReferencePath,
+  renderPath: visualCompareDifferentPath,
+  stride: 1,
+  diffPath: path.join(projectPaths.working, 'visual-compare-diff.png'),
+});
+assert(differentVisualCompare.status === 'review', 'visual compare should review very different PNGs');
+assert(differentVisualCompare.similarity_score < 40, 'visual compare should give low score to inverted PNGs');
+assert(differentVisualCompare.diff_path && fs.existsSync(differentVisualCompare.diff_path), 'visual compare should write a diff map PNG when diffPath is provided');
+assert(differentVisualCompare.diff_dimensions.width === 48 && differentVisualCompare.diff_dimensions.height === 32, 'visual compare diff map should preserve compared dimensions');
 
 const fastExportOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'render-fast.js'),
@@ -1093,7 +1472,12 @@ const maskPng = new PNG({ width: 900, height: 1200 });
 const layerPng = new PNG({ width: 260, height: 520 });
 for (let y = 0; y < maskPng.height; y += 1) {
   for (let x = 0; x < maskPng.width; x += 1) {
-    setPixel(maskPng, x, y, x >= 520 && x < 780 && y >= 300 && y < 820 ? [255, 255, 255, 255] : [0, 0, 0, 0]);
+    const cx = 650;
+    const cy = 560;
+    const nx = (x - cx) / 130;
+    const ny = (y - cy) / 260;
+    const inside = (nx * nx) + (ny * ny) <= 1;
+    setPixel(maskPng, x, y, inside ? [255, 255, 255, 255] : [0, 0, 0, 0]);
   }
 }
 for (let y = 0; y < layerPng.height; y += 1) {
@@ -1140,6 +1524,43 @@ assert(fs.existsSync(maskQualityReport.checks[0].overlay_path), 'mask quality sh
 const layerPackageReport = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'cutout-layer-package.json'), 'utf8'));
 assert(layerPackageReport.status === 'pass', 'layer package report should pass for valid layer');
 assert(layerPackageReport.layers[0].placement.left === 520, 'layer package should preserve placement left');
+
+const rectangularMaskPath = path.join(projectPaths.working, 'phone-rectangular-mask.png');
+const rectangularMaskPng = new PNG({ width: 900, height: 1200 });
+for (let y = 0; y < rectangularMaskPng.height; y += 1) {
+  for (let x = 0; x < rectangularMaskPng.width; x += 1) {
+    setPixel(rectangularMaskPng, x, y, x >= 520 && x < 780 && y >= 300 && y < 820 ? [255, 255, 255, 255] : [0, 0, 0, 0]);
+  }
+}
+fs.writeFileSync(rectangularMaskPath, PNG.sync.write(rectangularMaskPng));
+const rectangularCutoutResponsePath = path.join(projectPaths.working, 'cutout-rectangular-response.json');
+fs.writeFileSync(rectangularCutoutResponsePath, JSON.stringify({
+  elements: [
+    {
+      id: 'phone-rectangular-crop',
+      label: 'phone rectangular crop',
+      prompt: 'phone crop',
+      kind: 'phone_device',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      bbox_source: 'manual_crop',
+      mask_path: rectangularMaskPath,
+      layer_path: layerPath,
+      route: 'reference_cutout',
+      confidence: 0.82,
+      uncertainty_reason: '',
+    },
+  ],
+  merge_candidates: [],
+  split_candidates: [],
+}, null, 2));
+const rectangularCutout = runCutoutDecompose({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  mode: 'hybrid',
+  responsePath: rectangularCutoutResponsePath,
+});
+assert(rectangularCutout.plan.status === 'review', 'rectangular reference cutout mask should remain review');
+assert(rectangularCutout.maskQualityReport.checks[0].issues.some((issue) => /rectangular/.test(issue)), 'rectangular cutout should report rectangular mask issue');
 const cutoutCliOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'cutout-decompose.js'),
   '--project', projectId,
@@ -1552,6 +1973,17 @@ assert(opaqueCandidateAudit.rejection_reason.includes('alpha'), 'RGB/no-alpha ca
 assert(opaqueCandidateAudit.blocked_from_final_html === true, 'rejected ImageGen candidate must be blocked from final HTML');
 assert(opaqueCandidateAudit.alpha_extrema === null, 'RGB/no-alpha candidate should not invent alpha extrema');
 
+const opaqueLockedBaseAudit = auditImagegenCandidate({
+  id: 'clean_airport_skyline_base',
+  routeTarget: 'locked_base_layer',
+  outputPath: opaqueCandidatePath,
+  prompt: 'clean no-text airport skyline base layer for locked background',
+});
+assert(opaqueLockedBaseAudit.accepted === true, 'opaque locked_base_layer ImageGen candidate should be accepted without alpha');
+assert(opaqueLockedBaseAudit.status === 'accepted', 'opaque locked base candidate should have accepted status');
+assert(opaqueLockedBaseAudit.blocked_from_final_html === false, 'accepted opaque locked base candidate should not be blocked from final HTML');
+assert(opaqueLockedBaseAudit.edge_fringe_issues.length === 0, 'opaque locked base candidate should not report alpha fringe issues');
+
 const transparentCandidatePath = path.join(projectPaths.working, 'imagegen-transparent-alpha-candidate.png');
 const transparentCandidatePng = new PNG({ width: 10, height: 10 });
 for (let y = 0; y < transparentCandidatePng.height; y += 1) {
@@ -1657,6 +2089,14 @@ const sourceTruthAudit = auditSourceTruthBitmaps({
       symbology: 'QR',
     },
     {
+      id: 'training_reference',
+      kind: 'training_reference',
+      route: 'review',
+      path: path.join(projectPaths.source, 'reference.png'),
+      asset_source_type: 'imagegen_training_reference',
+      final_asset_ready: false,
+    },
+    {
       id: 'bad_barcode',
       kind: 'barcode',
       route: 'regenerated_image',
@@ -1669,10 +2109,12 @@ const sourceTruthAudit = auditSourceTruthBitmaps({
   ],
 });
 const qrSourceTruth = sourceTruthAudit.assets.find((asset) => asset.id === 'activation_qr');
+const skippedTrainingReference = sourceTruthAudit.assets.find((asset) => asset.id === 'training_reference');
 const badBarcodeTruth = sourceTruthAudit.assets.find((asset) => asset.id === 'bad_barcode');
 assert(sourceTruthAudit.status === 'fail', 'mixed source-truth bitmap audit should fail when one asset is invalid');
 assert(qrSourceTruth.status === 'pass', 'valid high-contrast QR source-truth bitmap should pass');
 assert(qrSourceTruth.high_contrast.pass === true, 'valid QR should record high-contrast pass');
+assert(skippedTrainingReference.status === 'skipped', 'mixed provenance source-truth audit should skip non-source-truth assets');
 assert(badBarcodeTruth.status === 'fail', 'invalid barcode source-truth bitmap should fail');
 assert(badBarcodeTruth.failures.some((failure) => failure.code === 'forbidden_source_truth_route'), 'source-truth barcode must reject regenerated route');
 assert(badBarcodeTruth.failures.some((failure) => failure.code === 'css_filter_allowed'), 'source-truth barcode must reject CSS filter allowance');
@@ -1964,6 +2406,34 @@ const lockedPhotoReadiness = lockedPhotoReadinessAudit.assets.find((asset) => as
 assert(lockedPhotoReadinessAudit.status === 'fail', 'locked photo layer with flattened text conflict must fail without clean-base proof or review gate');
 assert(lockedPhotoReadiness.failures.some((failure) => failure.code === 'locked_base_contains_flattened_text'), 'locked photo readiness should report flattened text conflict');
 
+const regeneratedOpaqueBaseReadinessAudit = auditAssetReadinessContract({
+  expectedContract: {
+    case_id: 'unit-regenerated-opaque-base-readiness',
+    required_routes: [
+      {
+        element_id: 'clean_airport_background',
+        kind: 'photo_background',
+        expected_route: 'locked_base_layer',
+      },
+    ],
+  },
+  provenance: {
+    assets: [
+      {
+        id: 'clean_airport_background',
+        route: 'locked_base_layer',
+        asset_source_type: 'regenerated_image',
+        status: 'accepted_for_html',
+        final_asset_ready: true,
+        contains_flattened_text: false,
+      },
+    ],
+  },
+});
+const regeneratedOpaqueBaseReadiness = regeneratedOpaqueBaseReadinessAudit.assets.find((asset) => asset.asset_id === 'clean_airport_background');
+assert(regeneratedOpaqueBaseReadinessAudit.status === 'fail', 'regenerated opaque locked bases should require explicit clean-base provenance');
+assert(regeneratedOpaqueBaseReadiness.failures.some((failure) => failure.code === 'missing_regenerated_locked_base_provenance'), 'regenerated opaque locked bases should report missing provenance');
+
 const greenFringeCandidatePath = path.join(projectPaths.working, 'imagegen-green-fringe-alpha-candidate.png');
 const greenFringeCandidatePng = new PNG({ width: 12, height: 12 });
 for (let y = 0; y < greenFringeCandidatePng.height; y += 1) {
@@ -2096,6 +2566,102 @@ const assetReadinessReport = JSON.parse(fs.readFileSync(assetReadinessReportPath
 assert(assetReadinessReport.status === 'fail', 'CLI asset readiness report should preserve helper status');
 assert(assetReadinessReport.summary.review_count === 1, 'CLI asset readiness report should count review-gated assets');
 assert(assetReadinessReport.summary.fail_count === 1, 'CLI asset readiness report should count failed prompt-only assets');
+
+const fusedLogoReadiness = auditAssetReadinessContract({
+  expectedContract: {
+    case_id: 'unit-logo-row-decomposition',
+    required_routes: [
+      {
+        element_id: 'payment_badge_row',
+        kind: 'payment_logo',
+        expected_route: 'reference_cutout',
+        requires_independent_children: true,
+        min_child_assets: 3,
+      },
+    ],
+  },
+  provenance: {
+    assets: [
+      {
+        id: 'payment_badge_row',
+        route: 'reference_cutout',
+        asset_source_type: 'reference_crop',
+        final_asset_ready: true,
+      },
+    ],
+  },
+});
+assert(fusedLogoReadiness.status === 'fail', 'fused logo/payment rows should fail when independent child assets are required');
+assert(fusedLogoReadiness.failures.some((failure) => failure.code === 'missing_independent_child_assets'), 'fused logo/payment rows should report missing independent child assets');
+
+const decomposedLogoReadiness = auditAssetReadinessContract({
+  expectedContract: {
+    case_id: 'unit-logo-row-decomposed-children',
+    required_routes: [
+      {
+        element_id: 'payment_badge_row',
+        kind: 'payment_logo',
+        expected_route: 'reference_cutout',
+        requires_independent_children: true,
+        min_child_assets: 3,
+      },
+    ],
+  },
+  provenance: {
+    dom_assets: [
+      {
+        id: 'payment_badge_row',
+        route: 'reference_cutout',
+        final_asset_ready: false,
+        child_assets: [
+          { id: 'payment_badge_1', route: 'reference_cutout', final_asset_ready: true },
+          { id: 'payment_badge_2', route: 'reference_cutout', final_asset_ready: true },
+          { id: 'payment_badge_3', route: 'reference_cutout', final_asset_ready: true },
+        ],
+      },
+    ],
+  },
+});
+assert(decomposedLogoReadiness.status === 'pass', 'independent child assets should satisfy grouped logo/payment readiness');
+assert(decomposedLogoReadiness.assets[0].readiness === 'independent_children_ready', 'decomposed logo/payment rows should report child readiness');
+
+const poseFidelityReadinessAudit = auditAssetReadinessContract({
+  expectedContract: {
+    case_id: 'unit-primary-human-pose-fidelity',
+    required_routes: [
+      {
+        element_id: 'traveler_alpha',
+        kind: 'human_traveler',
+        expected_route: 'regenerated_image',
+        requires_pose_fidelity_review: true,
+      },
+    ],
+  },
+  provenance: {
+    assets: [
+      {
+        id: 'traveler_alpha',
+        route: 'regenerated_image',
+        asset_source_type: 'regenerated_image',
+        status: 'accepted_for_html',
+        final_asset_ready: true,
+      },
+    ],
+  },
+  imagegenCandidates: {
+    candidates: [
+      {
+        id: 'traveler_candidate',
+        route_target: 'traveler_alpha',
+        accepted: true,
+        blocked_from_final_html: false,
+      },
+    ],
+  },
+});
+const poseFidelityReadiness = poseFidelityReadinessAudit.assets.find((asset) => asset.asset_id === 'traveler_alpha');
+assert(poseFidelityReadinessAudit.status === 'fail', 'primary regenerated human/device assets should require pose fidelity evidence when requested');
+assert(poseFidelityReadiness.failures.some((failure) => failure.code === 'missing_pose_fidelity_review'), 'pose fidelity readiness should report missing_pose_fidelity_review');
 
 const acquisitionExpectedPath = path.join(projectPaths.working, 'source-truth-acquisition-expected-contract.json');
 const acquisitionProvenancePath = path.join(projectPaths.working, 'source-truth-acquisition-provenance.json');

@@ -73,6 +73,42 @@ Install as a discoverable skill for both agents with `npm run install:all` (or `
 
 Do not write generated work into the skill directory or repository root. Keep runtime image projects under the system user-home Documents folder: `~/Documents/text2html-image-project`. Do not use CloudStorage, OneDrive, or localized `文档` paths for generated project output.
 
+## Training Productization
+
+Use the learning productization commands after an ImageGen-TDD training loop has generated many project folders and before starting another broad training round.
+
+Do not resume broad ImageGen training until the learning report exists.
+
+Run from the skill root:
+
+```bash
+npm run learning:index -- --root ~/Documents/text2html-image-project
+npm run learning:report -- --root ~/Documents/text2html-image-project
+```
+
+The commands are read-only for historical project folders. They write reports under:
+
+```text
+~/Documents/text2html-image-project/imagegen-tdd-learning-lab/reports/
+```
+
+Expected report outputs:
+
+- `normalized-project-index.json`
+- `training-productization-report.json`
+- `training-productization-report.md`
+- `promotion-candidates.json`
+- `next-training-plan.md`
+
+Use `promotion-candidates.json` to decide the next RED tests, skill/reference rules, and three-project training round. Do not count a project as a success when visual similarity passes but DOM, source-truth, route, export, or asset readiness gates fail.
+
+Mini-batch productization review:
+
+- Do not generate more training posters during productization review. Read the latest `training-productization-report.md`, `promotion-candidates.json`, `next-training-plan.md`, and each mini-batch project's `project-summary.json` plus hard-gate reports first.
+- If `promotion-candidates.json` still lists `missing_review_gate`, `prompt_only_not_review_gated`, or `no_accepted_imagegen_candidate`, do not treat the candidate as eliminated merely because newer samples passed. Add or keep RED tests that prove the repeated failure is promoted to `promote_to_test`, then fix the runtime/audit/rule path until `npm test` passes.
+- A hard-gated success only promotes rules that all hard gates prove: reference-vs-render review JSON/MD exists, DOM editability passes, route contract passes, asset readiness passes, source-truth acquisition passes, overflow passes, export report and real PNG exist, and visual comparison passes.
+- Keep `dom_editability`, `asset_readiness`, and `source_truth` review gaps as review gaps unless the project has machine-readable blocker conditions and required evidence. Do not promote prompt-only packages, review-gated assets, or visual similarity alone into success rules.
+
 ## Flood Cutout Asset Cleanup
 
 When a bitmap layer must be composited over HTML/CSS, clean it with edge-connected flood cutout before accepting it as a transparent PNG. This is required for AI-generated maps, characters, devices, landmarks, and irregular sticker-like assets that show gradient glow, gray matte, soft halos, or non-transparent outer backgrounds.
@@ -245,6 +281,7 @@ Use these rules when opening a full multilingual copy-recreation pipeline from r
 - Always run both page-level and cell-level overflow checks for dense multilingual tables. A page can have no scrollbars while individual cells still overflow their columns.
 - For local cell overflow detection, compare the text element bounding box with its parent cell, not only `document.scrollWidth` or page scrollbars.
 - Do not rely on `scrollHeight / lineHeight` to count visual lines in flex table cells; it can misreport centered single-line flex content. Use `Range.getClientRects()` or explicit span counts when checking real line breaks.
+- Use `npm run audit:overflow -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]` for browser-backed cell overflow evidence. It writes `reports/cell-overflow-report.json` and `reports/cell-overflow-summary.md`.
 - For long country names, decide early between single-line shrinking and semantic line breaks. Switching late can leave conflicting CSS rules, over-small fonts, or hidden overflow.
 - Do not put raw `<br>` in copy data if the renderer escapes HTML. Either add safe structured fields such as `country_cd_line1`, `country_cd_line2`, `country_cd_line3`, or implement a narrow safe token transform that does not allow arbitrary HTML.
 - A newline character inside a flex item may still render as one visual line. If semantic line breaks must be guaranteed, render explicit child spans and style the country cell as a vertical flex column.
@@ -287,6 +324,7 @@ Use this when a poster contains complex non-text art such as people, maps, globe
   - `licensed_asset`: use a documented external asset.
 - Every independently adjustable visual subject must be a separate PNG and a separate DOM node.
 - Do not fuse separately movable subjects into one same-canvas PNG unless the user explicitly approves a locked composition.
+- For repeated logo-like groups such as app icons, payment badges, country flags, or partner marks, add `requires_independent_children: true` and `min_child_assets` to the expected route contract when each mark should be independently movable or replaceable. A single final-ready row crop is not enough for those cases unless an explicit review gate covers the missing child assets.
 - Required examples: map/globe -> `globe-map.png`, left cloud -> `cloud-left.png`, right cloud -> `cloud-right.png`, skyline -> `skyline.png`, person/mascot -> `traveler.png`.
 - Every art asset must have explicit CSS placement: `left`, `top`, `width`, `height`, and `z-index`.
 - Write `reports/split-art-assets.json` with each asset's source path, `asset_source_type`, output path, placement, dimensions, alpha extrema, mask/debug path, and known limitations.
@@ -309,6 +347,9 @@ Use these rules for phone-UI posters and other same-canvas illustrated ads where
 - Do not feed feathered or semi-transparent masks into flood cutout as final art. Partial alpha that is not removed can become a dark opaque seam after PNG compositing. Use a hard mask for the removable exterior or explicitly clean near-transparent edge pixels before placing the layer.
 - For icon-sized assets inside editable UI, such as a small plane icon in a product pill or the three feature-card icons, prefer inline SVG/CSS recreation. Use a cropped PNG only when texture, painterly shading, or source fidelity matters more than clean editability; verify that the crop has no background matte before shipping.
 - QR codes and scannable codes are bitmap truth assets. Crop them from the reference into the project `source/` folder, copy them with the deliverable asset pack, preserve contrast and square geometry, and never redraw, OCR, blur, or scale them through CSS filters.
+- `export-fast` can carry local final-ready `<img>` layers with explicit pixel `left`, `top`, `width`, and `height` into the rendered SVG/PNG output. Use this only for assets with `data-asset-id`, `data-route`, `data-final-asset-ready="true"`, resolved provenance, and a passing bitmap-layer/source-truth audit.
+- `png-export-report.json` image-layer visibility evidence must prove bitmap layers survive into the final PNG. A generated SVG containing `<image>` tags is not enough; check `image_layer_evidence.visible_image_layer_count` before treating exported bitmap layers as rendered.
+- Bitmap visibility sampling must be source-alpha-aware: transparent source pixels do not count as rendered asset proof, even if the layer bbox covers varied background pixels.
 - Device mockups need a separate `phone safe-area` contract: keep the bezel/shadow, clipped screen background, and DOM screen UI in distinct z-index layers. Scale the phone shell and inner UI together, and verify no card, ring, or QR container is hidden by the shell or by an oversized screen background.
 - When enlarging a phone or feature cards to fill white space, preserve translation resilience first. Use `minmax(0, 1fr)`, `min-width: 0`, tight but readable `line-height`, and `overflow-wrap: anywhere` on labels that can expand; avoid one global text scale that makes S8N/localized copy overflow.
 - Left-side feature cards must leave the underlying landmark line art intentionally visible. Tighten card height, gap, and padding before moving the card stack down; do not cover skyline/landmark art unless the reference clearly does.
@@ -321,6 +362,7 @@ Use these rules before starting or continuing a poster recreation, transparent-l
 - `prompt_only is not a finished transparent asset`. A prompt package for ChatGPT Images 2, Codex image generation, or any external image model only means the layer request is ready. Do not place that layer into final HTML until real PNG outputs exist, match the expected canvas/bbox contract, and have an audit report.
 - ImageGen returning a green-background or other chroma-key/matte PNG is still not a finished transparent asset. It must be regenerated as a transparent PNG with alpha channel or rejected before HTML composition.
 - `flood-cutout is not semantic segmentation`. It removes edge-connected background and near-edge glow from a supplied bitmap. It cannot decide which part of a full ghost poster is the phone, map, person, or background. If the source is a full poster, return to layer planning, model-assisted visual review, manual crop, or user-supplied layers before using `flood-cutout`.
+- A rectangular mask is not semantic cutout proof. If a `reference_cutout` mask nearly fills its opaque bounding box, keep the asset review-gated until there is alpha/matting evidence that follows the actual subject shape.
 - For a current preview edit, start from the HTML path the user is actually viewing. Decide whether the active surface is `workspace-html` or `deliverable-copy` before editing. Do not rebuild or regenerate the full page just to fix a QR code, icon, copy position, phone safe-area, or asset path.
 - QR/barcode assets are bitmap truth assets. Crop them from the reference or original source image, keep them as PNG assets in the project asset pack, and verify they resolve from both the workspace HTML path and any detached delivery path.
 - Small single-color icons, such as a plane next to a product label, should be recreated as inline SVG/CSS unless source fidelity requires a PNG crop. Record SVG recreation as an editable substitute, not a pixel-perfect crop.
@@ -491,6 +533,19 @@ Browser/multimodal boundary:
 - Every build round should surface the local HTML path and `file_url` before screenshot review.
 - If the browser tool cannot open `file://` because of browser policy, use static DOM checks plus Playwright or system screenshot fallback. Do not treat browser policy failure as a page failure.
 
+## Reference-vs-Render Hard Gate
+
+For reference-image recreation, write direct comparison evidence before reporting completion:
+
+- Create `reports/reference-vs-render-review.json` and `reports/reference-vs-render-review.md`.
+- Run `npm run audit:visual-compare -- --reference <source/reference.png> --render <exports/index.png> --report <reports/reference-vs-render-pixel-audit.json> --diff <reports/reference-vs-render-diff.png>` for coarse pixel evidence and a diff map. This supplements, but does not replace, route/DOM/editability review.
+- Compare `source/reference.png` with the current screenshot or `exports/index.png`; score canvas match, layout, hierarchy, asset route match, text fidelity, typography, color/lighting, image quality, overflow/clipping, and editability preservation.
+- Every high or blocking issue needs screenshot coordinates or a DOM path plus a next action.
+- Visual similarity cannot override DOM, route, source-truth, or editability failure. A page that looks close but has rasterized business copy, unresolved source-truth assets, missing provenance, broken image paths, or failed DOM checks is still not complete.
+- If `overall_similarity_score` is below the task gate, run at least one focused repair round or record the gap as a RED candidate/blocking limitation.
+- Treat baked raster text conflicts with DOM overlays as review/fail evidence: phone screen labels, map legends, region labels, table text, CTA, or legal copy must not be visibly duplicated by text still baked into a bitmap layer.
+- When DOM text overlays a bitmap background, prefer a clean no-text base. If no clean no-text base exists, keep the bitmap review-gated and list the exact baked text conflict in the review report.
+
 ## Final Preview Links
 
 Every build or final delivery should surface a clickable local preview target for the active HTML. Every plain-text report or final response that references an HTML preview must include the local HTML file path. `npm run build` writes `reports/preview-links.md` and each built output in `reports/build-report.json` includes:
@@ -591,6 +646,9 @@ For reference-image recreation or image-editing tasks, also report:
 - Alpha extrema and mask/debug path for every PNG that was cut out or regenerated.
 - Whether stale CSS/SVG/PIL geometric placeholders remain, reported as `old_geometric_css=false` when clean.
 - Screenshot path and DOM contract result after the routed asset strategy is implemented.
+- `reports/reference-vs-render-review.json` and `reports/reference-vs-render-review.md` for reference-image recreation.
+- Whether visual similarity was blocked by DOM, asset-route, source-truth, or editability failure.
+- Whether bitmap layers under DOM overlays are clean no-text base layers, or which baked raster text conflicts with DOM overlays remain review-gated.
 
 For map or dense label work, also report:
 
@@ -608,6 +666,7 @@ npm run project:init -- --project <project-id> [--subproject <subproject-id>]
 npm run build -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]
 npm run quality-check -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]
 npm run audit:dom -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
+npm run audit:overflow -- --project <project-id> [--subproject <subproject-id>] [--group <html-group>]
 npm run template:check -- --project <project-id> [--subproject <subproject-id>]
 npm run copy-schema -- --project <project-id> [--subproject <subproject-id>]
 npm run visual:intake -- --project <project-id> --source-image <path> [--response <json>]
@@ -616,6 +675,7 @@ npm run route:assets -- --project <project-id> --source-image <path> --elements 
 npm run audit:imagegen -- --input <candidates.json> [--report <reports/imagegen-candidates.json>] [--project <project-id>] [--subproject <subproject-id>]
 npm run audit:asset-readiness -- --expected <expected-contract.json> --provenance <asset-provenance.json> [--routing <asset-routing-table.json>] [--imagegen <imagegen-candidates.json>] [--review-gates <review-gate-contract-audit.json>] [--report <reports/asset-readiness-audit.json>]
 npm run audit:source-truth-acquisition -- --expected <expected-contract.json> --provenance <asset-provenance.json> --plan <source-truth-acquisition-plan.json> [--review-gates <review-gate-contract-audit.json>] [--report <reports/source-truth-acquisition-audit.json>]
+npm run audit:visual-compare -- --reference <source/reference.png> --render <exports/index.png> [--report <reports/reference-vs-render-pixel-audit.json>] [--diff <reports/reference-vs-render-diff.png>]
 npm run visual:review -- --project <project-id> --round <n> --report <json>
 npm run review:score -- --project <project-id> [--subproject <subproject-id>] --round 1 --source-image <path> --screenshot <path> --overall-score 90 --layout-score 90 --typography-score 90 --color-score 90 --asset-score 90 --issue "medium|layout|observed|expected|fix hint"
 npm run batch-export -- --project <project-id> [--subproject <subproject-id>]  # report/export plan; verify PNGs separately

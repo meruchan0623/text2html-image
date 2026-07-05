@@ -145,6 +145,25 @@ If the in-app browser refuses `file://`, do not retry indefinitely or call the p
 
 Every build should also leave a reopening path: `reports/preview-links.md`, `reports/build-report.json.outputs[].markdown_link`, and the plain absolute `html` path. Any plain-text reports must include local HTML file paths for every referenced preview. Treat browser-native element annotation as a current-session capability, not a guaranteed output. Probe it before use; if unsupported, keep ordinary screenshots and write coordinate or visual-annotation notes as task evidence.
 
+## Reference-vs-Render Gate
+
+For reference-image recreation, do not finish on DOM/export evidence alone. Write:
+
+- `reports/reference-vs-render-review.json`
+- `reports/reference-vs-render-review.md`
+
+The review compares `source/reference.png` with the current browser screenshot or `exports/index.png`. It must score canvas, layout, hierarchy, asset-route match, text fidelity, typography, color/lighting, image quality, overflow/clipping, and editability preservation. High or blocking issues need screenshot coordinates or DOM paths.
+
+`visual similarity cannot override DOM or asset-route failure`: if DOM text is layered over a bitmap that still contains the same phone UI label, map legend, region label, table text, CTA, or legal copy, record the problem as baked raster text conflicts with DOM overlays. Use a clean no-text base before calling the overlay visually clean; otherwise keep the asset review-gated.
+
+## Mini-batch productization review
+
+After a P1/P2 mini-batch, stop generation and review the real outputs before choosing the next action. Read `training-productization-report.md`, `promotion-candidates.json`, `next-training-plan.md`, and each mini-batch project's `project-summary.json`, `reference-vs-render-review.json`, `dom-editability-report.json`, `asset-readiness-audit.json`, `source-truth-acquisition-audit.json`, `route-contract-audit.json`, `cell-overflow-report.json`, and `png-export-report.json`.
+
+If `promotion-candidates.json` still lists `missing_review_gate, prompt_only_not_review_gated, or no_accepted_imagegen_candidate`, treat that as a stable productization failure until a RED test covers it or a refreshed report proves it has disappeared. Passing mini-batch samples reduce risk and can become success-pattern evidence, but they do not by themselves erase historical repeated-failure candidates.
+
+Only promote success rules from projects classified as `success` with all hard gates passing. A reusable rule must be backed by DOM, route, asset readiness, source-truth, overflow, export, and reference-vs-render evidence. Keep review-gated gaps and prompt-only assets out of success rules.
+
 ## 7. Rework Prevention Reports
 
 For complex poster edits, prefer structured evidence over prose. One durable summary can stay at project root as `project-summary.json`; two durable project-level report files may also stay at root when names are self-explanatory and not mixed report types. Use project-level `reports/` when there are three or more durable reports, or mixed report types that need grouping. Iteration-specific reports should go under `runs/latest/reports/` unless promoted to a named run.
@@ -220,6 +239,9 @@ Before final delivery, confirm:
 - QC or equivalent DOM checks passed for the affected HTML files.
 - `reports/preview-links.md` exists and final response includes the active HTML Markdown link plus absolute path.
 - Browser annotation use is either probe-confirmed or explicitly replaced by screenshot/DOM/coordinate evidence.
+- Reference-image recreation includes `reports/reference-vs-render-review.json` and `reports/reference-vs-render-review.md`.
+- Bitmap layers under DOM overlays are clean no-text base layers, or baked raster text conflicts with DOM overlays are explicitly review-gated.
+- Visual similarity cannot override DOM or asset-route failure.
 - Real PNG export was performed when requested, not only an export plan.
 - `reports/png-export-report.json` exists when direct PNG export was requested.
 - PNG files exist under `exports/`.

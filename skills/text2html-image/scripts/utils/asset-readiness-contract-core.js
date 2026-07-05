@@ -96,6 +96,49 @@ function hasCleanLockedBaseProof(entries) {
   ));
 }
 
+function hasValue(value) {
+  return value !== undefined && value !== null && String(value).trim() !== '';
+}
+
+function dimensionsWithChecksum(entry) {
+  const dimensions = entry.dimensions || {};
+  return Boolean(
+    (Number(entry.width || dimensions.width) > 0)
+    && (Number(entry.height || dimensions.height) > 0)
+    && hasValue(entry.sha256 || dimensions.sha256 || entry.checksum || dimensions.checksum)
+  );
+}
+
+function regeneratedLockedBaseIssues(entry) {
+  if (!entry || entry.route !== 'locked_base_layer' || entry.asset_source_type !== 'regenerated_image') return [];
+  const issues = [];
+  if (entry.clean_base_layer !== true) issues.push('missing_clean_base_layer_true');
+  if (entry.no_text_base_layer !== true && entry.contains_flattened_text !== false) issues.push('missing_no_text_base_proof');
+  if (!hasValue(entry.path || entry.output_path || entry.src)) issues.push('missing_output_path');
+  if (!hasValue(entry.source_path || entry.source_image || entry.source_reference)) issues.push('missing_source_path');
+  if (!dimensionsWithChecksum(entry)) issues.push('missing_dimensions_or_checksum');
+  return issues;
+}
+
+function hasPoseFidelityProof(entries) {
+  return entries.some((entry) => (
+    entry.pose_fidelity_review === true
+    || entry.pose_fidelity_verified === true
+    || entry.pose_scale_review === true
+    || entry.relative_scale_review === true
+    || entry.source_guided_pose === true
+    || entry.reference_pose_matched === true
+    || entry.pose_fidelity_status === 'pass'
+  ));
+}
+
+function childEntriesFor(provenanceEntries, assetId) {
+  return provenanceEntries.filter((entry) => {
+    const parentId = String(entry.parent_asset_id || entry.parent_id || entry.group_id || '').trim();
+    return parentId === assetId;
+  });
+}
+
 function auditAssetReadinessContract({ expectedContract, provenance, imagegenCandidates, reviewGateAudit, routingTable } = {}) {
   const requiredRoutes = Array.isArray(expectedContract?.required_routes) ? expectedContract.required_routes : [];
   const provenanceEntries = collectEntries(provenance);
@@ -108,13 +151,23 @@ function auditAssetReadinessContract({ expectedContract, provenance, imagegenCan
     const assetId = String(required.element_id || required.id || '').trim();
     const routes = [...routeSet(required)];
     const entries = provenanceEntries.filter((entry) => idFor(entry) === assetId);
+    const childEntries = childEntriesFor(provenanceEntries, assetId);
     const routingEntry = routing.get(assetId) || null;
     const finalEntry = entries.find(isFinalReady) || null;
+    const regeneratedLockedBaseProblems = finalEntry ? regeneratedLockedBaseIssues(finalEntry) : [];
+    const finalChildCount = childEntries.filter(isFinalReady).length;
+    const inlineChildCount = entries.reduce((count, entry) => (
+      count + (Array.isArray(entry.child_assets) ? entry.child_assets.filter((child) => isFinalReady(child)).length : 0)
+    ), 0);
+    const childAssetCount = finalChildCount + inlineChildCount;
+    const requiresIndependentChildren = required.requires_independent_children === true;
+    const minChildAssets = Math.max(1, Number(required.min_child_assets || 1));
     const acceptedCandidate = acceptedCandidateFor(candidates, assetId);
     const matchingCandidates = candidateListFor(candidates, assetId);
     const reviewGateFound = coveredByReview.has(assetId);
     const flattenedTextConflict = hasFlattenedTextConflict(required, routingEntry, entries);
     const cleanLockedBaseProof = hasCleanLockedBaseProof(entries);
+    const poseFidelityProof = hasPoseFidelityProof(entries);
     const failures = [];
     let status = 'pass';
     let readiness = 'not_asset_required';
@@ -126,6 +179,35 @@ function auditAssetReadinessContract({ expectedContract, provenance, imagegenCan
         failures.push({
           code: 'locked_base_contains_flattened_text',
           message: 'photo background route has flattened text conflict and needs clean no-text base-layer proof or review gate coverage',
+        });
+      } else if (regeneratedLockedBaseProblems.length && !reviewGateFound) {
+        status = 'fail';
+        readiness = 'regenerated_locked_base_needs_provenance';
+        failures.push({
+          code: 'missing_regenerated_locked_base_provenance',
+          message: 'regenerated opaque locked-base assets require explicit clean-base provenance, source/output paths, dimensions, and checksum evidence',
+          issues: regeneratedLockedBaseProblems,
+        });
+      } else if (requiresIndependentChildren && childAssetCount < minChildAssets && reviewGateFound) {
+        status = 'review';
+        readiness = 'independent_children_review_gated';
+      } else if (requiresIndependentChildren && childAssetCount < minChildAssets) {
+        status = 'fail';
+        readiness = 'missing_independent_children';
+        failures.push({
+          code: 'missing_independent_child_assets',
+          message: 'asset group requires independently final-ready child assets or explicit review gate coverage',
+          child_asset_count: childAssetCount,
+          min_child_assets: minChildAssets,
+        });
+      } else if (requiresIndependentChildren) {
+        readiness = 'independent_children_ready';
+      } else if (required.requires_pose_fidelity_review === true && !poseFidelityProof && !reviewGateFound) {
+        status = 'fail';
+        readiness = 'pose_fidelity_needs_review';
+        failures.push({
+          code: 'missing_pose_fidelity_review',
+          message: 'primary regenerated human/device assets require pose, floor-contact, or relative-scale review evidence before final promotion',
         });
       } else if (finalEntry) {
         readiness = 'final_asset_ready';
@@ -179,8 +261,13 @@ function auditAssetReadinessContract({ expectedContract, provenance, imagegenCan
       review_gate_found: reviewGateFound,
       flattened_text_conflict: flattenedTextConflict,
       clean_locked_base_proof: cleanLockedBaseProof,
+      pose_fidelity_proof: poseFidelityProof,
       provenance_entry_count: entries.length,
       candidate_count: matchingCandidates.length,
+      child_asset_count: childAssetCount,
+      min_child_assets: requiresIndependentChildren ? minChildAssets : null,
+      requires_independent_children: requiresIndependentChildren,
+      regenerated_locked_base_provenance_issues: regeneratedLockedBaseProblems,
       failures,
     });
   }

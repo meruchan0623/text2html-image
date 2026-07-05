@@ -141,6 +141,12 @@ function validateTransparencyProvenance(provenance) {
   return issues;
 }
 
+function routeTargetAllowsOpaque(candidate) {
+  const routeTarget = String(candidate.routeTarget || candidate.route_target || '').trim();
+  const route = String(candidate.route || '').trim();
+  return routeTarget === 'locked_base_layer' || route === 'locked_base_layer';
+}
+
 function auditImagegenCandidate(candidate) {
   const outputPath = path.resolve(String(candidate.outputPath || candidate.output_path || ''));
   const issues = [];
@@ -163,7 +169,7 @@ function auditImagegenCandidate(candidate) {
       colorType = metadata.colorType;
       dimensions = { width: png.width, height: png.height };
       if (!hasAlphaColorType(colorType)) {
-        issues.push('no_alpha_channel');
+        if (!routeTargetAllowsOpaque(candidate)) issues.push('no_alpha_channel');
       } else {
         evidence = alphaEvidence(png);
         alphaExtrema = { min: evidence.min, max: evidence.max };
@@ -201,6 +207,7 @@ function auditImagegenCandidate(candidate) {
     transparent_corner_count: transparentCornerCount,
     edge_fringe_issues: issues,
     route_target: candidate.routeTarget || candidate.route_target || null,
+    alpha_required: !routeTargetAllowsOpaque(candidate),
     accepted,
     status: accepted ? 'accepted' : 'rejected',
     blocked_from_final_html: !accepted,
