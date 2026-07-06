@@ -14,6 +14,42 @@ Before editing, state which surface owns the next change:
 
 If the surface is `workspace-html`, resolve the active HTML path from files on disk first. Patch every `index*.html` in the active single-group `html/` path or active `html_group` unless the user explicitly scopes the request to one locale. Do not run `npm run build` before export; it can overwrite the direct edits.
 
+## Existing Project Inspect
+
+When the user says to continue an existing project, open an existing preview, or modify a named generated artifact and the active HTML/CSS surface is not already certain, run:
+
+```bash
+npm run project:inspect -- --project <project-id>
+```
+
+This command is read-only: it uses `getProjectPaths`, not `createProjectWorkspace`, and fails if the project folder does not exist. Use `reports/project-inspect.md` to choose the active HTML, identify grouped or localized variants, check existing exports/reports, and pick the next `task:brief` mode.
+
+Do not run `project:init` for an existing-project edit unless `project:inspect` proves the project is missing and the user actually wants a new workspace.
+
+## Task Brief Pre-Edit Guard
+
+For image-copy/edit tasks that need explicit limits, boundaries, or active-surface certainty, run:
+
+```bash
+npm run task:brief -- --project <project-id> --mode <mode>
+```
+
+as the first step (before manual HTML/CSS edits). The command records intent and expectations in:
+
+- `reports/task-brief.json`
+- `reports/task-brief.md`
+
+Mode guidance:
+
+- `preview-overwrite` (default): overwrite `html/index.html` / `html/master.css` as active preview.
+- `preview-only`: produce preview-only draft without touching canonical active files.
+- `faithful-recreate`: source-driven first pass requiring reference image.
+- `surgical-edit`: minimal patch to active HTML/CSS.
+- `multilingual-sync`: keep language variants synchronized.
+- `finalize-export`: permit real export flow.
+
+Keep `finalize-export` in mind for export expectations; otherwise avoid assuming any PNG export is done.
+
 ## Existing Preview Micro-Edit Guard
 
 Do not promote a micro-adjustment into a full regeneration. If the user points to an already-open `file://` preview and asks for a local fix, keep the work on that active surface unless they explicitly ask to rebuild templates.
@@ -248,6 +284,8 @@ Before final delivery, confirm:
 - Dense labels have coordinate/debug reports and omitted reasons.
 - QC or equivalent DOM checks passed for the affected HTML files.
 - `reports/preview-links.md` exists and final response includes the active HTML Markdown link plus absolute path.
+- When existing-project discovery used `project:inspect`, final response includes `reports/project-inspect.md` or `reports/project-inspect.json`.
+- When task boundaries are staged with `task:brief`, final response includes `reports/task-brief.md` or `reports/task-brief.json` path and an explicit export note (`finalize-export` required for export).
 - Browser annotation use is either probe-confirmed or explicitly replaced by screenshot/DOM/coordinate evidence.
 - Reference-image recreation includes `reports/reference-vs-render-review.json` and `reports/reference-vs-render-review.md`.
 - Bitmap layers under DOM overlays are clean no-text base layers, or baked raster text conflicts with DOM overlays are explicitly review-gated.

@@ -36,7 +36,9 @@
     "test": "node scripts/test.js",
     "install:all": "node scripts/install-skill.js",
     "install:claude": "node scripts/install-skill.js --target claude",
-    "install:codex": "node scripts/install-skill.js --target codex"
+    "install:codex": "node scripts/install-skill.js --target codex",
+    "task:brief": "node scripts/task-brief.js",
+    "project:inspect": "node scripts/project-inspect.js"
   },
   "keywords": [
     "ecommerce",

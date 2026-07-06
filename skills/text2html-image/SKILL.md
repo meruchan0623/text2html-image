@@ -53,6 +53,50 @@ The bundled `data/copy_master.json` may intentionally contain no active rows. Fo
 
 Then build the preview with `npm run build -- --project <project-id>`. Run QC only after a concrete HTML/CSS change or before export.
 
+## Task Brief Workflow (`task:brief`)
+
+When continuing an existing visual project and the active edit surface is unclear, inspect it first:
+
+```bash
+npm run project:inspect -- --project <project-id>
+```
+
+`project:inspect` is read-only. It does not create the project, rebuild HTML, edit files, or export images. It writes:
+
+- `reports/project-inspect.json`
+- `reports/project-inspect.md`
+
+Use it to find active `index*.html` files, nearby CSS, source assets, existing exports, report evidence, and the recommended next command.
+
+When image-copy/edit work needs explicit boundaries before touching files, start with:
+
+```bash
+npm run task:brief -- --project <project-id> --mode <mode>
+```
+
+`task:brief` is a lightweight pre-edit command. It writes:
+
+- `reports/task-brief.json`
+- `reports/task-brief.md`
+
+under `~/Documents/text2html-image-project/<project-id>/reports/`.
+
+Key modes:
+
+- `preview-overwrite` (default): active index preview edit workflow. Edit `html/index.html` and `html/master.css`, and return active preview URL/path in handoff. No formal export by default.
+- `preview-only`: detached preview draft; do not overwrite canonical `index*.html` / `master.css`.
+- `faithful-recreate`: reference-first pass; source image required. No export by default.
+- `surgical-edit`: minimum patch to active HTML/CSS. No rebuild/export by default.
+- `multilingual-sync`: align locale variants together.
+- `finalize-export`: enables real export path; only this mode permits export by default.
+
+Default handoff expectation after `task:brief` work:
+
+- include `reports/project-inspect.md` when it was used for existing-project discovery
+- include active HTML Markdown/link or absolute file path
+- include preview report path if generated
+- state export skipped unless `--mode finalize-export`
+
 ## Self-Contained Skill Package
 
 The skill root is the package root. Run commands from the directory that contains this `SKILL.md`:

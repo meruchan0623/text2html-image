@@ -23,6 +23,8 @@ const { checkTemplates } = require('./utils/template-registry-core');
 const { checkCopySchema } = require('./utils/copy-schema-core');
 const { runVisualIntake } = require('./utils/visual-intake-core');
 const { composeCodexHtmlPrompt } = require('./utils/codex-html-prompt-core');
+const { buildTaskBrief, renderTaskBriefMarkdown, writeTaskBrief } = require('./utils/task-brief-core');
+const { inspectProject, renderProjectInspectMarkdown, writeProjectInspect } = require('./utils/project-inspect-core');
 const { runCutoutDecompose, shouldAutoSemanticCutout } = require('./utils/cutout-decompose-core');
 const { validateVisualReviewReport } = require('./utils/visual-review-core');
 const { auditImagegenCandidate } = require('./utils/imagegen-candidate-core');
@@ -321,6 +323,7 @@ assert(packageJson.scripts['template:check'] === 'node scripts/template-check.js
 assert(packageJson.scripts['copy-schema'] === 'node scripts/copy-schema.js', 'package.json missing copy-schema script');
 assert(packageJson.scripts['visual:intake'] === 'node scripts/visual-intake.js', 'package.json missing visual:intake script');
 assert(packageJson.scripts['prompt:compose'] === 'node scripts/compose-codex-html-prompt.js', 'package.json missing prompt:compose script');
+assert(packageJson.scripts['task:brief'] === 'node scripts/task-brief.js', 'package.json missing task:brief script');
 assert(packageJson.scripts['cutout:decompose'] === 'node scripts/cutout-decompose.js', 'package.json missing cutout:decompose script');
 assert(packageJson.scripts['visual:review'] === 'node scripts/visual-review.js', 'package.json missing visual:review script');
 assert(packageJson.scripts['audit:imagegen'] === 'node scripts/audit-imagegen-candidates.js', 'package.json missing audit:imagegen script');
@@ -335,6 +338,7 @@ assert(packageJson.scripts['audit:visual-compare'] === 'node scripts/audit-visua
 assert(packageJson.scripts['audit:visual-dom'] === 'node scripts/audit-visual-dom.js', 'package.json missing audit:visual-dom script');
 assert(packageJson.scripts['learning:index'] === 'node scripts/learning-index.js', 'package.json missing learning:index script');
 assert(packageJson.scripts['learning:report'] === 'node scripts/learning-report.js', 'package.json missing learning:report script');
+assert(packageJson.scripts['project:inspect'] === 'node scripts/project-inspect.js', 'package.json missing project:inspect script');
 for (const dependency of ['@resvg/resvg-js', 'css-tree', 'parse5']) {
   assert(packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency], `package.json missing ${dependency}`);
 }
@@ -2334,6 +2338,146 @@ const codexPromptCliOutput = require('child_process').execFileSync(process.execP
   encoding: 'utf8',
 });
 assert(codexPromptCliOutput.includes('Codex first-pass HTML prompt written'), 'prompt:compose CLI should print prompt path');
+
+const taskBriefPaths = createProjectWorkspace('task brief active preview');
+const activeIndexPath = path.join(taskBriefPaths.html, 'index.html');
+fs.writeFileSync(activeIndexPath, '<!doctype html><html><body><main class="poster">Active preview</main></body></html>\n');
+fs.writeFileSync(path.join(taskBriefPaths.html, 'master.css'), '.poster { width: 320px; height: 180px; }\n');
+
+const activeBrief = buildTaskBrief({
+  projectPaths: taskBriefPaths,
+  mode: 'preview-overwrite',
+  constraints: ['保留现有版面，只改主标题'],
+});
+assert(activeBrief.mode === 'preview-overwrite', 'preview-overwrite brief should keep requested mode');
+assert(activeBrief.detached_preview === false, 'preview-overwrite should use active index as preview');
+assert(activeBrief.export_allowed === false, 'preview-overwrite should not allow export by default');
+assert(activeBrief.allowed_writes.includes('html/index.html'), 'preview-overwrite should allow html/index.html writes');
+assert(activeBrief.allowed_writes.includes('html/master.css'), 'preview-overwrite should allow html/master.css writes');
+assert(activeBrief.forbidden_writes.includes('exports/*'), 'preview-overwrite should forbid exports by default');
+assert(activeBrief.preview_files.includes(activeIndexPath), 'preview-overwrite should include active index.html in preview_files');
+assert(activeBrief.required_handoff.includes('explicit_preview_file_links_in_conversation'), 'brief should require proactive preview links');
+assert(activeBrief.required_handoff.includes('export_skipped_note'), 'brief should require export skipped note');
+assert(activeBrief.constraints.includes('保留现有版面，只改主标题'), 'brief should preserve user constraints');
+
+const previewOnlyBrief = buildTaskBrief({
+  projectPaths: taskBriefPaths,
+  mode: 'preview-only',
+  previewName: 'preview-title-options',
+});
+assert(previewOnlyBrief.detached_preview === true, 'preview-only should create detached preview policy');
+assert(previewOnlyBrief.preview_files.some((item) => item.endsWith('html/preview-title-options.html')), 'preview-only should point to detached preview HTML');
+assert(!previewOnlyBrief.allowed_writes.includes('html/index.html'), 'preview-only should not allow canonical index writes');
+
+const exportBrief = buildTaskBrief({
+  projectPaths: taskBriefPaths,
+  mode: 'finalize-export',
+});
+assert(exportBrief.export_allowed === true, 'finalize-export should allow real exports');
+assert(!exportBrief.forbidden_writes.includes('exports/*'), 'finalize-export should not forbid exports');
+
+const faithfulBrief = buildTaskBrief({
+  projectPaths: taskBriefPaths,
+  mode: 'faithful-recreate',
+  sourceImage: path.join(taskBriefPaths.source, 'reference.png'),
+});
+assert(faithfulBrief.source_image.endsWith('source/reference.png'), 'faithful-recreate should record source image');
+assert(faithfulBrief.workflow_hints.includes('visual:intake -> route:assets --from-intake -> prompt:compose'), 'faithful-recreate should include first-pass workflow hint');
+
+assertThrows(
+  () => buildTaskBrief({ projectPaths: taskBriefPaths, mode: 'unknown-mode' }),
+  /Unknown task brief mode/,
+  'unknown task brief mode should fail'
+);
+assertThrows(
+  () => buildTaskBrief({ projectPaths: taskBriefPaths, mode: 'faithful-recreate' }),
+  /sourceImage is required/,
+  'faithful-recreate should require source image'
+);
+
+const taskBriefMarkdown = renderTaskBriefMarkdown(activeBrief);
+assert(taskBriefMarkdown.includes('主动输出 preview 文件链接'), 'task brief markdown should require proactive preview links');
+assert(taskBriefMarkdown.includes(activeIndexPath), 'task brief markdown should include active index path');
+assert(taskBriefMarkdown.includes('本轮默认不执行正式 export'), 'task brief markdown should state export is skipped by default');
+
+const writtenTaskBrief = writeTaskBrief({ projectPaths: taskBriefPaths, brief: activeBrief });
+assert(fs.existsSync(writtenTaskBrief.jsonPath), 'writeTaskBrief should write task-brief.json');
+assert(fs.existsSync(writtenTaskBrief.markdownPath), 'writeTaskBrief should write task-brief.md');
+assert(JSON.parse(fs.readFileSync(writtenTaskBrief.jsonPath, 'utf8')).mode === 'preview-overwrite', 'task-brief.json should contain mode');
+
+assertThrows(
+  () => require('child_process').execFileSync(process.execPath, [
+    path.join(ROOT, 'scripts', 'task-brief.js'),
+    '--project', taskBriefPaths.project_id,
+    '--mode', 'unknown-mode',
+  ], { cwd: ROOT, encoding: 'utf8' }),
+  /Command failed/,
+  'task-brief CLI should fail for unknown mode'
+);
+
+const taskBriefCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'task-brief.js'),
+  '--project', taskBriefPaths.project_id,
+  '--mode', 'preview-overwrite',
+  '--constraint', '只改 HTML 和 CSS，不导出 PNG',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(taskBriefCliOutput.includes('Task brief written:'), 'task-brief CLI should print markdown report path');
+assert(taskBriefCliOutput.includes('Active preview HTML:'), 'task-brief CLI should print active preview html');
+assert(taskBriefCliOutput.includes('Formal export allowed: false'), 'task-brief CLI should print export policy');
+
+const inspectPaths = createProjectWorkspace('project inspect active preview');
+fs.writeFileSync(path.join(inspectPaths.html, 'index.html'), '<!doctype html><html><body><main class="poster">中文</main></body></html>\n');
+fs.writeFileSync(path.join(inspectPaths.html, 'index.en.html'), '<!doctype html><html><body><main class="poster">English</main></body></html>\n');
+fs.writeFileSync(path.join(inspectPaths.html, 'master.css'), '.poster { width: 1080px; height: 1448px; }\n');
+fs.writeFileSync(path.join(inspectPaths.source, 'reference.png'), 'source fixture');
+fs.writeFileSync(path.join(inspectPaths.exports, 'index.png'), 'export fixture');
+fs.writeFileSync(path.join(inspectPaths.reports, 'preview-links.md'), '# Preview\n');
+
+const inspectSummary = inspectProject(inspectPaths);
+assert(inspectSummary.project_exists === true, 'project inspect should find existing project');
+assert(inspectSummary.html_entries.length === 2, 'project inspect should list shallow HTML variants');
+assert(inspectSummary.html_entries.some((entry) => entry.variant === 'en'), 'project inspect should include localized HTML variant');
+assert(inspectSummary.css_files.some((file) => file.relative_path === 'html/master.css'), 'project inspect should list master.css');
+assert(inspectSummary.source_files.count === 1, 'project inspect should count source files');
+assert(inspectSummary.export_files.count === 1, 'project inspect should count export files');
+assert(inspectSummary.report_files.count >= 1, 'project inspect should count report files');
+assert(inspectSummary.report_files.sample.includes('preview-links.md'), 'project inspect should include existing preview-links report sample');
+assert(inspectSummary.recommended_next_commands.some((command) => command.includes('task:brief') && command.includes('preview-overwrite')), 'project inspect should recommend preview-overwrite task brief');
+assert(inspectSummary.active_preview.html.endsWith('html/index.html'), 'project inspect should prefer canonical index.html as active preview');
+
+const inspectMarkdown = renderProjectInspectMarkdown(inspectSummary);
+assert(inspectMarkdown.includes('## Active HTML'), 'project inspect markdown should include active HTML section');
+assert(inspectMarkdown.includes('Recommended Next Commands'), 'project inspect markdown should include next commands');
+assert(inspectMarkdown.includes('task:brief'), 'project inspect markdown should mention task:brief');
+
+const writtenProjectInspect = writeProjectInspect({ projectPaths: inspectPaths, summary: inspectSummary });
+assert(fs.existsSync(writtenProjectInspect.jsonPath), 'writeProjectInspect should write project-inspect.json');
+assert(fs.existsSync(writtenProjectInspect.markdownPath), 'writeProjectInspect should write project-inspect.md');
+assert(JSON.parse(fs.readFileSync(writtenProjectInspect.jsonPath, 'utf8')).html_entries.length === 2, 'project-inspect.json should contain HTML entries');
+
+const projectInspectCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'project-inspect.js'),
+  '--project', inspectPaths.project_id,
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(projectInspectCliOutput.includes('Project inspect written:'), 'project:inspect CLI should print markdown report path');
+assert(projectInspectCliOutput.includes('HTML entries: 2'), 'project:inspect CLI should print HTML entry count');
+assert(projectInspectCliOutput.includes('Recommended next command: npm run task:brief'), 'project:inspect CLI should print task:brief as recommended next command');
+
+const missingInspectProject = `missing-inspect-${Date.now()}`;
+const missingInspectPaths = getProjectPaths(missingInspectProject);
+fs.rmSync(missingInspectPaths.root, { recursive: true, force: true });
+assertThrows(
+  () => inspectProject(missingInspectPaths),
+  /Project workspace does not exist/,
+  'project inspect should fail for missing projects'
+);
+assert(!fs.existsSync(missingInspectPaths.root), 'project inspect should not create missing project workspace');
 
 const opaqueCandidatePath = path.join(projectPaths.working, 'imagegen-opaque-rgb-candidate.png');
 const opaqueCandidatePng = new PNG({ width: 10, height: 10 });

@@ -53,11 +53,23 @@ npm run install:codex    # 只安装到 Codex
 cd skills/text2html-image
 
 npm run project:init -- --project <project-id>
+npm run project:inspect -- --project <project-id>
+npm run task:brief -- --project <project-id> --mode preview-overwrite
 npm run build -- --project <project-id>
 npm run quality-check -- --project <project-id>
 npm run audit:dom -- --project <project-id> --group <html-group>
 npm run render:profile -- --project <project-id> --group <html-group>
 npm run export-fast -- --project <project-id> --group <html-group> --scale 2
+```
+
+`project:inspect` 用于继续已有项目：它只读扫描现有 workspace，列出 active HTML、CSS、source、exports、reports 和建议下一步命令，不会创建或覆盖项目文件。
+
+`task:brief` 在高频的拷贝/微改场景下是编辑前置步骤：先声明边界与目标，再决定是否执行 rebuild/export。
+
+```bash
+npm run task:brief -- --project <project-id> --mode faithful-recreate
+npm run task:brief -- --project <project-id> --mode preview-only
+npm run task:brief -- --project <project-id> --mode finalize-export
 ```
 
 如果使用项目级 copy 数据，构建时显式传入：
@@ -195,6 +207,18 @@ flowchart TD
     T --> U["确认真实文件、尺寸、语言版本"]
     U --> S
 ```
+
+标准流程新增两层便利化：
+
+1. 对已有项目，先运行 `project:inspect` 找到当前 active HTML、CSS、语言变体、已有导出和报告。
+2. 在图像拷贝/编辑前运行 `task:brief` 固定本轮覆盖、预览和导出边界。
+
+最终汇报中回传：
+
+1. 激活预览文件（Markdown 链接或 `file://`/绝对路径）
+2. `reports/project-inspect.md` / `reports/project-inspect.json`（如本轮用来定位项目）
+3. `reports/task-brief.md` / `reports/task-brief.json`（如存在）
+4. 导出执行结果说明（`finalize-export` 才默认导出；否则明确写明跳过）
 
 ## 常用命令
 

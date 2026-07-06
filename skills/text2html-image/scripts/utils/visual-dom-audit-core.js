@@ -358,6 +358,25 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function removeTemporaryDirectory(dirPath, options = {}) {
+  const retries = Number(options.retries || 8);
+  const delayMs = Number(options.delayMs || 150);
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      fs.rmSync(dirPath, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const retryable = ['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code);
+      if (!retryable || attempt === retries) throw error;
+      sleepSync(delayMs);
+    }
+  }
+}
+
 function requestJson(url) {
   return new Promise((resolve, reject) => {
     const request = http.request(url, { method: 'GET' }, (response) => {
@@ -470,7 +489,7 @@ async function evaluateInChrome({ fileUrl, chromePath, viewportWidth, viewportHe
   } finally {
     child.kill();
     await sleep(100);
-    fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 });
+    removeTemporaryDirectory(profileDir);
   }
 }
 
