@@ -11,7 +11,7 @@ The convenience upgrade should keep the existing static HTML/CSS workflow intact
 - Reduce repeated prompt writing for common copy-image and edit rounds.
 - Make the active work mode explicit before editing.
 - Prevent accidental formal image export unless the user asks for it.
-- Make preview handoff reliable by always surfacing the active `index.html` path in the conversation.
+- Make preview handoff reliable by proactively surfacing preview file links and the active `index.html` path in the conversation.
 - Keep changes small, testable, and aligned with the existing scripts and reports.
 
 ## Non-Goals
@@ -60,7 +60,8 @@ Default rules:
 - It is allowed to overwrite the active project `html/index.html`.
 - It is allowed to overwrite the active project `html/master.css`.
 - Do not write or overwrite `exports/` unless the user explicitly asks for formal export.
-- The final response must include an explicit clickable link to the active `index.html` file and the plain absolute local HTML path.
+- Every response that hands off a visual result must explicitly include the clickable active `index.html` preview link and the plain absolute local HTML path.
+- If a screenshot preview or browser-rendered preview file exists, include that preview file link in the conversation as well.
 
 ### `preview-only`
 
@@ -71,6 +72,7 @@ Default rules:
 - Do not overwrite canonical `html/index.html` or `html/master.css`.
 - Write a clearly named preview file, such as `html/preview-<topic>.html` plus its CSS.
 - Do not write or overwrite `exports/` unless explicitly requested.
+- Every response that hands off the draft must explicitly include the clickable detached preview HTML file link and its plain absolute local path.
 - The final response must identify that the preview is detached from the canonical files.
 
 ### `surgical-edit`
@@ -112,7 +114,8 @@ Unless the user explicitly says to export final images:
 
 - Do not create or overwrite formal `exports/index.png`.
 - Do not present an export report as a completed image export.
-- Preview evidence may be HTML links, browser screenshots, or report paths.
+- Preview evidence should be actively surfaced in the conversation, not only buried in reports.
+- When preview HTML, screenshot previews, or browser-rendered preview images exist, include explicit preview file links in the response.
 
 When the active mode is `preview-overwrite`, overwriting these files is allowed:
 
@@ -123,6 +126,7 @@ The final response for every preview/edit round must include:
 
 - A clickable link to the active `index.html`.
 - The plain absolute local HTML path.
+- Explicit links to any generated preview files, such as detached preview HTML or screenshot preview images.
 - `reports/preview-links.md` when it exists.
 - A note when formal export was intentionally skipped.
 
@@ -136,6 +140,7 @@ The final response for every preview/edit round must include:
   "mode": "preview-overwrite",
   "source_image": "/absolute/path/reference.png",
   "active_html": "/absolute/path/html/index.html",
+  "preview_files": ["/absolute/path/html/index.html"],
   "allowed_writes": ["html/index.html", "html/master.css"],
   "forbidden_writes": ["exports/*"],
   "export_allowed": false,
@@ -145,6 +150,7 @@ The final response for every preview/edit round must include:
     "locales": []
   },
   "required_handoff": [
+    "explicit_preview_file_links_in_conversation",
     "clickable_index_html_link",
     "plain_absolute_index_html_path",
     "preview_links_report_if_present",
@@ -167,6 +173,7 @@ The final response for every preview/edit round must include:
 - `--constraint` may be repeated and is copied into the brief as user-specific hard rules.
 - The command should refuse unknown modes.
 - The command should not create generated HTML, CSS, screenshots, or exports. It only writes task brief reports.
+- The command should record expected preview files so the agent can proactively output them in conversation after the edit/render round.
 
 ## Documentation Updates
 
@@ -175,6 +182,7 @@ Update the skill docs to mention the convenience entry near the existing preview
 - Use `task:brief` before an image-edit round when the user intent mixes preview, overwrite, multilingual sync, or export rules.
 - The brief does not replace the existing workflow commands.
 - Formal export still requires an explicit user request.
+- Preview files should be explicitly linked in the user-facing response whenever they exist.
 
 ## Testing
 
@@ -183,9 +191,11 @@ Add tests to `scripts/test.js` that verify:
 - `package.json` exposes `task:brief`.
 - Each known mode renders the expected allowed/forbidden write policy.
 - `preview-overwrite` allows `html/index.html` and `html/master.css`, forbids `exports/*`, and sets `export_allowed: false`.
+- `preview-overwrite` requires `explicit_preview_file_links_in_conversation` and includes the active `index.html` in `preview_files`.
+- `preview-only` requires detached preview file links in the user-facing handoff.
 - `finalize-export` sets `export_allowed: true`.
 - Unknown modes fail.
-- Markdown output contains the active `index.html` handoff requirement.
+- Markdown output contains the active `index.html` handoff requirement and the proactive preview file link requirement.
 
 ## Implementation Boundary
 
