@@ -1,146 +1,158 @@
-# Colleague Task Brief Convenience Design
+# 同事抄图任务简报便利化设计
 
-## Context
+## 背景
 
-The attached colleague conversations show that `text2html-image` already works for image-to-HTML recreation and iterative poster editing. The costly part is not core generation. The costly part is repeatedly translating natural-language intent into the correct workflow surface, overwrite policy, preview handoff, multilingual sync, font handling, and export boundary.
+同事的对话上下文说明，`text2html-image` 现在已经可以完成图片转可编辑 HTML/CSS、局部改图、多语言版本和预览验证。真正消耗时间的不是核心生成能力，而是每一轮都要重新把自然语言需求翻译成正确的编辑面、覆盖策略、预览交付方式、多语言同步策略、字体规则和导出边界。
 
-The convenience upgrade should keep the existing static HTML/CSS workflow intact and add a low-friction task brief layer that helps the agent start each image round with the right constraints.
+这次便利化改造不做 GUI，不重写生成器，不改变静态 HTML/CSS 工作流。它只增加一个低摩擦的任务简报层，让 agent 在开始每轮图片任务前拿到明确约束。
 
-## Goals
+## 目标
 
-- Reduce repeated prompt writing for common copy-image and edit rounds.
-- Make the active work mode explicit before editing.
-- Prevent accidental formal image export unless the user asks for it.
-- Make preview handoff reliable by proactively surfacing preview file links and the active `index.html` path in the conversation.
-- Keep changes small, testable, and aligned with the existing scripts and reports.
+- 减少同事反复书写长提示词的成本。
+- 在编辑前明确本轮工作模式。
+- 默认不生成或覆盖正式 `exports/` 图片，除非用户明确要求。
+- 默认把 active `html/index.html` 当作 preview 交付面，改完后主动在对话中输出它的可点击链接和本地绝对路径。
+- 只有用户明确要求“只预览不覆盖”、需要多方案比较、或改动方向高风险时，才新建 detached preview 文件。
+- 保持改动小、可测试，并沿用现有脚本和报告体系。
 
-## Non-Goals
+## 非目标
 
-- Do not build a GUI or interactive control page.
-- Do not add scripts to generated previews.
-- Do not replace `visual:intake`, `route:assets`, `prompt:compose`, `audit:*`, or `export-fast`.
-- Do not introduce a full automated design generator.
-- Do not change the workspace root or project layout rules.
+- 不构建 GUI 或交互式控制页。
+- 不给生成出的 preview 添加 `<script>`。
+- 不替代 `visual:intake`、`route:assets`、`prompt:compose`、`audit:*` 或 `export-fast`。
+- 不引入完整自动设计生成器。
+- 不改变 workspace root 或项目目录布局规则。
 
-## Recommended Approach
+## 推荐方案
 
-Add a lightweight task brief generator, exposed as:
+新增一个轻量任务简报生成器：
 
 ```bash
-npm run task:brief -- --project <project-id> --mode <mode> [--source-image <path>] [--html <path>] [--constraint <text>] [--lang <lang>...]
+npm run task:brief -- --project task-brief-smoke --mode preview-overwrite --constraint "只输出 active index preview，不做正式 export"
 ```
 
-The command writes:
+命令只写报告，不生成 HTML、CSS、截图或正式导出图：
 
 - `reports/task-brief.json`
 - `reports/task-brief.md`
 
-The Markdown brief is optimized for direct agent read-in. The JSON brief is optimized for tests and future automation.
+Markdown 供 agent 直接阅读；JSON 供测试和未来自动化使用。
 
-## Modes
+## 核心策略
+
+默认最快路径是：直接更新 active `html/index.html` 与 `html/master.css`，并把 active `index.html` 当作 preview 链接输出给用户。
+
+这样比每轮新建 `preview-*.html` 更快，因为 HTML 本身就是可预览源文件。新建 detached preview 会多出复制、命名、同步回正式稿和解释当前稿/预览稿关系的成本。
+
+detached preview 只在以下情况使用：
+
+- 用户明确说“只预览，不覆盖正式稿”。
+- 用户要求 A/B/C 多个方案供选择。
+- 改动方向不确定，直接覆盖主稿的返工风险高。
+- 需要保留当前主稿作为前后对照。
+
+## 模式
 
 ### `faithful-recreate`
 
-Use when the user asks for 1:1 recreation from a reference image.
+用于用户要求从参考图 1:1 还原。
 
-Default rules:
+默认规则：
 
-- Use the reference image as the only visual source.
-- Do not redesign, beautify, simplify, or change copy.
-- Produce editable static HTML/CSS.
-- Run the existing first-pass entrance when appropriate: `visual:intake -> route:assets --from-intake -> prompt:compose`.
-- Complex art, logos, app icons, people, maps, phones, and dense screenshots must be routed as source-truth bitmap/cutout/review assets instead of approximate CSS redraws.
+- 参考图是唯一视觉来源。
+- 不重新设计、不美化、不简化、不改文案。
+- 输出可编辑静态 HTML/CSS。
+- 需要时走既有首轮入口：`visual:intake -> route:assets --from-intake -> prompt:compose`。
+- 复杂插图、Logo、App icon、人物、地图、手机截图和密集截图必须进入 source-truth bitmap、cutout 或 review 路由，不用近似 CSS 重画冒充。
 
 ### `preview-overwrite`
 
-Use when the user wants the current main preview updated.
+用于用户希望更新当前主 preview。这是最常用、最快的默认模式。
 
-Default rules:
+默认规则：
 
-- It is allowed to overwrite the active project `html/index.html`.
-- It is allowed to overwrite the active project `html/master.css`.
-- Do not write or overwrite `exports/` unless the user explicitly asks for formal export.
-- Every response that hands off a visual result must explicitly include the clickable active `index.html` preview link and the plain absolute local HTML path.
-- If a screenshot preview or browser-rendered preview file exists, include that preview file link in the conversation as well.
+- 允许覆盖 active 项目的 `html/index.html`。
+- 允许覆盖 active 项目的 `html/master.css`。
+- active `html/index.html` 就是本轮 preview 文件。
+- 每轮视觉结果交付时，必须在对话中主动输出 active `index.html` 的可点击链接和本地绝对路径。
+- 如果存在截图 preview 或浏览器渲染 preview 图片，也要在对话中主动输出这些 preview 文件链接。
+- 除非用户明确要求正式导出，否则不写入或覆盖 `exports/`。
 
 ### `preview-only`
 
-Use when the user asks to see a draft before applying it.
+用于用户明确要求先看草稿、不要覆盖主稿。
 
-Default rules:
+默认规则：
 
-- Do not overwrite canonical `html/index.html` or `html/master.css`.
-- Write a clearly named preview file, such as `html/preview-<topic>.html` plus its CSS.
-- Do not write or overwrite `exports/` unless explicitly requested.
-- Every response that hands off the draft must explicitly include the clickable detached preview HTML file link and its plain absolute local path.
-- The final response must identify that the preview is detached from the canonical files.
+- 不覆盖 canonical `html/index.html` 或 `html/master.css`。
+- 写清晰命名的 detached preview 文件，例如 `html/preview-kkday-title.html` 和对应 CSS。
+- 每轮交付时，必须在对话中主动输出 detached preview HTML 的可点击链接和本地绝对路径。
+- 说明这个 preview 与 canonical 文件是分离的。
+- 除非用户明确要求正式导出，否则不写入或覆盖 `exports/`。
 
 ### `surgical-edit`
 
-Use for narrow edits such as changing a status mark, order number, one badge, one copy block, one color token, or one font family.
+用于窄改，例如只改勾叉、订单编号、一个 badge、一段文案、一个色值或一个字体。
 
-Default rules:
+默认规则：
 
-- Edit only the smallest affected HTML/CSS surface.
-- Do not rebuild before editing generated workspace HTML.
-- Keep sibling language variants synchronized unless the user scopes the edit to one language.
-- Do not change layout, spacing, imagery, color, font, export files, or other elements outside the requested target.
+- 只编辑最小受影响 HTML/CSS 表面。
+- 修改 workspace HTML 前不 rebuild。
+- 除非用户明确限定单语言，否则同步同一 active group 下的兄弟语言版本。
+- 不改请求目标之外的版面、间距、图片、颜色、字体、导出文件或其他元素。
 
 ### `multilingual-sync`
 
-Use when the user asks for English, Japanese, or other language variants.
+用于用户要求英文、日文或其他语言版本。
 
-Default rules:
+默认规则：
 
-- Start from the accepted source language design.
-- Preserve the layout and visual hierarchy.
-- Use language-specific font and line-height overrides only where needed.
-- Check line breaks, overflow, and visual balance for every affected locale.
-- Do not shrink text excessively to force a translation into the source-language box.
+- 从已接受的源语言设计开始。
+- 保持版面和视觉层级。
+- 只在必要时使用语言限定字体、字距和行高覆盖。
+- 检查每个受影响 locale 的分行、溢出和视觉平衡。
+- 不为了塞入翻译而过度缩小文字。
 
 ### `finalize-export`
 
-Use only when the user explicitly asks to export PNG/JPG/WebP, save final images, or deliver final assets.
+只在用户明确要求导出 PNG/JPG/WebP、保存最终图片或交付最终素材时使用。
 
-Default rules:
+默认规则：
 
-- Produce real image files, not only `reports/export-report.json`.
-- Verify file existence, pixel dimensions, and affected language variants.
-- Keep CSS canvas dimensions fixed and use export scale rather than changing layout size.
+- 生成真实图片文件，不能只生成 `reports/export-report.json`。
+- 验证文件存在、像素尺寸和受影响语言版本。
+- 保持 CSS canvas 尺寸不变，用 export scale 提高清晰度。
 
-## Default Output Policy
+## 默认输出政策
 
-Unless the user explicitly says to export final images:
+除非用户明确说要导出最终图片：
 
-- Do not create or overwrite formal `exports/index.png`.
-- Do not present an export report as a completed image export.
-- Preview evidence should be actively surfaced in the conversation, not only buried in reports.
-- When preview HTML, screenshot previews, or browser-rendered preview images exist, include explicit preview file links in the response.
+- 不创建或覆盖正式 `exports/index.png`。
+- 不把 export report 当作已完成图片导出。
+- preview 证据必须主动在对话中输出，不只埋在报告里。
+- 默认 preview 文件是 active `html/index.html`。
+- 如果存在 detached preview HTML、截图 preview 或浏览器渲染 preview 图片，也必须在对话中输出链接。
 
-When the active mode is `preview-overwrite`, overwriting these files is allowed:
+每轮 preview/edit 交付必须包含：
 
-- `html/index.html`
-- `html/master.css`
+- active `index.html` 的可点击链接。
+- active `index.html` 的纯文本本地绝对路径。
+- 任何额外 preview 文件链接，例如 detached preview HTML 或截图 preview 图片。
+- `reports/preview-links.md`，如果它存在。
+- 明确说明本轮没有执行正式 export，除非用户已经要求 export。
 
-The final response for every preview/edit round must include:
+## 数据结构
 
-- A clickable link to the active `index.html`.
-- The plain absolute local HTML path.
-- Explicit links to any generated preview files, such as detached preview HTML or screenshot preview images.
-- `reports/preview-links.md` when it exists.
-- A note when formal export was intentionally skipped.
-
-## Data Shape
-
-`task-brief.json` should include:
+`task-brief.json` 应包含：
 
 ```json
 {
   "project_id": "example-project",
   "mode": "preview-overwrite",
-  "source_image": "/absolute/path/reference.png",
-  "active_html": "/absolute/path/html/index.html",
-  "preview_files": ["/absolute/path/html/index.html"],
+  "source_image": "/Users/tashima_meru/Downloads/reference.png",
+  "active_html": "/Users/tashima_meru/Documents/text2html-image-project/example-project/html/index.html",
+  "preview_files": ["/Users/tashima_meru/Documents/text2html-image-project/example-project/html/index.html"],
+  "detached_preview": false,
   "allowed_writes": ["html/index.html", "html/master.css"],
   "forbidden_writes": ["exports/*"],
   "export_allowed": false,
@@ -164,47 +176,51 @@ The final response for every preview/edit round must include:
 }
 ```
 
-## CLI Behavior
+`preview-only` 模式中，`detached_preview` 为 `true`，`preview_files` 指向 detached preview HTML，而不是 canonical `html/index.html`。
 
-- `--mode` is required.
-- `--project` is required.
-- `--source-image` is required for `faithful-recreate`.
-- `--html` is optional. If omitted, the command resolves the likely active `html/index.html` under the project.
-- `--constraint` may be repeated and is copied into the brief as user-specific hard rules.
-- The command should refuse unknown modes.
-- The command should not create generated HTML, CSS, screenshots, or exports. It only writes task brief reports.
-- The command should record expected preview files so the agent can proactively output them in conversation after the edit/render round.
+## CLI 行为
 
-## Documentation Updates
+- `--mode` 必填。
+- `--project` 必填。
+- `faithful-recreate` 模式下 `--source-image` 必填。
+- `--html` 可选；如果省略，命令解析项目下最可能的 active `html/index.html`。
+- `--constraint` 可以重复传入，并进入 brief 的硬约束列表。
+- 未知模式必须失败。
+- 命令只写 `task-brief` 报告，不创建 HTML、CSS、截图或正式导出图。
+- 命令要记录预期 preview 文件，方便 agent 在后续编辑或渲染后主动输出到对话中。
 
-Update the skill docs to mention the convenience entry near the existing preview and execution-flow guidance:
+## 文档更新
 
-- Use `task:brief` before an image-edit round when the user intent mixes preview, overwrite, multilingual sync, or export rules.
-- The brief does not replace the existing workflow commands.
-- Formal export still requires an explicit user request.
-- Preview files should be explicitly linked in the user-facing response whenever they exist.
+在现有 preview 和 execution-flow 说明附近补充：
 
-## Testing
+- 当用户意图混合了 preview、覆盖、多语言同步或 export 规则时，先用 `task:brief`。
+- `task:brief` 不替代现有 workflow 命令。
+- 默认 active `html/index.html` 就是 preview。
+- detached preview 只用于用户明确要求不覆盖、多方案比较或高风险试改。
+- 正式 export 仍然需要用户明确要求。
+- 只要 preview 文件存在，就要在用户可见回复里显式输出链接。
 
-Add tests to `scripts/test.js` that verify:
+## 测试要求
 
-- `package.json` exposes `task:brief`.
-- Each known mode renders the expected allowed/forbidden write policy.
-- `preview-overwrite` allows `html/index.html` and `html/master.css`, forbids `exports/*`, and sets `export_allowed: false`.
-- `preview-overwrite` requires `explicit_preview_file_links_in_conversation` and includes the active `index.html` in `preview_files`.
-- `preview-only` requires detached preview file links in the user-facing handoff.
-- `finalize-export` sets `export_allowed: true`.
-- Unknown modes fail.
-- Markdown output contains the active `index.html` handoff requirement and the proactive preview file link requirement.
+在 `scripts/test.js` 中覆盖：
 
-## Implementation Boundary
+- `package.json` 暴露 `task:brief`。
+- 每个已知 mode 都产出预期的 allowed/forbidden write policy。
+- `preview-overwrite` 允许 `html/index.html` 和 `html/master.css`，禁止 `exports/*`，并设置 `export_allowed: false`。
+- `preview-overwrite` 设置 `detached_preview: false`，并把 active `index.html` 放进 `preview_files`。
+- `preview-only` 设置 `detached_preview: true`，并要求在用户可见交付中输出 detached preview 文件链接。
+- `finalize-export` 设置 `export_allowed: true`。
+- 未知 mode 失败。
+- Markdown 输出包含 active `index.html` 交付要求和主动输出 preview 文件链接的要求。
 
-This should be a small additive change:
+## 实施边界
 
-- New script: `scripts/task-brief.js`
-- New core helper: `scripts/utils/task-brief-core.js`
-- Package script entry: `task:brief`
-- Focused docs additions in `SKILL.md`, `README.md`, and `references/execution-flow.md`
-- Focused tests in `scripts/test.js`
+这是一个小型增量改造：
 
-Do not refactor the build, render, audit, or asset-routing systems while implementing this feature.
+- 新增 `scripts/task-brief.js`
+- 新增 `scripts/utils/task-brief-core.js`
+- 新增 package script：`task:brief`
+- 小范围更新 `SKILL.md`、`README.md`、`references/execution-flow.md`
+- 小范围更新 `scripts/test.js`
+
+不要在这个任务里重构 build、render、audit 或 asset-routing 系统。
