@@ -457,9 +457,13 @@ assert(skillBody.includes('asset-generation-prompts.json'), 'skill must document
 assert(skillBody.includes('npm run template:check'), 'skill must document template:check command');
 assert(skillBody.includes('npm run copy-schema'), 'skill must document copy-schema command');
 assert(skillBody.includes('npm run visual:intake'), 'skill must document visual:intake command');
+assert(skillBody.includes('接到图后先生成大范围反向视觉提示词'), 'skill must document reverse visual prompt as the first reference-image step');
+assert(skillBody.includes('reverse_visual_prompt'), 'skill must document the reverse_visual_prompt contract');
+assert(skillBody.includes('route:assets -- --project <project-id> --source-image <path> --from-intake'), 'skill must document route:assets --from-intake');
 assert(skillBody.includes('## Codex First-Pass HTML Prompt Bundle'), 'skill must document Codex first-pass prompt bundle');
 assert(skillBody.includes('reports/codex-first-pass-html-prompt.md'), 'skill must document codex first-pass prompt output');
 assert(skillBody.includes('npm run prompt:compose'), 'skill must document prompt:compose command');
+assert(skillBody.includes('without `reports/reverse-visual-spec.md` and `reports/codex-first-pass-html-prompt.md`'), 'skill must block first HTML before reverse spec and prompt bundle exist');
 assert(skillBody.includes('npm run cutout:decompose'), 'skill must document cutout:decompose command');
 assert(skillBody.includes('npm run visual:review'), 'skill must document visual:review command');
 assert(skillBody.includes('element-decomposition-plan.json'), 'skill must document element decomposition plan output');
@@ -580,6 +584,8 @@ assert(executionFlow.includes('asset-provenance.json'), 'execution flow must inc
 assert(executionFlow.includes('split-art-assets.json'), 'execution flow must include split art assets evidence');
 assert(executionFlow.includes('asset-generation-prompts.json'), 'execution flow must include generated prompt package evidence');
 assert(executionFlow.includes('codex-first-pass-html-prompt.md'), 'execution flow must include codex prompt bundle evidence');
+assert(executionFlow.includes('reverse_visual_prompt'), 'execution flow must document reverse_visual_prompt intake');
+assert(executionFlow.includes('visual:intake -> route:assets --from-intake -> prompt:compose'), 'execution flow must document the first-pass entrance order');
 assert(executionFlow.includes('transparent PNG with alpha channel'), 'execution flow must require transparent PNG ImageGen prompts');
 assert(executionFlow.includes('npm run audit:imagegen'), 'execution flow must include ImageGen candidate audit command');
 assert(executionFlow.includes('reports/imagegen-candidates.json'), 'execution flow must include ImageGen candidate report');
@@ -633,6 +639,8 @@ assert(stageGuides.includes('Multiple delivery/export packs -> `exports/<deliver
 assert(stageGuides.includes('Iterative screenshots/scores/masks/temp export diagnostics -> `runs/latest/`'), 'stage-guides must document run-level iterative diagnostics path');
 assert(stageGuides.includes('Prompt package is not an asset'), 'stage guides must separate prompt packages from usable assets');
 assert(stageGuides.includes('npm run prompt:compose'), 'stage guides must require prompt:compose before first-pass HTML');
+assert(stageGuides.includes('route:assets --from-intake'), 'stage guides must document route assets from visual intake');
+assert(stageGuides.includes('reverse_visual_prompt'), 'stage guides must document reverse_visual_prompt');
 assert(stageGuides.includes('Visual intake is a hypothesis package'), 'stage guides must document visual intake hypothesis status');
 assert(stageGuides.includes('Cutout decomposition is not a provider client'), 'stage guides must document provider-neutral cutout decomposition');
 assert(stageGuides.includes('Mask quality requires alpha evidence'), 'stage guides must document alpha evidence for masks');
@@ -1493,8 +1501,8 @@ const visualIntakeNoResponse = runVisualIntake({
 assert(visualIntakeNoResponse.manifest.status === 'review', 'visual intake without model response should remain review');
 assert(fs.existsSync(path.join(projectPaths.reports, 'visual-intake-request.json')), 'visual intake should write request package');
 assert(fs.existsSync(path.join(projectPaths.reports, 'visual-intake-manifest.json')), 'visual intake should write manifest');
-const visualIntakeResponsePath = path.join(projectPaths.working, 'visual-intake-response.json');
-fs.writeFileSync(visualIntakeResponsePath, JSON.stringify({
+const missingReversePromptResponsePath = path.join(projectPaths.working, 'visual-intake-missing-reverse-prompt-response.json');
+fs.writeFileSync(missingReversePromptResponsePath, JSON.stringify({
   visual_hierarchy: ['headline', 'phone mockup', 'cloud background'],
   elements: [
     {
@@ -1505,6 +1513,60 @@ fs.writeFileSync(visualIntakeResponsePath, JSON.stringify({
       suggested_route: 'reference_cutout',
       confidence: 0.86,
       evidence: ['right side rectangular phone body'],
+      uncertainty_reason: '',
+    },
+    {
+      id: 'soft-app-icon',
+      kind: 'application_icon',
+      description: 'soft multicolor application icon that is visually hard to rebuild as simple SVG',
+      bbox: { x: 120, y: 780, w: 58, h: 58 },
+      suggested_route: 'editable_vector',
+      confidence: 0.81,
+      evidence: ['small rounded app icon with gradients'],
+      uncertainty_reason: '',
+    },
+  ],
+  business_text_candidates: ['Travel eSIM'],
+  unknowns_requiring_user_or_agent_review: [],
+}, null, 2));
+const visualIntakeMissingReversePrompt = runVisualIntake({
+  projectPaths,
+  sourceImage: routeSourcePath,
+  responsePath: missingReversePromptResponsePath,
+  targetCanvas: { width: 900, height: 1200 },
+  taskType: 'recreate',
+});
+assert(visualIntakeMissingReversePrompt.manifest.status === 'review', 'visual intake without reverse_visual_prompt should remain review');
+assert(visualIntakeMissingReversePrompt.manifest.validation_issues.some((issue) => issue.includes('reverse_visual_prompt')), 'visual intake should record missing reverse_visual_prompt issue');
+const broadReverseVisualPrompt = [
+  'Canvas is a tall 900 by 1200 ecommerce poster with a calm warm off-white background and soft blue cloud accents. The top-left area carries the main travel eSIM headline, then a smaller supporting subtitle and business offer line, all intended as editable DOM text. The right half is dominated by a large phone mockup with a pale screen, rounded corners, subtle shadow, and overlapping decorative cloud forms.',
+  'The composition hierarchy starts with the headline block, then the phone mockup, then secondary benefit pills and background atmosphere. Spacing is generous around the top headline, tighter around the phone and CTA zone, and the bottom remains reserved for supporting details. Color is mostly cream, sky blue, muted navy, and soft gray, with minimal saturated accents.',
+  'Typography should be geometric sans-serif with bold headline weight, smaller medium subtitle, and compact labels. Candidate editable DOM includes headline, subtitle, CTA, price or offer text, captions, and legal copy. Candidate bitmap or generated assets include phone body if not rebuildable, soft clouds, shadows, and any complex app art. Unknowns include exact copy, logo legality, QR/source-truth crops, and whether the phone screen should be recreated as editable UI or locked bitmap.'
+].join(' ');
+assert(broadReverseVisualPrompt.length >= 600, 'test reverse prompt fixture must meet minimum length');
+const visualIntakeResponsePath = path.join(projectPaths.working, 'visual-intake-response.json');
+fs.writeFileSync(visualIntakeResponsePath, JSON.stringify({
+  reverse_visual_prompt: broadReverseVisualPrompt,
+  visual_hierarchy: ['headline', 'phone mockup', 'cloud background'],
+  elements: [
+    {
+      id: 'phone-mockup',
+      kind: 'complex_art',
+      description: 'large phone mockup on the right',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      suggested_route: 'reference_cutout',
+      confidence: 0.86,
+      evidence: ['right side rectangular phone body'],
+      uncertainty_reason: '',
+    },
+    {
+      id: 'soft-app-icon',
+      kind: 'application_icon',
+      description: 'soft multicolor application icon that is visually hard to rebuild as simple SVG',
+      bbox: { x: 120, y: 780, w: 58, h: 58 },
+      suggested_route: 'editable_vector',
+      confidence: 0.81,
+      evidence: ['small rounded app icon with gradients'],
       uncertainty_reason: '',
     },
   ],
@@ -1519,7 +1581,11 @@ const visualIntakeWithResponse = runVisualIntake({
   taskType: 'recreate',
 });
 assert(visualIntakeWithResponse.manifest.status === 'pass', 'visual intake with confident response should pass');
+assert(visualIntakeWithResponse.manifest.reverse_visual_prompt === broadReverseVisualPrompt, 'visual intake should preserve reverse_visual_prompt');
 assert(visualIntakeWithResponse.manifest.elements[0].id === 'phone-mockup', 'visual intake should preserve element id');
+const reverseVisualSpecPath = path.join(projectPaths.reports, 'reverse-visual-spec.md');
+assert(fs.existsSync(reverseVisualSpecPath), 'visual intake with qualified response should write reverse-visual-spec.md');
+assert(fs.readFileSync(reverseVisualSpecPath, 'utf8').includes(broadReverseVisualPrompt), 'reverse-visual-spec.md should include the broad reverse visual prompt');
 const visualIntakeCliOutput = require('child_process').execFileSync(process.execPath, [
   path.join(ROOT, 'scripts', 'visual-intake.js'),
   '--project', projectId,
@@ -1532,6 +1598,26 @@ const visualIntakeCliOutput = require('child_process').execFileSync(process.exec
 assert(visualIntakeCliOutput.includes('Visual intake manifest written'), 'visual-intake should print manifest path');
 const visualIntakeManifest = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'visual-intake-manifest.json'), 'utf8'));
 assert(visualIntakeManifest.elements[0].suggested_route === 'reference_cutout', 'visual intake manifest should preserve suggested route');
+assert(visualIntakeManifest.reverse_visual_prompt === broadReverseVisualPrompt, 'visual intake manifest should preserve reverse_visual_prompt after CLI run');
+const routeFromIntakeCliOutput = require('child_process').execFileSync(process.execPath, [
+  path.join(ROOT, 'scripts', 'route-assets.js'),
+  '--project', projectId,
+  '--source-image', routeSourcePath,
+  '--from-intake',
+], {
+  cwd: ROOT,
+  encoding: 'utf8',
+});
+assert(routeFromIntakeCliOutput.includes('Asset routing table written'), 'route-assets --from-intake should print routing table path');
+const routeFromIntakeTable = JSON.parse(fs.readFileSync(path.join(projectPaths.reports, 'asset-routing-table.json'), 'utf8'));
+assert(routeFromIntakeTable.elements[0].id === 'phone-mockup', 'route-assets --from-intake should read visual intake elements');
+assert(routeFromIntakeTable.elements[0].suggested_route === 'reference_cutout', 'route-assets --from-intake should preserve suggested_route');
+assert(routeFromIntakeTable.elements[0].route === 'reference_cutout', 'route-assets --from-intake should preserve suggested_route as routing input');
+const routeFromIntakeAppIcon = routeFromIntakeTable.elements.find((item) => item.id === 'soft-app-icon');
+assert(routeFromIntakeAppIcon.kind === 'application_icon', 'route-assets --from-intake should preserve hard-to-vector intake kind');
+assert(routeFromIntakeAppIcon.suggested_route === 'editable_vector', 'route-assets --from-intake should preserve the original suggested route for review');
+assert(!['editable_vector', 'editable_text'].includes(routeFromIntakeAppIcon.route), 'route-assets --from-intake should still apply hard-to-vector routing rules');
+assert(fs.readFileSync(path.join(projectPaths.reports, 'reverse-prompt-brief.md'), 'utf8').includes('phone-mockup'), 'route-assets --from-intake should write reverse prompt brief from intake elements');
 
 const cutoutNoResponse = runCutoutDecompose({
   projectPaths,
@@ -2174,14 +2260,69 @@ assertThrows(
   /visual-intake-manifest\.json/,
   'prompt compose should fail when visual intake manifest is missing'
 );
+const missingReverseSpecPaths = createProjectWorkspace('codex prompt missing reverse spec');
+fs.writeFileSync(path.join(missingReverseSpecPaths.reports, 'visual-intake-manifest.json'), JSON.stringify({
+  generated_at: new Date().toISOString(),
+  project_id: missingReverseSpecPaths.project_id,
+  source_image: routeSourcePath,
+  canvas: { width: 900, height: 1200 },
+  status: 'pass',
+  reverse_visual_prompt: broadReverseVisualPrompt,
+  visual_hierarchy: ['headline', 'phone mockup'],
+  elements: [
+    {
+      id: 'phone-mockup',
+      kind: 'complex_art',
+      description: 'large phone mockup on the right',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      suggested_route: 'reference_cutout',
+      confidence: 0.86,
+      evidence: ['right side rectangular phone body'],
+      uncertainty_reason: '',
+    },
+  ],
+  business_text_candidates: ['Travel eSIM'],
+  unknowns_requiring_user_or_agent_review: [],
+  validation_issues: [],
+}, null, 2));
+fs.writeFileSync(path.join(missingReverseSpecPaths.reports, 'reverse-prompt-brief.md'), '# Reverse Prompt Brief\n\n- `phone-mockup`: `reference_cutout`\n');
+fs.writeFileSync(path.join(missingReverseSpecPaths.reports, 'asset-routing-table.json'), JSON.stringify({
+  generated_at: new Date().toISOString(),
+  project_id: missingReverseSpecPaths.project_id,
+  source_image: routeSourcePath,
+  canvas: { width: 900, height: 1200, format: 'png' },
+  status: 'pass',
+  elements: [
+    {
+      id: 'phone-mockup',
+      kind: 'complex_art',
+      description: 'large phone mockup on the right',
+      bbox: { x: 520, y: 300, w: 260, h: 520 },
+      route: 'reference_cutout',
+      status: 'planned',
+      cutout_feasibility: 'high',
+      regeneration_fit: 'medium',
+      difficulty_signals: [],
+      decision_reason: 'Cutout feasibility is high with no blocking occlusion signals.',
+      expected_output: 'assets/phone-mockup.png',
+    },
+  ],
+}, null, 2));
+assertThrows(
+  () => composeCodexHtmlPrompt({ projectPaths: missingReverseSpecPaths }),
+  /reverse-visual-spec\.md/,
+  'prompt compose should fail when reverse-visual-spec.md is missing'
+);
 const composedPromptBundle = composeCodexHtmlPrompt({ projectPaths });
 assert(composedPromptBundle.audit.status === 'pass', 'prompt compose audit should pass with required artifacts');
-assert(fs.existsSync(path.join(projectPaths.reports, 'reverse-visual-spec.md')), 'prompt compose should write reverse-visual-spec.md');
+assert(fs.existsSync(path.join(projectPaths.reports, 'reverse-visual-spec.md')), 'prompt compose should require existing reverse-visual-spec.md');
+assert(composedPromptBundle.reverseVisualSpec.includes(broadReverseVisualPrompt), 'prompt compose should read the visual-intake reverse visual spec');
 assert(fs.existsSync(path.join(projectPaths.reports, 'visual-elements.json')), 'prompt compose should write visual-elements.json');
 assert(fs.existsSync(path.join(projectPaths.reports, 'first-pass-html-plan.md')), 'prompt compose should write first-pass-html-plan.md');
 assert(fs.existsSync(path.join(projectPaths.reports, 'codex-first-pass-html-prompt.md')), 'prompt compose should write codex-first-pass-html-prompt.md');
 assert(fs.existsSync(path.join(projectPaths.reports, 'codex-prompt-compose-audit.json')), 'prompt compose should write codex-prompt-compose-audit.json');
 assert(composedPromptBundle.prompt.includes('Read these local artifacts in this order'), 'prompt bundle should define artifact read order');
+assert(composedPromptBundle.prompt.indexOf('1. `') < composedPromptBundle.prompt.indexOf('2. `'), 'prompt bundle should keep reverse-visual-spec.md as the first read item');
 assert(composedPromptBundle.prompt.includes('Do not start writing HTML until'), 'prompt bundle should block premature HTML');
 assert(composedPromptBundle.firstPassPlan.includes('DOM text'), 'first-pass plan should name DOM text responsibilities');
 assert(composedPromptBundle.firstPassPlan.includes('prompt_only assets are not final assets'), 'first-pass plan should preserve prompt-only boundary');

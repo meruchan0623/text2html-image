@@ -63,8 +63,12 @@ For reference-image recreation or image-editing work, create routing evidence be
 
 Fixed routing rule: 人物、地图、云和天际线，应用程序图标这些难以用 SVG 或图形线条复刻的部分，请采用抠图或者反向生成提示词再生图的形式进行.
 
+First-pass entrance order: `visual:intake -> route:assets --from-intake -> prompt:compose`. The first agent/model response to a reference image must include `reverse_visual_prompt`, a broad visual blueprint for composition/layout, hierarchy, color, typography, material/assets, spatial relationships, editable DOM candidates, bitmap candidates, and unknowns. `visual:intake` must write that blueprint to `reports/reverse-visual-spec.md`; without it, do not write first-pass HTML.
+
 Required evidence:
 
+- `reports/reverse-visual-spec.md`: the broad reverse visual prompt and intake summary created before routing. This is a visual blueprint, not final business truth.
+- `reports/visual-intake-manifest.json`: intake manifest with `status: "pass"` and the original `reverse_visual_prompt`.
 - `reports/reverse-prompt-brief.md`: visual structure, text hierarchy, simple vector shapes, complex art subjects, decorative layers, and likely editable/localizable content.
 - `reports/asset-routing-table.json`: one route per meaningful visible element plus `cutout_feasibility`, `regeneration_fit`, difficulty signals, and decision reason.
 - `reports/codex-first-pass-html-prompt.md`: stable Codex read-in prompt composed from visual intake, reverse prompt brief, and asset routing before writing the first HTML/CSS pass.
@@ -79,7 +83,7 @@ Required evidence:
 - `reports/asset-readiness-audit.json`: final/review readiness validation from `npm run audit:asset-readiness -- --expected <expected-contract.json> --provenance <asset-provenance.json> --routing <asset-routing-table.json> --imagegen <imagegen-candidates.json> --review-gates <review-gate-contract-audit.json> --report <reports/asset-readiness-audit.json>`. Asset-like routes must have final-ready provenance or explicit review-gate coverage; prompt-only, rejected ImageGen candidates, planned cutouts, and flattened-text photo backgrounds cannot silently count as usable assets.
 - `reports/source-truth-acquisition-audit.json`: acquisition plan validation from `npm run audit:source-truth-acquisition -- --expected <expected-contract.json> --provenance <asset-provenance.json> --plan <source-truth-acquisition-plan.json> --review-gates <review-gate-contract-audit.json> --report <reports/source-truth-acquisition-audit.json>`. Review-gated QR/barcode/logo/icon/flag assets must name allowed real source types and explicitly forbid regenerated images, approximate redraws, and editable-vector substitutes.
 
-The visual brief is an intake and routing aid, not final business truth. OCR text, table content, prices, country/operator rows, QR/barcode assets, and legal copy still need DOM/source verification.
+The visual brief and `reverse_visual_prompt` are intake and routing aids, not final business truth. OCR text, table content, prices, country/operator rows, QR/barcode assets, logos, and legal copy still need DOM/source verification.
 
 Even if ImageGen returns a PNG, do not accept green-background channel images, chroma-key backgrounds, or colored matte backgrounds as transparent assets. Regenerate as real alpha PNG or reject before HTML composition.
 

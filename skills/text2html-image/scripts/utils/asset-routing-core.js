@@ -220,6 +220,7 @@ function routeAssets(options) {
       kind: normalizeKind(element.kind),
       description: String(element.description || ''),
       bbox: element.bbox || null,
+      suggested_route: element.suggested_route || null,
       route,
       status,
       cutout_feasibility: score.cutoutFeasibility,

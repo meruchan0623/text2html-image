@@ -259,6 +259,7 @@ function composeCodexHtmlPrompt(options = {}) {
   if (!projectPaths?.reports) throw new Error('composeCodexHtmlPrompt requires projectPaths with a reports directory.');
   const paths = defaultPromptPaths(projectPaths, options);
   const visualIntake = readJsonFile(paths.visualIntake, 'visual-intake-manifest.json');
+  const reverseVisualSpec = readTextFile(paths.reverseVisualSpec, 'reverse-visual-spec.md');
   const reverseBrief = readTextFile(paths.reverseBrief, 'reverse-prompt-brief.md');
   const routing = readJsonFile(paths.routing, 'asset-routing-table.json');
   const assetPrompts = fs.existsSync(paths.assetPrompts) ? readJsonFile(paths.assetPrompts, 'asset-generation-prompts.json') : { prompts: [] };
@@ -269,7 +270,6 @@ function composeCodexHtmlPrompt(options = {}) {
   }
 
   const visualElements = buildVisualElements({ visualIntake, routing });
-  const reverseVisualSpec = renderReverseVisualSpec({ visualElements, reverseBrief });
   const firstPassPlan = renderFirstPassHtmlPlan({ visualElements, assetPrompts });
   const prompt = renderCodexPromptBundle({ paths, visualElements, assetPrompts });
   const warnings = [];
@@ -283,6 +283,7 @@ function composeCodexHtmlPrompt(options = {}) {
     status: 'pass',
     allow_review: Boolean(options.allowReview),
     required_inputs: {
+      reverse_visual_spec: paths.reverseVisualSpec,
       visual_intake_manifest: paths.visualIntake,
       reverse_prompt_brief: paths.reverseBrief,
       asset_routing_table: paths.routing,
@@ -292,7 +293,6 @@ function composeCodexHtmlPrompt(options = {}) {
       asset_provenance: assetProvenanceExists ? paths.assetProvenance : null,
     },
     written_outputs: {
-      reverse_visual_spec: paths.reverseVisualSpec,
       visual_elements: paths.visualElements,
       first_pass_html_plan: paths.firstPassPlan,
       codex_first_pass_html_prompt: paths.prompt,
@@ -311,7 +311,6 @@ function composeCodexHtmlPrompt(options = {}) {
     warnings,
   };
 
-  writeTextFile(paths.reverseVisualSpec, reverseVisualSpec);
   writeJson(paths.visualElements, visualElements);
   writeTextFile(paths.firstPassPlan, firstPassPlan);
   writeTextFile(paths.prompt, prompt);

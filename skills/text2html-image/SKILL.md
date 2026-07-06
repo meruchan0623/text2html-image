@@ -505,19 +505,22 @@ Route visible elements as follows:
 - Large decorative texture or background art that should not be edited separately and does not contain required text -> `locked_base_layer`.
 - Tiny details that do not affect the message, are not visible at target size, or would harm editability -> `omit_or_simplify`.
 
-Use `npm run route:assets -- --project <project-id> --source-image <path> --elements <json-or-path>` to write the routing reports. The script reads agent/human-supplied element candidates; it does not claim to semantically detect all people, maps, clouds, logos, or text from pixels alone.
+接到图后先生成大范围反向视觉提示词：for reference-image recreation, the first structured response must include `reverse_visual_prompt`, a broad visual blueprint covering composition, hierarchy, color, typography, material/assets, spatial relationships, editable DOM candidates, bitmap candidates, and unknowns. `visual:intake` writes this blueprint to `reports/reverse-visual-spec.md`; do not start routing or first-pass HTML from memory alone.
+
+Use `npm run route:assets -- --project <project-id> --source-image <path> --from-intake` after `visual:intake` passes to write routing reports from `visual-intake-manifest.json.elements`. Use `npm run route:assets -- --project <project-id> --source-image <path> --elements <json-or-path>` only when an explicit external element list is needed. The script reads agent/human-supplied element candidates; it does not claim to semantically detect all people, maps, clouds, logos, or text from pixels alone.
 
 When an element may need later movement, scaling, replacement, localization, or independent visual tuning, it must be a separate asset and a separate DOM node. Do not merge it into a same-canvas PNG unless the user explicitly approves a locked composition.
 
-Before the loop, decide which parts are bitmap base assets and which parts must remain editable HTML/SVG. If text editability is required, never use OCR output as final rendered pixels. If a clean no-text base image is available, prefer base image plus editable text overlay. Do not start the HTML/CSS recreation until the reverse prompt brief and asset routing table exist for reference-image recreation work.
+Before the loop, decide which parts are bitmap base assets and which parts must remain editable HTML/SVG. If text editability is required, never use OCR output as final rendered pixels. If a clean no-text base image is available, prefer base image plus editable text overlay. Do not start the HTML/CSS recreation until `reports/reverse-visual-spec.md`, the reverse prompt brief, the asset routing table, and `reports/codex-first-pass-html-prompt.md` exist for reference-image recreation work.
 
 ## Codex First-Pass HTML Prompt Bundle
 
-For reference-image recreation, run `npm run prompt:compose` after `npm run visual:intake` has a model/agent response and after `npm run route:assets` has written routing evidence. This step makes the Codex read-in method explicit and stable before the first HTML/CSS pass. It does not call a model, generate HTML, or mark assets final.
+For reference-image recreation, the first-pass chain is fixed: `visual:intake` -> `route:assets --from-intake` -> `prompt:compose` -> Codex reads `reports/codex-first-pass-html-prompt.md` -> write HTML/CSS. Run `npm run prompt:compose` only after `npm run visual:intake` has a passing model/agent response with `reverse_visual_prompt`, `reports/reverse-visual-spec.md` exists, and `npm run route:assets -- --from-intake` has written routing evidence. This step makes the Codex read-in method explicit and stable before the first HTML/CSS pass. It does not call a model, generate HTML, or mark assets final.
 
 Required inputs:
 
 - `reports/visual-intake-manifest.json` with `status: "pass"` unless `--allow-review` is explicitly used.
+- `reports/reverse-visual-spec.md`
 - `reports/reverse-prompt-brief.md`
 - `reports/asset-routing-table.json`
 - optional `reports/asset-generation-prompts.json`
@@ -525,13 +528,12 @@ Required inputs:
 
 Required outputs:
 
-- `reports/reverse-visual-spec.md`
 - `reports/visual-elements.json`
 - `reports/first-pass-html-plan.md`
 - `reports/codex-first-pass-html-prompt.md`
 - `reports/codex-prompt-compose-audit.json`
 
-The prompt bundle must tell Codex to read those local artifacts before writing HTML, separate editable DOM text from CSS/SVG vectors and bitmap/source-truth layers, and preserve the rule that `prompt_only` assets are not final assets. Do not start the first HTML/CSS pass until `reports/codex-first-pass-html-prompt.md` exists for reference-image recreation work.
+The prompt bundle must tell Codex to read those local artifacts before writing HTML, with `reports/reverse-visual-spec.md` as the first read item, separate editable DOM text from CSS/SVG vectors and bitmap/source-truth layers, and preserve the rule that `prompt_only` assets are not final assets. `reverse_visual_prompt` is a visual blueprint, not final business truth; OCR, prices, table rows, QR/scannable codes, logos, and legal copy still require later DOM/source verification. Do not write first-pass HTML without `reports/reverse-visual-spec.md` and `reports/codex-first-pass-html-prompt.md`.
 
 Loop:
 
@@ -723,6 +725,7 @@ npm run audit:visual-dom -- --project <project-id> [--subproject <subproject-id>
 npm run template:check -- --project <project-id> [--subproject <subproject-id>]
 npm run copy-schema -- --project <project-id> [--subproject <subproject-id>]
 npm run visual:intake -- --project <project-id> --source-image <path> [--response <json>]
+npm run route:assets -- --project <project-id> --source-image <path> --from-intake [--subproject <subproject-id>]
 npm run prompt:compose -- --project <project-id> [--subproject <subproject-id>] [--allow-review]
 npm run cutout:decompose -- --project <project-id> --source-image <path> --mode hybrid [--response <json>]
 npm run route:assets -- --project <project-id> --source-image <path> --elements <json-or-path> [--subproject <subproject-id>]
@@ -748,9 +751,11 @@ Use these commands when a reference image needs structured visual understanding,
 
 `npm run copy-schema` writes `reports/copy-schema-report.json` and fails when template tokens cannot be supplied by copy rows or known derived fields.
 
-`npm run visual:intake` writes `reports/visual-intake-request.json` and `reports/visual-intake-manifest.json`. Visual intake is a hypothesis package. Without a supplied response JSON, the manifest status remains `review`.
+`npm run visual:intake` writes `reports/visual-intake-request.json` and `reports/visual-intake-manifest.json`. With a qualified response it also writes `reports/reverse-visual-spec.md` from `reverse_visual_prompt`. Visual intake is a hypothesis package. Without a supplied response JSON, or with missing/short `reverse_visual_prompt`, the manifest status remains `review`.
 
-`npm run prompt:compose` writes `reports/reverse-visual-spec.md`, `reports/visual-elements.json`, `reports/first-pass-html-plan.md`, `reports/codex-first-pass-html-prompt.md`, and `reports/codex-prompt-compose-audit.json`. Use it to stabilize the Codex first-pass HTML prompt after visual intake and asset routing, before writing HTML/CSS.
+`npm run route:assets -- --from-intake` reads `reports/visual-intake-manifest.json.elements` and writes `reports/reverse-prompt-brief.md`, `reports/asset-routing-table.json`, `reports/asset-generation-prompts.json`, and `reports/asset-provenance.json`.
+
+`npm run prompt:compose` requires existing `reports/reverse-visual-spec.md`, then writes `reports/visual-elements.json`, `reports/first-pass-html-plan.md`, `reports/codex-first-pass-html-prompt.md`, and `reports/codex-prompt-compose-audit.json`. Use it to stabilize the Codex first-pass HTML prompt after visual intake and asset routing, before writing HTML/CSS.
 
 `npm run cutout:decompose` writes `reports/agent-cutout-request.json`, `reports/element-decomposition-plan.json`, `reports/mask-quality-report.json`, `reports/cutout-layer-package.json`, and `reports/agent-cutout-review.json`. Cutout decomposition is not a general provider client. It can consume Agent/model JSON, external masks, and external transparent PNG layers, and it auto-dispatches Mac-only person cutouts when Apple Vision is available.
 

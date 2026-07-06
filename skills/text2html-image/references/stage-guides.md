@@ -83,9 +83,9 @@ Asset index records should follow this shape:
 - Keep text as selectable HTML.
 - Use CSS/SVG for decorative details when possible.
 - Use bitmap images only for background, hero/product/character, and patch assets.
-- For reference-image recreation, start from `reports/reverse-prompt-brief.md` and `reports/asset-routing-table.json` so text, vectors, cutouts, regenerated imagery, locked base layers, and omitted details are separated before coding.
-- Use `npm run route:assets` to generate the initial routing table and ImageGen prompt-only package from an agent/human-supplied element list.
-- After visual intake and asset routing, run `npm run prompt:compose` and read `reports/codex-first-pass-html-prompt.md` before writing the first HTML/CSS pass.
+- For reference-image recreation, first produce `reverse_visual_prompt` through `npm run visual:intake` and require `reports/reverse-visual-spec.md` before coding. This broad prompt describes composition/layout, hierarchy, color, typography, material/assets, spatial relationships, editable DOM candidates, bitmap candidates, and unknowns, but it is not final OCR/business truth.
+- Use `npm run route:assets -- --project <project-id> --source-image <path> --from-intake` after visual intake passes. `route:assets --from-intake` generates the initial routing table and ImageGen prompt-only package from `visual-intake-manifest.json.elements`.
+- After `reports/reverse-visual-spec.md`, `reports/reverse-prompt-brief.md`, and `reports/asset-routing-table.json` exist, run `npm run prompt:compose` and read `reports/codex-first-pass-html-prompt.md` before writing the first HTML/CSS pass.
 - Keep independently adjustable complex art as separate `<img>` nodes with explicit CSS `left`, `top`, `width`, `height`, and `z-index`; record them in `reports/split-art-assets.json`.
 - Remove stale CSS/SVG/PIL geometric placeholders after PNG art replaces them, and report the clean state as `old_geometric_css=false`.
 - Run `npm run build -- --project <project-id> [--subproject <subproject-id>] [--copy-data <copy-data.json>]` to render selected copy rows through `templates/<template_id>/master.html`.
